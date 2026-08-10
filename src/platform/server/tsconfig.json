@@ -1,0 +1,16 @@
+{
+  // platform / server（規約 §10.1 / §10.3）。client を参照しない（§2.3 の server → client 禁止）。
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "../../../dist/platform/server",
+    "tsBuildInfoFile": "../../../dist/platform/server/.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"],
+  "references": [{ "path": "../shared" }]
+}

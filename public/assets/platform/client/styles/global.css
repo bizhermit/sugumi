@@ -1,0 +1,18 @@
+@layer reset, tokens, base, layout, utilities;
+
+/*
+ * グローバル CSS（規約 §5.3）。配信専用ディレクトリに置き、ソースツリー（src/）には置かない（§6.6 / §2.1）。
+ * 先頭行の @layer 宣言だけが本ファイルの確定要素である。宣言順で優先度が決まるため最初に固定する。
+ *
+ * - reset:     最小限のリセット
+ * - tokens:    :root の CSS Custom Properties（--sg-<category>-<name>。§11.4）
+ * - base:      素の HTML 要素の既定見た目（層1で装飾なしにならないために必須。§5.3）
+ * - layout:    ページ骨格
+ * - utilities: ごく少数（.visually-hidden 等。ユーティリティ CSS フレームワーク化はしない）
+ *
+ * コンポーネント CSS は @layer を使わず、public/assets/<エリア>/client/components/<name>.css に置く
+ * （分類 A のみ。§5.3 / §11.5。対応の欠落は §12.4-39 が双方向で検査する）。
+ * 分類 B（shadow なし・既定）は個別 CSS を持たず、base / layout レイヤに要素セレクタで書く。
+ *
+ * TODO(フェーズ3〜4): 各レイヤの中身。ダークテーマ等の全体切替は tokens の再定義だけで行う（§5.3）。
+ */

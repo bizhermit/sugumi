@@ -1,0 +1,17 @@
+-- DB スキーマの正本（規約 §3.4）。tsc の管理外・配信対象外であり、リポジトリ直下の db/ に置く。
+--
+-- 適用は src/hosts/<name>/main.ts の起動時に1度だけ、listen の前に行う（fail fast。§3.4）。
+-- 実行は node:sqlite の exec()（マイグレーション専用）であり、業務クエリは prepare() +
+-- パラメータバインドで行う（§3.4）。
+--
+-- 本ファイルを読むために <repo> を解決する方法は §6.5 の規定（new URL("../../../", import.meta.url)）に
+-- 従う。起動時アサートと同じ値を使い、ここで別の求め方をしない（§3.4）。
+--
+-- テーブルを追加するときの規約:
+--   1. CREATE TABLE IF NOT EXISTS で冪等にする（§3.4）
+--   2. 主キー列にも NOT NULL を必ず明記する（id TEXT PRIMARY KEY NOT NULL）。
+--      SQLite は INTEGER PRIMARY KEY 以外の PK 列に NULL の挿入を許すため（§3.4 実測）
+--   3. docs/spec/data.md のテーブル節・カラム表・インデックス一覧を同時に更新する
+--      （§12.4-46 / -47 / -48 が PRAGMA と完全一致で突合する。フェーズ2投入）
+--
+-- フェーズ1ではテーブルを1つも定義しない（0件で docs/spec/data.md と一致し、検査は緑である）。

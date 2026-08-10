@@ -1,0 +1,23 @@
+{
+  // services/admin / server（規約 §10.1 / §10.3）。client 系は参照しない（§2.3 の server → client 禁止）。
+  // packages は assetNamespaces に宣言したものだけを書く（§10.1 / §12.4-34(c)）。
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "../../../../dist/services/admin/server",
+    "tsBuildInfoFile": "../../../../dist/services/admin/server/.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"],
+  "references": [
+    { "path": "../../../platform/shared" },
+    { "path": "../../../platform/server" },
+    { "path": "../../../packages/user-profile/shared" },
+    { "path": "../../../packages/user-profile/server" },
+    { "path": "../shared" }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  // hosts/admin（規約 §10.1 / §10.3）。admin は packages/user-profile を使うため型解決に要る2本を参照する。
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "../../../dist/hosts/admin",
+    "tsBuildInfoFile": "../../../dist/hosts/admin/.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"],
+  "references": [
+    { "path": "../../platform/shared" },
+    { "path": "../../platform/server" },
+    { "path": "../../packages/user-profile/shared" },
+    { "path": "../../packages/user-profile/server" },
+    { "path": "../../services/admin/server" }
+  ]
+}

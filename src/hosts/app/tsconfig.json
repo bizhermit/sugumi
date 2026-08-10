@@ -1,0 +1,22 @@
+{
+  // hosts/app（規約 §10.1 / §10.3）。hosts にレイヤーは無く、server レイヤーと同じ lib / types を使う。
+  // outDir は dist/hosts/<h>（dist/hosts/server にすると .tsbuildinfo を共有して TS6377 が再発する。§10.3）。
+  // マウントしないサービスと client レイヤーは参照しない（§15.1 / §10.3）。
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "../../../dist/hosts/app",
+    "tsBuildInfoFile": "../../../dist/hosts/app/.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"],
+  "references": [
+    { "path": "../../platform/shared" },
+    { "path": "../../platform/server" },
+    { "path": "../../services/app/server" }
+  ]
+}

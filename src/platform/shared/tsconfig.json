@@ -1,0 +1,18 @@
+{
+  // platform / shared（規約 §10.1 / §10.3）。shared は何にも依存しない葉であり references は空。
+  // lib に dom を、types に node を入れない（§10.4）。isolatedDeclarations は shared のみ true（§10.6）。
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": [],
+    "isolatedDeclarations": true,
+    "rootDir": ".",
+    "outDir": "../../../dist/platform/shared",
+    "tsBuildInfoFile": "../../../dist/platform/shared/.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"],
+  "references": []
+}

@@ -1,0 +1,20 @@
+{
+  // packages/user-profile / server（規約 §10.1 / §10.3）。client 系は参照しない（§2.3 の server → client 禁止）。
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "../../../../dist/packages/user-profile/server",
+    "tsBuildInfoFile": "../../../../dist/packages/user-profile/server/.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"],
+  "references": [
+    { "path": "../../../platform/shared" },
+    { "path": "../../../platform/server" },
+    { "path": "../shared" }
+  ]
+}

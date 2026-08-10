@@ -1,0 +1,17 @@
+{
+  // services/app / shared（規約 §10.1 / §10.3）。shared は shared だけを参照する（§2.3）。
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": [],
+    "isolatedDeclarations": true,
+    "rootDir": ".",
+    "outDir": "../../../../dist/services/app/shared",
+    "tsBuildInfoFile": "../../../../dist/services/app/shared/.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"],
+  "references": [{ "path": "../../../platform/shared" }]
+}

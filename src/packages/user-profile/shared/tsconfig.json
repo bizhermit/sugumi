@@ -1,0 +1,17 @@
+{
+  // packages/user-profile / shared（規約 §10.1 / §10.3）。参照してよいのは platform の shared だけ。
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": [],
+    "isolatedDeclarations": true,
+    "rootDir": ".",
+    "outDir": "../../../../dist/packages/user-profile/shared",
+    "tsBuildInfoFile": "../../../../dist/packages/user-profile/shared/.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"],
+  "references": [{ "path": "../../../platform/shared" }]
+}

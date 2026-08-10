@@ -1,0 +1,23 @@
+{
+  // hosts/dev（規約 §10.1 / §10.3 / §15.1）。複数サービスをマウントする host は既存を書き換えず追加する。
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "../../../dist/hosts/dev",
+    "tsBuildInfoFile": "../../../dist/hosts/dev/.tsbuildinfo"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/*.test.ts"],
+  "references": [
+    { "path": "../../platform/shared" },
+    { "path": "../../platform/server" },
+    { "path": "../../packages/user-profile/shared" },
+    { "path": "../../packages/user-profile/server" },
+    { "path": "../../services/app/server" },
+    { "path": "../../services/admin/server" }
+  ]
+}
