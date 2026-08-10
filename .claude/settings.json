@@ -1,0 +1,14 @@
+{
+  "extraKnownMarketplaces": {
+    "hermit-works": {
+      "source": {
+        "source": "github",
+        "repo": "bizhermit/hermit-works"
+      },
+      "autoUpdate": true
+    }
+  },
+  "enabledPlugins": {
+    "hw@hermit-works": true
+  }
+}

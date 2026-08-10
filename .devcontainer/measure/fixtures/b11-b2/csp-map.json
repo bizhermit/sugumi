@@ -1,0 +1,6 @@
+{
+  "/a/": "default-src 'self'; script-src 'nonce-{nonce}' 'sha256-0DngR5skaGNG0Vk1ESOGKlkfsDLrmyqZRKkSg0iG9BY='; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+  "/b/": "default-src 'self'; script-src 'nonce-{nonce}' 'sha256-0DngR5skaGNG0Vk1ESOGKlkfsDLrmyqZRKkSg0iG9BY=' http://127.0.0.1:8299/assets/platform/shared/ http://127.0.0.1:8299/assets/platform/client/ http://127.0.0.1:8299/assets/packages/user-profile/shared/ http://127.0.0.1:8299/assets/packages/user-profile/client/ http://127.0.0.1:8299/assets/services/app/shared/ http://127.0.0.1:8299/assets/services/app/client/; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+  "/c/": "default-src 'self'; script-src 'nonce-{nonce}' 'sha256-0DngR5skaGNG0Vk1ESOGKlkfsDLrmyqZRKkSg0iG9BY=' 'strict-dynamic'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+  "/z/": "default-src 'self'; script-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+}
