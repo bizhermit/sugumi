@@ -1708,31 +1708,91 @@ describe("§12.4-52 resolveRepoRoot の呼び出し元許可リスト", () => {
 // §12.4-53: 追跡対象の公開物に、開発支援ディレクトリ配下のファイルへの名指し参照が無い
 // ============================================================================
 
+/**
+ * 走査から外すディレクトリ（リポジトリ直下からの相対パス）。**用途説明を必ず添える**（§12.4-3 の思想）。
+ * いずれも `.gitignore` によって追跡対象外＝公開物ではないため、走査する意味が無い。
+ */
+const NON_PUBLIC_DIRS: ReadonlyArray<readonly [path: string, why: string]> = [
+  [".git", "VCS の内部データ。公開物ではない"],
+  ["node_modules", "依存の実体。`.gitignore` で除外され追跡しない"],
+  ["dist", "ビルド成果物。`.gitignore` で除外され追跡しない"],
+  [".hw", "開発支援の作業記録そのもの。追跡せず、走査対象にもしない"],
+  [
+    ".devcontainer/measure/permission/deploy",
+    "実測ハーネスが生成する作業領域。`.devcontainer/.gitignore` で除外され追跡しない",
+  ],
+];
+
+/**
+ * 走査から外すファイル。**用途説明を必ず添える**。
+ * `.env` は**読み取り自体を避ける**（秘密情報であり、追跡対象でもない。§6.5）。
+ */
+const NON_PUBLIC_FILE_PATTERNS: ReadonlyArray<
+  readonly [re: RegExp, why: string]
+> = [
+  [
+    /(^|\/)\.env$/,
+    "秘密情報。`.gitignore` で除外され追跡しない（読み取り自体を避ける）",
+  ],
+  [/\.local$/, "ローカル設定。`.gitignore` で除外され追跡しない"],
+  [/\.db(-wal|-shm)?$/, "DB の実体。`.gitignore` で除外され追跡しない"],
+  [/\.tsbuildinfo$/, "ビルド中間物。`.gitignore` で除外され追跡しない"],
+];
+
+/**
+ * **公開物（追跡対象）とみなすファイルをリポジトリ全体から列挙する。**
+ *
+ * 走査対象を「ディレクトリの列挙」で持つと、**新しい公開ディレクトリが増えたときに検査から漏れる**。
+ * 実際に `.devcontainer/` が追跡対象になった際、列挙方式では対象外のままだった（2度目の再発）。
+ * そこで**既定を「全部走査」にし、外すものだけを理由つきで列挙する**（opt-out）。
+ * **走査し過ぎは誤検出として気づけるが、走査漏れは無言で見逃す**——安全な側に倒すための設計である。
+ */
+function listPublicFiles(): string[] {
+  const skipDirs = new Set(NON_PUBLIC_DIRS.map(([p]) => p));
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const abs = join(dir, e.name);
+      const rel = toPosix(relative(REPO_ROOT, abs));
+      if (e.isDirectory()) {
+        if (!skipDirs.has(rel)) walk(abs);
+        continue;
+      }
+      if (!NON_PUBLIC_FILE_PATTERNS.some(([re]) => re.test(rel))) out.push(abs);
+    }
+  };
+  walk(REPO_ROOT);
+  return out;
+}
+
 describe("§12.4-53 公開物からの非公開ディレクトリ参照の禁止", () => {
+  test("走査対象が空でなく、代表的な公開物を実際に含む（0件で緑にしない）", () => {
+    // §12.4 冒頭の 0 件アサートと同じ趣旨。走査が壊れても violations が空になり緑になるため、
+    // 「何を実際に見たか」を先に固定する。
+    const rels = new Set(
+      listPublicFiles().map((f) => toPosix(relative(REPO_ROOT, f))),
+    );
+    for (const must of [
+      "docs/conventions.md",
+      "tests/architecture.test.ts",
+      "README.md",
+      "CLAUDE.md",
+      ".devcontainer/devcontainer.json",
+      ".claude/settings.json",
+    ]) {
+      assert.ok(rels.has(must), `走査対象に ${must} が含まれていない`);
+    }
+    assert.ok(rels.size >= 50, `走査対象が少なすぎる（${rels.size} 件）`);
+  });
+
   test("追跡対象の公開物が、開発支援ディレクトリ配下のファイルを名指ししていない", () => {
     // 検出するのは「ディレクトリ名の直後にパス区切りとファイル名が続く形」だけである。
     // `.gitignore` の除外パターンとしてディレクトリ名だけを書いた記述（規約 §6.5 / §11.6）は
     // **参照ではなく除外設定そのもの**なので違反にしない。用途: `.gitignore` の必須項目を規定するため。
-    // これが唯一の除外であり、ファイル単位の除外リストは持たない（増える一方になるため。§12.4-3）。
     // 正規表現の綴りに `\` を挟んでいるのは、この検査が自分自身の実装に当たらないようにするため。
     const named = /\.hw\/[A-Za-z0-9_.-]/;
-
-    const rootAssets = existsSync(REPO_ROOT)
-      ? readdirSync(REPO_ROOT, { withFileTypes: true })
-          .filter((e) => e.isFile())
-          .map((e) => join(REPO_ROOT, e.name))
-      : [];
-    const targets = [
-      ...listFilesRecursive(DOCS_ROOT),
-      ...listFilesRecursive(SRC_ROOT),
-      ...listFilesRecursive(join(REPO_ROOT, "tests")),
-      ...listFilesRecursive(PUBLIC_ROOT),
-      ...listFilesRecursive(join(REPO_ROOT, "db")),
-      ...rootAssets,
-    ];
-
     const violations: string[] = [];
-    for (const f of targets) {
+    for (const f of listPublicFiles()) {
       if (named.test(readFileSync(f, "utf8"))) {
         violations.push(toPosix(relative(REPO_ROOT, f)));
       }
