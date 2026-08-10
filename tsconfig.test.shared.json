@@ -1,0 +1,21 @@
+{
+  // テストの型検査専用（規約 §10.1）。noEmit・非 composite。レイヤーごとに1本で、サービス数が増えても増えない。
+  // include はブレース展開を書かない（TS が解釈するのは * / ? / **/ の3つだけ。§10.1）。
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": ["node"],
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/platform/shared/**/*.ts",
+    "src/packages/*/shared/**/*.ts",
+    "src/services/*/shared/**/*.ts"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  // ソリューション（規約 §10.1）。files は空にし、実在する全プロジェクトを references で列挙する。
+  // 本ファイルだけが `src/` を明示して書く（§10.1 / §12.4-34）。
+  "files": [],
+  "references": [
+    { "path": "src/platform/shared" },
+    { "path": "src/platform/server" },
+    { "path": "src/platform/client" },
+    { "path": "src/packages/user-profile/shared" },
+    { "path": "src/packages/user-profile/server" },
+    { "path": "src/packages/user-profile/client" },
+    { "path": "src/services/app/shared" },
+    { "path": "src/services/app/server" },
+    { "path": "src/services/app/client" },
+    { "path": "src/services/admin/shared" },
+    { "path": "src/services/admin/server" },
+    { "path": "src/services/admin/client" },
+    { "path": "src/hosts/app" },
+    { "path": "src/hosts/admin" },
+    { "path": "src/hosts/dev" }
+  ]
+}

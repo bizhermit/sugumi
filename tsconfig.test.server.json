@@ -1,0 +1,23 @@
+{
+  // テストの型検査専用（規約 §10.1）。noEmit・非 composite。
+  // hosts と tests/ は dom を必要とせず node 型だけが要るため、本ファイルにまとめる（§10.1）。
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025"],
+    "types": ["node"],
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/platform/server/**/*.ts",
+    "src/packages/*/server/**/*.ts",
+    "src/services/*/server/**/*.ts",
+    "src/hosts/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}

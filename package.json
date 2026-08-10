@@ -1,0 +1,48 @@
+{
+  "name": "sugumi",
+  "version": "0.1.0",
+  "description": "Webプラットフォーム標準のみで動く、runtime 依存ゼロの汎用Webアプリテンプレート",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "exports": {
+    "./platform/*.js": {
+      "types": "./dist/platform/*.d.ts",
+      "development": "./src/platform/*.ts",
+      "default": "./dist/platform/*.js"
+    },
+    "./packages/*.js": {
+      "types": "./dist/packages/*.d.ts",
+      "development": "./src/packages/*.ts",
+      "default": "./dist/packages/*.js"
+    },
+    "./services/*.js": {
+      "types": "./dist/services/*.d.ts",
+      "development": "./src/services/*.ts",
+      "default": "./dist/services/*.js"
+    },
+    "./hosts/*.js": {
+      "types": "./dist/hosts/*.d.ts",
+      "development": "./src/hosts/*.ts",
+      "default": "./dist/hosts/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --build --force && tsc -p tsconfig.test.shared.json --noEmit && tsc -p tsconfig.test.server.json --noEmit && tsc -p tsconfig.test.client.json --noEmit",
+    "test": "tsc --build && node --conditions=development --test",
+    "format": "biome check --write .",
+    "format:check": "biome check .",
+    "start:app": "node --env-file=.env --permission --allow-net --allow-fs-read=./package.json --allow-fs-read=./dist/ --allow-fs-read=./public/ --allow-fs-read=./db/schema.sql --allow-fs-write=./data/ dist/hosts/app/main.js",
+    "start:admin": "node --env-file=.env --permission --allow-net --allow-fs-read=./package.json --allow-fs-read=./dist/ --allow-fs-read=./public/ --allow-fs-read=./db/schema.sql --allow-fs-write=./data/ dist/hosts/admin/main.js",
+    "start:dev": "node --env-file=.env --permission --allow-net --allow-fs-read=./package.json --allow-fs-read=./dist/ --allow-fs-read=./public/ --allow-fs-read=./db/schema.sql --allow-fs-write=./data/ dist/hosts/dev/main.js"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.7",
+    "@types/node": "26.2.0",
+    "typescript": "7.0.2"
+  }
+}

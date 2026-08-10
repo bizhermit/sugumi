@@ -1,0 +1,21 @@
+{
+  // テストの型検査専用（規約 §10.1）。noEmit・非 composite。
+  // client のテストだけが lib に dom を必要とするため、server 側と1本にまとめられない（§10.1 H4）。
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2025", "dom", "dom.iterable"],
+    "types": ["node"],
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/platform/client/**/*.ts",
+    "src/packages/*/client/**/*.ts",
+    "src/services/*/client/**/*.ts"
+  ]
+}
