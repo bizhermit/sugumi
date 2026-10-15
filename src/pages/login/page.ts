@@ -67,6 +67,8 @@ function loginForm(
   csrfToken: string,
   { status = 200, username = "", message }: FormState,
 ): Response {
+  // パスワード欄の spellcheck などは、_assets/index.ts で表示に切り替えたときに
+  // 入力がスペルチェックや予測変換に渡らないようにするため
   const html = layout({
     title: "ログイン",
     page: import.meta.url,
@@ -78,7 +80,7 @@ ${csrfInput(csrfToken)}
 <p><label>ユーザー名 <input name="username" autocomplete="username" required value="${
       escapeHtml(username)
     }"></label></p>
-<p><label>パスワード <input type="password" name="password" autocomplete="current-password" required></label></p>
+<p><label>パスワード <input type="password" name="password" autocomplete="current-password" required spellcheck="false" autocapitalize="off" autocorrect="off"></label></p>
 <p><button>ログイン</button></p>
 </form>`,
   });

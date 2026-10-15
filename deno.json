@@ -2,7 +2,7 @@
   "permissions": {
     "default": {
       "net": true,
-      "read": ["src", "dist", "data"],
+      "read": ["src", "dist/public", "data"],
       "write": ["data"],
       "env": [
         "PORT",
@@ -19,6 +19,9 @@
     },
     "check-imports": {
       "read": ["src", "scripts"]
+    },
+    "check-bundle": {
+      "read": ["dist/public"]
     },
     "account": {
       "read": ["src", "data"],
@@ -37,9 +40,10 @@
     "dev": "deno task build && (deno task gen --watch & deno task bundle --watch & deno run --watch=src/pages/,dist/public/ -P src/main.ts)",
     "gen": "deno run -P=gen scripts/gen-routes.ts",
     "start": "deno run -P src/main.ts",
-    "build": "rm -rf dist/public && deno task bundle",
+    "build": "rm -rf dist/public && deno task check:imports && deno task bundle && deno task check:bundle",
     "bundle": "deno bundle --platform browser --minify --sourcemap=external --code-splitting --outdir dist/public src/**/_assets/index.ts src/**/_assets/index.css",
     "check:imports": "deno run -P=check-imports scripts/check-imports.ts",
+    "check:bundle": "deno run -P=check-bundle scripts/check-bundle.ts",
     "account:add": "deno run -P=account scripts/add-account.ts"
   },
   "fmt": {

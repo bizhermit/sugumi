@@ -7,6 +7,8 @@ FROM denoland/deno:2.9.7@sha256:fa335acdf6b72106eda2cb6a8cb5f4187e7630e357467489
 WORKDIR /app
 COPY deno.json ./
 COPY src/ ./src/
+# build タスクがバンドルの前後で import とバンドルの中身を確かめる
+COPY scripts/ ./scripts/
 RUN deno task build && mkdir data
 
 # ---- runtime: サーバーを実行する ----

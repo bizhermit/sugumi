@@ -89,3 +89,7 @@ scripts/          deno task から実行するスクリプト
   - `_assets/` と `_shared/` からは相対パスだけを import できる（`node:` などは使えない）。
 - `_shared/` では Deno の API も DOM の API も使わない。
 - `_shared/` のコードはブラウザに配信される。秘密の値や、利用者に見せたくない判定は置かない。
+- `deno task build` は、バンドルの前に `check:imports` を、あとに `check:bundle` を実行する。
+  - `check:bundle` は、バンドルに `_assets/` と `_shared/` 以外のソースが入っていたら失敗する。
+  - `deno task dev` の監視中の再ビルドでは、どちらも実行されない。
+- `src/` にシンボリックリンクを置かない。

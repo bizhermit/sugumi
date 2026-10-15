@@ -6,16 +6,22 @@
  *   `_shared/` の中（共有）        ：`_shared/` だけを import できる
  *   それ以外（サーバー）            ：`_assets/` を import できない
  *
- * あわせて、src/_shared/ がないことを確かめる。ディレクトリをまたぐ共有の部品は src/lib/_shared/ に置く。
+ * あわせて、src/_shared/ とシンボリックリンクがないことを確かめる。
+ * ディレクトリをまたぐ共有の部品は src/lib/_shared/ に置く。
+ * シンボリックリンクは、リンクの置き場所とリンク先で取り決めの判定が食い違うため使わない。
  *
- * import の指定子は正規表現で拾うため、文字列やコメントの中の `from "..."` も import として扱う。
+ * import の指定子は正規表現で拾うため、文字列やコメントの中の `from "..."` も import として扱い、
+ * `from` と指定子の間にコメントを挟んだものは見逃す。
+ * 見逃しは deno task build のあとに check-bundle.ts が、実際にバンドルされたソースで検出する。
  */
 
 type Kind = "client" | "shared" | "server";
 
 const ROOT = new URL("../", import.meta.url);
 const ROOT_PATH = decodeURIComponent(ROOT.pathname);
-const SPECIFIER = /(?:\bfrom|\bimport)\s*\(?\s*["']([^"']+)["']/g;
+const SPECIFIER = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*(["'`])((?:(?!\1)[^\n])+)\1/g;
+const DYNAMIC_IMPORT = /\bimport\s*\(\s*(?!["'`])/g;
+const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 
 const violations: string[] = [];
 if (await exists(new URL("src/_shared/", ROOT))) {
@@ -34,13 +40,18 @@ if (violations.length > 0) {
 async function checkFile(file: URL): Promise<void> {
   const from = relative(file);
   const fromKind = kindOf(from);
-  const lines = (await Deno.readTextFile(file)).split("\n");
-  for (const [i, line] of lines.entries()) {
-    for (const [, specifier] of line.matchAll(SPECIFIER)) {
-      const reason = check(from, fromKind, specifier, file);
-      if (reason) {
-        violations.push(`${from}:${i + 1}: ${specifier} を import できません（${reason}）`);
-      }
+  const text = await Deno.readTextFile(file);
+  const lineOf = (index: number) => text.slice(0, index).split("\n").length;
+  for (const { 2: specifier, index } of text.matchAll(SPECIFIER)) {
+    const reason = check(from, fromKind, specifier, file);
+    if (reason) {
+      violations.push(`${from}:${lineOf(index)}: ${specifier} を import できません（${reason}）`);
+    }
+  }
+  // 読み込む先を変数で決めると、どこを読み込むかを確かめられない
+  if (fromKind !== "server") {
+    for (const { index } of text.matchAll(DYNAMIC_IMPORT)) {
+      violations.push(`${from}:${lineOf(index)}: import() には文字列を直接書いてください`);
     }
   }
 }
@@ -95,10 +106,13 @@ async function exists(url: URL): Promise<boolean> {
 
 async function* walk(dir: URL): AsyncGenerator<URL> {
   for await (const entry of Deno.readDir(dir)) {
-    if (entry.isDirectory) {
+    const url = new URL(encodeURIComponent(entry.name), dir);
+    if (entry.isSymlink) {
+      violations.push(`${relative(url)}: シンボリックリンクは使えません`);
+    } else if (entry.isDirectory) {
       yield* walk(new URL(`${encodeURIComponent(entry.name)}/`, dir));
-    } else if (entry.isFile && entry.name.endsWith(".ts")) {
-      yield new URL(encodeURIComponent(entry.name), dir);
+    } else if (entry.isFile && SOURCE_FILE.test(entry.name)) {
+      yield url;
     }
   }
 }

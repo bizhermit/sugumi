@@ -11,7 +11,7 @@
  */
 import { errorPage, methodNotAllowed } from "./error-page.ts";
 
-// deno.json の permissions と Dockerfile で、dist/ の読み取りを許可している
+// deno.json の permissions と Dockerfile で、dist/public/ の読み取りを許可している
 const PUBLIC_DIR = new URL("../../dist/public/", import.meta.url);
 const SRC_DIR = new URL("../", import.meta.url);
 
@@ -20,7 +20,6 @@ export const ASSETS_PREFIX = "/assets/";
 const CONTENT_TYPES: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
-  ".map": "application/json; charset=utf-8",
 };
 
 type Asset = { body: Uint8Array<ArrayBuffer>; contentType: string; hash: string };
@@ -78,6 +77,8 @@ async function loadAssets(): Promise<Map<string, Asset>> {
     throw new Error("dist/public/ がありません。deno task build を実行してください");
   }
   for await (const relative of walk(PUBLIC_DIR, "")) {
+    // ソースマップは check-bundle.ts の検査のために出力している。配信するとコメントを含むソースが公開される
+    if (relative.endsWith(".map")) continue;
     const body = await Deno.readFile(new URL(relative, PUBLIC_DIR));
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", body));
     const hash = Array.from(digest.slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("");

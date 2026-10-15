@@ -14,4 +14,5 @@ deno task build  # クライアントコードをバンドル
 deno task start  # サーバー起動（先に deno task build が必要）
 deno task account:add <ユーザー名> <表示名>  # アカウントを追加（パスワードは入力を求める）
 deno task check:imports  # サーバー・クライアント間の import の取り決めを確認
+deno task check:bundle   # バンドルにサーバーのコードが入っていないかを確認（build でも実行される）
 ```
