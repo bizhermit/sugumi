@@ -1,9 +1,15 @@
-/**
- * アプリ全体のリクエストハンドラ。
- * 今後はここでルーティングを行い、各モジュール（src/modules/*）へ処理を振り分ける。
- */
-export function handler(_req: Request): Response {
-  return new Response("hello world", {
-    headers: { "content-type": "text/plain; charset=utf-8" },
-  });
+import { errorPage } from "./error-page.ts";
+import { loadRoutes } from "./router.ts";
+
+const routes = await loadRoutes();
+
+export async function handler(req: Request): Promise<Response> {
+  const page = routes.get(new URL(req.url).pathname);
+  if (!page) return errorPage(404);
+  try {
+    return await page(req);
+  } catch (e) {
+    console.error(e);
+    return errorPage(500);
+  }
 }

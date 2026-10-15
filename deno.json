@@ -2,11 +2,12 @@
   "permissions": {
     "default": {
       "net": true,
+      "read": ["src/pages"],
       "env": ["PORT"]
     }
   },
   "tasks": {
-    "dev": "deno run --watch -P src/main.ts",
+    "dev": "deno run --watch=src/pages/ -P src/main.ts",
     "start": "deno run -P src/main.ts",
     "build": "deno bundle --platform browser --minify --sourcemap=external -o dist/public/main.js client/main.ts"
   },
