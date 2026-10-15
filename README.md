@@ -1,0 +1,16 @@
+# SUGUMI
+
+外部依存ゼロのWebアプリケーションテンプレート
+
+- Deno + TypeScript
+- フレームワーク・ライブラリを使わない
+- SSRを基本とし、JavaScriptは段階的な機能拡張を担う
+- モジュラーモノリス構成
+
+## 開発
+
+```sh
+deno task dev    # 開発サーバー（ファイル監視あり）
+deno task build  # クライアントコードをバンドル
+deno task start  # サーバー起動
+```
