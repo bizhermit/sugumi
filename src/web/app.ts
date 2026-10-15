@@ -2,7 +2,7 @@ import { csrfFor } from "./csrf.ts";
 import { errorPage } from "./error-page.ts";
 import { loadRouter } from "./router.ts";
 import { withSecurityHeaders } from "./security-headers.ts";
-import { clearSessionCookie, getSession, hasSessionCookie } from "./session.ts";
+import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";
 import { path, redirect } from "./url.ts";
 
 const match = await loadRouter();

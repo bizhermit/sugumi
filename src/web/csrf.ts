@@ -6,12 +6,12 @@
  * GET・HEAD・OPTIONS 以外のリクエストは、app.ts がページより先に verify() で検証する。
  * そのため GET などでは状態を変えないこと。
  */
-import { clearHostCookie, hostCookie, readCookie } from "./cookie.ts";
-import { randomToken, timingSafeEqual } from "./crypto.ts";
-import { secret } from "./db.ts";
-import { PRE_LOGIN_CSRF_TIMEOUT_MINUTES } from "./env.ts";
-import { escapeHtml } from "./html.ts";
-import type { Session } from "./session.ts";
+import { clearHostCookie, hostCookie, readCookie } from "../lib/cookie.ts";
+import { randomToken, timingSafeEqual } from "../lib/crypto.ts";
+import { secret } from "../lib/db.ts";
+import { PRE_LOGIN_CSRF_TIMEOUT_MINUTES } from "../lib/env.ts";
+import { escapeHtml } from "../lib/html.ts";
+import type { Session } from "../lib/auth/session.ts";
 
 const FIELD_NAME = "_csrf";
 const HEADER_NAME = "x-csrf-token";

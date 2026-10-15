@@ -1,11 +1,11 @@
-import { authenticate } from "../accounts.ts";
-import { audit } from "../audit.ts";
-import { clearPreLoginCookie, csrfInput } from "../csrf.ts";
-import { errorPage, methodNotAllowed } from "../error-page.ts";
-import { escapeHtml } from "../html.ts";
-import type { PageContext } from "../router.ts";
-import { createSession, destroySession, sessionCookie } from "../session.ts";
-import { path, redirect } from "../url.ts";
+import { authenticate } from "../lib/auth/accounts.ts";
+import { createSession, destroySession, sessionCookie } from "../lib/auth/session.ts";
+import { audit } from "../lib/audit.ts";
+import { clearPreLoginCookie, csrfInput } from "../web/csrf.ts";
+import { errorPage, methodNotAllowed } from "../web/error-page.ts";
+import { escapeHtml } from "../lib/html.ts";
+import type { PageContext } from "../web/router.ts";
+import { path, redirect } from "../web/url.ts";
 
 export default async function (req: Request, ctx: PageContext): Promise<Response> {
   if (req.method === "POST") return await login(req, ctx);

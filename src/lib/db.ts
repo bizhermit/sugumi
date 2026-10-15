@@ -7,7 +7,7 @@
 import { DatabaseSync } from "node:sqlite";
 
 // deno.json の permissions と Dockerfile で、data/ への読み書きを許可している
-const DATA_DIR = new URL("../data/", import.meta.url);
+const DATA_DIR = new URL("../../data/", import.meta.url);
 
 const MIGRATIONS = [
   `

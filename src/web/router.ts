@@ -15,7 +15,7 @@
  * `../` で pages 外に届かないよう、リクエストの内容をファイルパスや import の指定子に使わないこと。
  * `/%61dmin` も `/admin` と同じページに照合されるため、アクセス制御は生の pathname ではなく照合結果で判定すること。
  */
-import type { Session } from "./session.ts";
+import type { Session } from "../lib/auth/session.ts";
 
 export type PageContext = {
   params: Record<string, string>;
@@ -33,7 +33,7 @@ export type Segment = { literal: string } | { param: string };
 export type PageFile = { url: URL; relative: string; segments: Segment[] };
 type DynamicRoute = { segments: Segment[]; handler: PageHandler };
 
-const PAGES_DIR = new URL("./pages/", import.meta.url);
+const PAGES_DIR = new URL("../pages/", import.meta.url);
 
 /** ファイル名が不正な場合や、同じ URL に対応するページが複数ある場合は例外を投げる。 */
 export async function scanPages(): Promise<PageFile[]> {

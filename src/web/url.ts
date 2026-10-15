@@ -1,4 +1,4 @@
-import type { RoutePath } from "./routes.gen.ts";
+import type { RoutePath } from "../routes.gen.ts";
 
 type ParamNames<P extends string> = P extends `${string}[${infer Name}]${infer Rest}`
   ? Name | ParamNames<Rest>

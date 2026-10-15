@@ -1,10 +1,10 @@
 /**
  * ログイン中のセッション。ログインに成功したときだけ作るため、ログインしていない利用者が DB を増やすことはできない。
  */
-import { clearHostCookie, hostCookie, readCookie } from "./cookie.ts";
-import { randomToken } from "./crypto.ts";
-import { db } from "./db.ts";
-import { SESSION_ABSOLUTE_TIMEOUT_MINUTES, SESSION_IDLE_TIMEOUT_MINUTES } from "./env.ts";
+import { clearHostCookie, hostCookie, readCookie } from "../cookie.ts";
+import { randomToken } from "../crypto.ts";
+import { db } from "../db.ts";
+import { SESSION_ABSOLUTE_TIMEOUT_MINUTES, SESSION_IDLE_TIMEOUT_MINUTES } from "../env.ts";
 
 const COOKIE_NAME = "__Host-sid";
 const IDLE_TIMEOUT_MS = SESSION_IDLE_TIMEOUT_MINUTES * 60 * 1000;
