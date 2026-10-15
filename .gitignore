@@ -1,18 +1,37 @@
-# ビルド成果物（規約 §11.6 / §2.1）
-dist/
-*.tsbuildinfo
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.AppleDouble
+.LSOverride
 
-# 依存（npm ci で再現する。規約 §11.6）
-node_modules/
+# Editor
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/scripts/
+.idea/
+*.swp
+*.swo
+*~
 
-# 秘密情報・ローカル設定（規約 §6.5。.env.example は追跡対象）
+# log/tmp
+*.log
+*.tmp
+*.temp
+*.bak
+
+# env
 .env
-*.local
+.env.*
+!.env.example
 
-# SQLite（セッショントークンのハッシュとパスワードハッシュを含む。規約 §6.5 / §11.6）
-*.db
-*.db-wal
-*.db-shm
+# Claude
+.claude/settings.local.json
+CLAUDE.local.md
 
-# 開発支援の作業記録（公開物ではない。規約 §11.6。判断・実測は docs/decisions/ へ昇華する）
-.hw/
+# Python
+__pycache__/
