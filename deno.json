@@ -2,19 +2,26 @@
   "permissions": {
     "default": {
       "net": true,
-      "read": ["src"],
-      "env": ["PORT"]
+      "read": ["src", "data"],
+      "write": ["data"],
+      "env": ["PORT", "LOGIN_LOCKOUT_MINUTES", "LOGIN_MAX_FAILED_ATTEMPTS"]
     },
     "gen": {
       "read": ["src/pages", "src/routes.gen.ts"],
       "write": ["src/routes.gen.ts"]
+    },
+    "account": {
+      "read": ["src", "data"],
+      "write": ["data"],
+      "env": ["PORT", "LOGIN_LOCKOUT_MINUTES", "LOGIN_MAX_FAILED_ATTEMPTS"]
     }
   },
   "tasks": {
     "dev": "deno task gen --watch & deno run --watch=src/pages/ -P src/main.ts",
     "gen": "deno run -P=gen scripts/gen-routes.ts",
     "start": "deno run -P src/main.ts",
-    "build": "deno bundle --platform browser --minify --sourcemap=external -o dist/public/main.js client/main.ts"
+    "build": "deno bundle --platform browser --minify --sourcemap=external -o dist/public/main.js client/main.ts",
+    "account:add": "deno run -P=account scripts/add-account.ts"
   },
   "fmt": {
     "lineWidth": 100

@@ -15,7 +15,20 @@
  * `../` で pages 外に届かないよう、リクエストの内容をファイルパスや import の指定子に使わないこと。
  * `/%61dmin` も `/admin` と同じページに照合されるため、アクセス制御は生の pathname ではなく照合結果で判定すること。
  */
-export type PageContext = { params: Record<string, string> };
+import type { Session } from "./session.ts";
+
+export type PageContext = {
+  params: Record<string, string>;
+  /** ログインしていなければ undefined。 */
+  session: Session | undefined;
+  /** フォームに埋め込む CSRF トークン。 */
+  csrfToken: () => Promise<string>;
+  /**
+   * 接続元の IP アドレス。リバースプロキシの裏ではプロキシのアドレスになる。
+   * X-Forwarded-For は利用者が書き換えられるため使っていない。
+   */
+  remoteAddress: string | undefined;
+};
 export type PageHandler = (req: Request, ctx: PageContext) => Response | Promise<Response>;
 export type RouteMatch = { handler: PageHandler; params: Record<string, string> };
 
