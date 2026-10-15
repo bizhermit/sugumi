@@ -1,0 +1,19 @@
+/* layout() が全ページで読み込む。 */
+
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+body {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* prevent-double-submit.ts が送信中のフォームに付ける */
+form[aria-busy="true"] button {
+  cursor: progress;
+  opacity: 0.6;
+}

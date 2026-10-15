@@ -1,11 +1,12 @@
-import { authenticate } from "../lib/auth/accounts.ts";
-import { createSession, destroySession, sessionCookie } from "../lib/auth/session.ts";
-import { audit } from "../lib/audit.ts";
-import { clearPreLoginCookie, csrfInput } from "../web/csrf.ts";
-import { errorPage, methodNotAllowed } from "../web/error-page.ts";
-import { escapeHtml } from "../lib/html.ts";
-import type { PageContext } from "../web/router.ts";
-import { path, redirect } from "../web/url.ts";
+import { authenticate } from "../../lib/auth/accounts.ts";
+import { createSession, destroySession, sessionCookie } from "../../lib/auth/session.ts";
+import { audit } from "../../lib/audit.ts";
+import { clearPreLoginCookie, csrfInput } from "../../web/csrf.ts";
+import { errorPage, methodNotAllowed } from "../../web/error-page.ts";
+import { escapeHtml } from "../../lib/html.ts";
+import { layout } from "../../web/layout.ts";
+import type { PageContext } from "../../web/router.ts";
+import { path, redirect } from "../../web/url.ts";
 
 export default async function (req: Request, ctx: PageContext): Promise<Response> {
   if (req.method === "POST") return await login(req, ctx);
@@ -66,28 +67,21 @@ function loginForm(
   csrfToken: string,
   { status = 200, username = "", message }: FormState,
 ): Response {
-  const html = `<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ログイン</title>
-</head>
-<body>
-<h1>ログイン</h1>
+  const html = layout({
+    title: "ログイン",
+    page: import.meta.url,
+    body: `<h1>ログイン</h1>
 ${message ? `<p role="alert">${escapeHtml(message)}</p>\n` : ""}<form method="post" action="${
-    escapeHtml(path("/login"))
-  }">
+      escapeHtml(path("/login"))
+    }">
 ${csrfInput(csrfToken)}
 <p><label>ユーザー名 <input name="username" autocomplete="username" required value="${
-    escapeHtml(username)
-  }"></label></p>
+      escapeHtml(username)
+    }"></label></p>
 <p><label>パスワード <input type="password" name="password" autocomplete="current-password" required></label></p>
 <p><button>ログイン</button></p>
-</form>
-</body>
-</html>
-`;
+</form>`,
+  });
   return new Response(html, {
     status,
     headers: {

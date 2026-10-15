@@ -1,10 +1,11 @@
-import { audit } from "../lib/audit.ts";
-import { csrfInput } from "../web/csrf.ts";
-import { methodNotAllowed } from "../web/error-page.ts";
-import { escapeHtml } from "../lib/html.ts";
-import type { PageContext } from "../web/router.ts";
-import { clearSessionCookie, destroySession } from "../lib/auth/session.ts";
-import { path, redirect } from "../web/url.ts";
+import { audit } from "../../lib/audit.ts";
+import { csrfInput } from "../../web/csrf.ts";
+import { methodNotAllowed } from "../../web/error-page.ts";
+import { escapeHtml } from "../../lib/html.ts";
+import { layout } from "../../web/layout.ts";
+import type { PageContext } from "../../web/router.ts";
+import { clearSessionCookie, destroySession } from "../../lib/auth/session.ts";
+import { path, redirect } from "../../web/url.ts";
 
 export default async function (req: Request, ctx: PageContext): Promise<Response> {
   if (req.method === "POST") return await logout(ctx);
@@ -28,24 +29,16 @@ async function logout(ctx: PageContext): Promise<Response> {
 }
 
 async function confirmPage(ctx: PageContext): Promise<Response> {
-  const html = `<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ログアウト</title>
-</head>
-<body>
-<h1>ログアウト</h1>
+  const html = layout({
+    title: "ログアウト",
+    body: `<h1>ログアウト</h1>
 <p>ログアウトしますか？</p>
 <form method="post" action="${escapeHtml(path("/logout"))}">
 ${csrfInput(await ctx.csrfToken())}
 <button>ログアウト</button>
 </form>
-<p><a href="${escapeHtml(path("/home"))}">ホームに戻る</a></p>
-</body>
-</html>
-`;
+<p><a href="${escapeHtml(path("/home"))}">ホームに戻る</a></p>`,
+  });
   return new Response(html, {
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
   });

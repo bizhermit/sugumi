@@ -1,13 +1,14 @@
 /**
- * src/pages/ のファイルを URL に対応させる。各ページは default export でハンドラを公開する。
+ * src/pages/ のディレクトリを URL に対応させる。各ディレクトリの page.ts が default export でハンドラを公開する。
  *
- *   src/pages/index.ts      → /
- *   src/pages/foo/index.ts  → /foo
- *   src/pages/foo/bar.ts    → /foo/bar
- *   src/pages/user/[id].ts  → /user/123（ctx.params.id は "123"）
+ *   src/pages/page.ts            → /
+ *   src/pages/foo/page.ts        → /foo
+ *   src/pages/foo/bar/page.ts    → /foo/bar
+ *   src/pages/user/[id]/page.ts  → /user/123（ctx.params.id は "123"）
  *
- * `_` や `.` で始まるファイル・ディレクトリと、`.test.ts`・`.d.ts` はルートにしない。
- * ページ専用のヘルパーは `_` で始まる名前にして pages 内に置ける。
+ * page.ts 以外のファイルはルートにしないため、ページ専用の部品は同じディレクトリに置ける。
+ * `_` や `.` で始まるディレクトリは走査しない。ページの JS・CSS は `_assets/` に置く（assets.ts を参照）。
+ * `/assets/` は静的ファイルの配信に使うため、`pages/assets/` は作れない。
  *
  * 静的なルートを動的なルートより優先し、動的なルート同士では前の区切りが固定のものを優先する。
  * パラメータの値はデコード済みで、形式の検証は各ページで行う。`%2F` は区切りにせず値の一部として渡す。
@@ -35,12 +36,16 @@ type DynamicRoute = { segments: Segment[]; handler: PageHandler };
 
 const PAGES_DIR = new URL("../pages/", import.meta.url);
 
-/** ファイル名が不正な場合や、同じ URL に対応するページが複数ある場合は例外を投げる。 */
+/** ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合は例外を投げる。 */
 export async function scanPages(): Promise<PageFile[]> {
   const pages: PageFile[] = [];
   const sources = new Map<string, string>();
   for await (const { url, relative } of walk(PAGES_DIR, "")) {
     const segments = parseSegments(relative);
+    // /assets/ は assets.ts が静的ファイルの配信に使う
+    if (segments[0] && "literal" in segments[0] && segments[0].literal === "assets") {
+      throw new Error(`${relative}: assets はページの URL に使えません`);
+    }
     const key = JSON.stringify(segments.map((s) => "param" in s ? null : s.literal));
     const existing = sources.get(key);
     if (existing) throw new Error(`${relative}: ${existing} と同じ URL に対応しています`);
@@ -85,8 +90,7 @@ export async function loadRouter(): Promise<(pathname: string) => RouteMatch | u
 }
 
 function parseSegments(relative: string): Segment[] {
-  const names = relative.replace(/\.ts$/, "").split("/");
-  if (names.at(-1) === "index") names.pop();
+  const names = relative.split("/").slice(0, -1);
   const seen = new Set<string>();
   return names.map((name) => {
     if (!/[[\]]/.test(name)) return { literal: name };
@@ -134,15 +138,10 @@ function compareSpecificity(a: Segment[], b: Segment[]): number {
 
 async function* walk(dir: URL, prefix: string): AsyncGenerator<{ url: URL; relative: string }> {
   for await (const entry of Deno.readDir(dir)) {
-    if (/^[_.]/.test(entry.name)) continue;
-    if (entry.isDirectory) {
+    if (entry.isDirectory && !/^[_.]/.test(entry.name)) {
       yield* walk(new URL(`${encodeURIComponent(entry.name)}/`, dir), `${prefix}${entry.name}/`);
-    } else if (entry.isFile && isPageFile(entry.name)) {
-      yield { url: new URL(encodeURIComponent(entry.name), dir), relative: prefix + entry.name };
+    } else if (entry.isFile && entry.name === "page.ts") {
+      yield { url: new URL(entry.name, dir), relative: prefix + entry.name };
     }
   }
-}
-
-function isPageFile(name: string): boolean {
-  return name.endsWith(".ts") && !name.endsWith(".test.ts") && !name.endsWith(".d.ts");
 }
