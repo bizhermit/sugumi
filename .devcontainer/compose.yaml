@@ -16,8 +16,11 @@ services:
       - ..:/workspace:cached
       - claude-config:/home/dev/.claude
       - gh-config:/home/dev/.config/gh
+      # SQLite のデータベース。Rebuild しても残し、ホストのリポジトリには置かない
+      - app-data:/workspace/data
     command: sleep infinity
 
 volumes:
   claude-config:
   gh-config:
+  app-data:
