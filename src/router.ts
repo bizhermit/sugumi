@@ -23,10 +23,7 @@ export type PageContext = {
   session: Session | undefined;
   /** フォームに埋め込む CSRF トークン。 */
   csrfToken: () => Promise<string>;
-  /**
-   * 接続元の IP アドレス。リバースプロキシの裏ではプロキシのアドレスになる。
-   * X-Forwarded-For は利用者が書き換えられるため使っていない。
-   */
+  /** 接続元の IP アドレス。リバースプロキシの裏ではプロキシのアドレスになる。 */
   remoteAddress: string | undefined;
 };
 export type PageHandler = (req: Request, ctx: PageContext) => Response | Promise<Response>;

@@ -15,6 +15,7 @@ const VALID_HOST = /^(?:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*|\[[0-9A-Fa-f:.]+\])(?:
 const MAX_BODY_BYTES = 1024 * 1024;
 
 export async function handler(req: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
+  // X-Forwarded-For は利用者が書き換えられるため使わず、TCP の接続元を使う
   const addr = info?.remoteAddr;
   return withSecurityHeaders(
     await handle(req, addr && "hostname" in addr ? addr.hostname : undefined),

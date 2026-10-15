@@ -51,6 +51,7 @@ async function login(req: Request, ctx: PageContext): Promise<Response> {
       message: "ユーザー名またはパスワードが違うか、アカウントがロックされています。",
     });
   }
+  // ログイン前と同じトークンを使い続けるとセッション固定攻撃を受けるため、ログインのたびに作り直す
   if (ctx.session) await destroySession(ctx.session);
   audit("login_succeeded", { accountId: result.account.id, remoteAddress });
   const res = redirect(path("/home"), 303);

@@ -34,6 +34,7 @@ export type Csrf = {
   readonly stale: boolean;
   /** 照合先がなければログイン前の Cookie を発行し、applyCookie() でレスポンスに載せる。 */
   token(): Promise<string>;
+  /** トークンはフォームの `_csrf` か、fetch から送る場合は `X-CSRF-Token` ヘッダーで受け取る。 */
   verify(req: Request): Promise<boolean>;
   applyCookie(res: Response): Response;
 };
@@ -88,7 +89,6 @@ async function sign(binding: string): Promise<string> {
   return new Uint8Array(mac).toBase64({ alphabet: "base64url", omitPadding: true });
 }
 
-/** トークンはフォームの `_csrf` か、fetch から送る場合は `X-CSRF-Token` ヘッダーで受け取る。 */
 async function readFormToken(req: Request): Promise<string | undefined> {
   const type = req.headers.get("content-type") ?? "";
   if (!/^(?:application\/x-www-form-urlencoded|multipart\/form-data)\b/i.test(type)) {

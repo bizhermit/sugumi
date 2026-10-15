@@ -33,7 +33,6 @@ if (LOGIN_MAX_FAILED_ATTEMPTS === 0) {
   console.warn("LOGIN_MAX_FAILED_ATTEMPTS が 0 のため、ログインの試行回数を制限していません");
 }
 
-// アカウントがないときもパスワードの検証と同じだけ時間をかけ、応答時間からアカウントの有無を見分けられないようにする
 const DUMMY_HASH = await hashPassword(randomToken());
 
 /** 呼び出し側は、どの失敗かを利用者に区別して見せないこと。アカウントの有無やロックの状態が分かってしまう。 */
@@ -41,8 +40,11 @@ export async function authenticate(username: string, password: string): Promise<
   const row = db.prepare("SELECT * FROM accounts WHERE username = ?").get(username) as
     | AccountRow
     | undefined;
+  // 長い入力で重いハッシュを計算させ、CPU を使い切らせないため、上限を超えたら計算しない。
+  // アカウントの有無に関わらず計算しないため、応答時間の差は出ない
   const checkable = password.length <= PASSWORD_MAX_LENGTH;
   if (!row) {
+    // アカウントがあるときと同じだけ時間をかけ、応答時間からアカウントの有無を見分けられないようにする
     if (checkable) await verifyPassword(password, DUMMY_HASH);
     return { status: "unknown_user" };
   }
@@ -57,7 +59,7 @@ export async function authenticate(username: string, password: string): Promise<
 }
 
 /**
- * 検証の前に失敗として 1 回数え、ロック中なら undefined を返す。成功すると数え直す。
+ * 検証の前に失敗として 1 回数え、ロック中なら undefined を返す。
  * LOGIN_MAX_FAILED_ATTEMPTS が 0 なら数えず、それまでのロックも無視する。
  * 検証の後で数えると、検証中に並行して送られたリクエストが上限を超えて試せてしまうため。
  * 上限に達する回で先にロックするのは、検証中にプロセスが落ちてもロックが残るようにするため。

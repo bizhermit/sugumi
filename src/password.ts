@@ -12,7 +12,6 @@ const KEY_LENGTH = 32;
 const SALT_LENGTH = 16;
 
 export const PASSWORD_MIN_LENGTH = 8;
-/** 長い入力を重いハッシュにかけさせて CPU を使い切らせないため、これより長いものは検証しない。 */
 export const PASSWORD_MAX_LENGTH = 128;
 
 export async function hashPassword(password: string): Promise<string> {

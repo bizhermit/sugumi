@@ -46,10 +46,7 @@ export async function getSession(req: Request): Promise<Session | undefined> {
   return { id: token, accountId: row.account_id };
 }
 
-/**
- * 新しいトークンでセッションを作る。呼び出し側は sessionCookie() で Cookie を返すこと。
- * ログイン前と同じトークンを使い続けるとセッション固定攻撃を受けるため、ログインのたびに作る。
- */
+/** 呼び出し側は sessionCookie() で Cookie を返すこと。 */
 export async function createSession(accountId: number): Promise<Session> {
   const now = Date.now();
   if (now >= nextSweepAt) {
