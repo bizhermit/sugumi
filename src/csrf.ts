@@ -9,6 +9,7 @@
 import { clearHostCookie, hostCookie, readCookie } from "./cookie.ts";
 import { randomToken, timingSafeEqual } from "./crypto.ts";
 import { secret } from "./db.ts";
+import { PRE_LOGIN_CSRF_TIMEOUT_MINUTES } from "./env.ts";
 import { escapeHtml } from "./html.ts";
 import type { Session } from "./session.ts";
 
@@ -16,7 +17,7 @@ const FIELD_NAME = "_csrf";
 const HEADER_NAME = "x-csrf-token";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const PRE_LOGIN_COOKIE = "__Host-csrf";
-const PRE_LOGIN_TTL_MS = 60 * 60 * 1000;
+const PRE_LOGIN_TTL_MS = PRE_LOGIN_CSRF_TIMEOUT_MINUTES * 60 * 1000;
 
 // 鍵は DB に保存し、再起動の前に表示したフォームも送信できるようにしている。
 // トークンは照合先のセッション ID か Cookie の値も知らなければ作れないため、DB が漏れただけでは偽造できない。
@@ -79,7 +80,7 @@ export function csrfInput(token: string): string {
 
 function isFresh(value: string, now: number): boolean {
   const issuedAt = Number(value.match(/^(\d{1,16})\.[A-Za-z0-9_-]{43}$/)?.[1]);
-  return now - issuedAt >= 0 && now - issuedAt < PRE_LOGIN_TTL_MS;
+  return now - issuedAt >= 0 && (PRE_LOGIN_TTL_MS === 0 || now - issuedAt < PRE_LOGIN_TTL_MS);
 }
 
 async function sign(binding: string): Promise<string> {

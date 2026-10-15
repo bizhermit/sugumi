@@ -4,11 +4,11 @@
 import { clearHostCookie, hostCookie, readCookie } from "./cookie.ts";
 import { randomToken } from "./crypto.ts";
 import { db } from "./db.ts";
+import { SESSION_ABSOLUTE_TIMEOUT_MINUTES, SESSION_IDLE_TIMEOUT_MINUTES } from "./env.ts";
 
 const COOKIE_NAME = "__Host-sid";
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
-/** 操作を続けていても、ログインからこの時間が経てば切れる。 */
-const ABSOLUTE_TIMEOUT_MS = 12 * 60 * 60 * 1000;
+const IDLE_TIMEOUT_MS = SESSION_IDLE_TIMEOUT_MINUTES * 60 * 1000;
+const ABSOLUTE_TIMEOUT_MS = SESSION_ABSOLUTE_TIMEOUT_MINUTES * 60 * 1000;
 /** リクエストのたびに DB へ書き込まないよう、最終アクセス時刻はこの間隔より古くなったときだけ更新する。 */
 const TOUCH_INTERVAL_MS = 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 1000;
@@ -20,6 +20,12 @@ type SessionRow = { account_id: number; created_at: number; last_access_at: numb
 
 let nextSweepAt = 0;
 
+if (IDLE_TIMEOUT_MS === 0 && ABSOLUTE_TIMEOUT_MS === 0) {
+  console.warn(
+    "セッションのタイムアウトがどちらも 0 のため、ログアウトするまでセッションが切れません",
+  );
+}
+
 /** Cookie のセッションが存在し期限内なら返し、操作がない場合の期限を延ばす。 */
 export async function getSession(req: Request): Promise<Session | undefined> {
   const token = readCookie(req, COOKIE_NAME);
@@ -30,9 +36,7 @@ export async function getSession(req: Request): Promise<Session | undefined> {
     .get(hash) as SessionRow | undefined;
   if (!row) return undefined;
   const now = Date.now();
-  if (
-    now - row.last_access_at >= IDLE_TIMEOUT_MS || now - row.created_at >= ABSOLUTE_TIMEOUT_MS
-  ) {
+  if (isExpired(row, now)) {
     db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hash);
     return undefined;
   }
@@ -49,8 +53,10 @@ export async function getSession(req: Request): Promise<Session | undefined> {
 export async function createSession(accountId: number): Promise<Session> {
   const now = Date.now();
   if (now >= nextSweepAt) {
-    db.prepare("DELETE FROM sessions WHERE last_access_at <= ? OR created_at <= ?")
-      .run(now - IDLE_TIMEOUT_MS, now - ABSOLUTE_TIMEOUT_MS);
+    // isExpired() と同じ条件。タイムアウトが 0 の条件は使わない
+    db.prepare(
+      "DELETE FROM sessions WHERE (? > 0 AND last_access_at <= ?) OR (? > 0 AND created_at <= ?)",
+    ).run(IDLE_TIMEOUT_MS, now - IDLE_TIMEOUT_MS, ABSOLUTE_TIMEOUT_MS, now - ABSOLUTE_TIMEOUT_MS);
     nextSweepAt = now + SWEEP_INTERVAL_MS;
   }
   const token = randomToken();
@@ -75,6 +81,11 @@ export function sessionCookie(session: Session): string {
 
 export function clearSessionCookie(): string {
   return clearHostCookie(COOKIE_NAME);
+}
+
+function isExpired(row: SessionRow, now: number): boolean {
+  return (IDLE_TIMEOUT_MS > 0 && now - row.last_access_at >= IDLE_TIMEOUT_MS) ||
+    (ABSOLUTE_TIMEOUT_MS > 0 && now - row.created_at >= ABSOLUTE_TIMEOUT_MS);
 }
 
 /**

@@ -4,7 +4,14 @@
       "net": true,
       "read": ["src", "data"],
       "write": ["data"],
-      "env": ["PORT", "LOGIN_LOCKOUT_MINUTES", "LOGIN_MAX_FAILED_ATTEMPTS"]
+      "env": [
+        "PORT",
+        "LOGIN_LOCKOUT_MINUTES",
+        "LOGIN_MAX_FAILED_ATTEMPTS",
+        "SESSION_IDLE_TIMEOUT_MINUTES",
+        "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
+        "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
+      ]
     },
     "gen": {
       "read": ["src/pages", "src/routes.gen.ts"],
@@ -13,7 +20,14 @@
     "account": {
       "read": ["src", "data"],
       "write": ["data"],
-      "env": ["PORT", "LOGIN_LOCKOUT_MINUTES", "LOGIN_MAX_FAILED_ATTEMPTS"]
+      "env": [
+        "PORT",
+        "LOGIN_LOCKOUT_MINUTES",
+        "LOGIN_MAX_FAILED_ATTEMPTS",
+        "SESSION_IDLE_TIMEOUT_MINUTES",
+        "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
+        "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
+      ]
     }
   },
   "tasks": {

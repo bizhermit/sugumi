@@ -10,6 +10,15 @@ export const LOGIN_LOCKOUT_MINUTES = integer("LOGIN_LOCKOUT_MINUTES", 60, 1);
 /** ログインに続けてこの回数だけ失敗するとロックする。0 ならロックしない。 */
 export const LOGIN_MAX_FAILED_ATTEMPTS = integer("LOGIN_MAX_FAILED_ATTEMPTS", 5, 0);
 
+/** ログイン中に操作がないまま、この分数が経つとセッションが切れる。0 なら切れない。 */
+export const SESSION_IDLE_TIMEOUT_MINUTES = integer("SESSION_IDLE_TIMEOUT_MINUTES", 30, 0);
+
+/** 操作を続けていても、ログインからこの分数が経つとセッションが切れる。0 なら切れない。 */
+export const SESSION_ABSOLUTE_TIMEOUT_MINUTES = integer("SESSION_ABSOLUTE_TIMEOUT_MINUTES", 720, 0);
+
+/** ログイン前に表示したフォーム（ログイン画面など）の CSRF トークンが有効な分数。0 なら切れない。 */
+export const PRE_LOGIN_CSRF_TIMEOUT_MINUTES = integer("PRE_LOGIN_CSRF_TIMEOUT_MINUTES", 60, 0);
+
 function integer(name: string, fallback: number, min: number): number {
   const raw = Deno.env.get(name);
   if (raw === undefined || raw === "") return fallback;
