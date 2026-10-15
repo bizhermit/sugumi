@@ -2,12 +2,17 @@
   "permissions": {
     "default": {
       "net": true,
-      "read": ["src/pages"],
+      "read": ["src"],
       "env": ["PORT"]
+    },
+    "gen": {
+      "read": ["src/pages", "src/routes.gen.ts"],
+      "write": ["src/routes.gen.ts"]
     }
   },
   "tasks": {
-    "dev": "deno run --watch=src/pages/ -P src/main.ts",
+    "dev": "deno task gen --watch & deno run --watch=src/pages/ -P src/main.ts",
+    "gen": "deno run -P=gen scripts/gen-routes.ts",
     "start": "deno run -P src/main.ts",
     "build": "deno bundle --platform browser --minify --sourcemap=external -o dist/public/main.js client/main.ts"
   },
