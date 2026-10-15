@@ -7,7 +7,7 @@ FROM denoland/deno:2.9.7@sha256:fa335acdf6b72106eda2cb6a8cb5f4187e7630e357467489
 WORKDIR /app
 COPY deno.json ./
 COPY client/ ./client/
-RUN deno task build
+RUN deno task build && mkdir data
 
 # ---- runtime: サーバーを実行する ----
 # distroless はシェルやパッケージマネージャを含まないため、攻撃対象を小さくできる
@@ -17,6 +17,8 @@ WORKDIR /app
 COPY deno.json ./
 COPY src/ ./src/
 COPY --from=build /app/dist/ ./dist/
+# SQLite のデータベースを置く。コンテナを作り直しても消えないよう、/app/data にボリュームをマウントすること
+COPY --from=build --chown=65532:65532 /app/data/ ./data/
 
 # root で動かさない（65532 は distroless の nonroot ユーザー）
 USER 65532:65532

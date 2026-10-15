@@ -38,3 +38,6 @@ __pycache__/
 
 # Build
 /dist/
+
+# Data
+/data/

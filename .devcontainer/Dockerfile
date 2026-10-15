@@ -86,8 +86,8 @@ RUN userdel -r ubuntu \
     && groupadd -g "${GID}" dev \
     && useradd -m -s /bin/bash -u "${UID}" -g "${GID}" dev \
     # ボリュームのマウントポイント。dev 所有で作っておかないと初回マウント時に root 所有になる
-    && mkdir -p /home/dev/.claude /home/dev/.config/gh \
-    && chown -R "${UID}:${GID}" /home/dev
+    && mkdir -p /home/dev/.claude /home/dev/.config/gh /workspace/data \
+    && chown -R "${UID}:${GID}" /home/dev /workspace/data
 
 # sudo 権限は与えない。必要な場合のみ以下を有効にして Rebuild する
 # RUN echo 'dev ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/dev \

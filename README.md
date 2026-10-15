@@ -13,4 +13,5 @@
 deno task dev    # 開発サーバー（ファイル監視あり）
 deno task build  # クライアントコードをバンドル
 deno task start  # サーバー起動
+deno task account:add <ユーザー名> <表示名>  # アカウントを追加（パスワードは入力を求める）
 ```

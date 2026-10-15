@@ -16,3 +16,9 @@ export function errorPage(status: number): Response {
     headers: { "content-type": "text/html; charset=utf-8" },
   });
 }
+
+export function methodNotAllowed(allow: string[]): Response {
+  const res = errorPage(405);
+  res.headers.set("allow", allow.join(", "));
+  return res;
+}
