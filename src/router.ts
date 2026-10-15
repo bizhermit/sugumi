@@ -7,9 +7,10 @@
  *   src/pages/user/[id].ts  → /user/123（ctx.params.id は "123"）
  *
  * 静的なルートを動的なルートより優先し、動的なルート同士では前の区切りが固定のものを優先する。
- * パラメータの値はデコード済みで、形式の検証は各ページで行う。
+ * パラメータの値はデコード済みで、形式の検証は各ページで行う。`%2F` は区切りにせず値の一部として渡す。
  *
  * `../` で pages 外に届かないよう、リクエストの内容をファイルパスや import の指定子に使わないこと。
+ * `/%61dmin` も `/admin` と同じページに照合されるため、アクセス制御は生の pathname ではなく照合結果で判定すること。
  */
 export type PageContext = { params: Record<string, string> };
 export type PageHandler = (req: Request, ctx: PageContext) => Response | Promise<Response>;
@@ -72,14 +73,16 @@ function parseSegments(relative: string): Segment[] {
   });
 }
 
-/** 不正なパーセントエンコーディングを含む場合は undefined を返す。 */
+/** 不正なパーセントエンコーディングや、デコード後に制御文字を含む場合は undefined を返す。 */
 function splitPath(pathname: string): string[] | undefined {
   if (pathname === "/") return [];
+  let parts: string[];
   try {
-    return pathname.slice(1).split("/").map(decodeURIComponent);
+    parts = pathname.slice(1).split("/").map(decodeURIComponent);
   } catch {
     return undefined;
   }
+  return parts.some((part) => /\p{Cc}/u.test(part)) ? undefined : parts;
 }
 
 function matchSegments(segments: Segment[], parts: string[]): Record<string, string> | undefined {
