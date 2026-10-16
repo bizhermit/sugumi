@@ -1,6 +1,6 @@
-import { randomToken } from "./crypto.ts";
-import { db } from "./db.ts";
-import { LOGIN_LOCKOUT_MINUTES, LOGIN_MAX_FAILED_ATTEMPTS } from "./env.ts";
+import { randomToken } from "../crypto.ts";
+import { db } from "../db.ts";
+import { LOGIN_LOCKOUT_MINUTES, LOGIN_MAX_FAILED_ATTEMPTS } from "../env.ts";
 import {
   hashPassword,
   PASSWORD_MAX_LENGTH,

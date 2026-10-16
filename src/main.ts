@@ -1,4 +1,4 @@
-import { handler } from "./app.ts";
-import { PORT } from "./env.ts";
+import { handler } from "./web/app.ts";
+import { PORT } from "./lib/env.ts";
 
 Deno.serve({ port: PORT }, handler);

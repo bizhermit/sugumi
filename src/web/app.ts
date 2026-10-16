@@ -1,8 +1,9 @@
+import { ASSETS_PREFIX, serveAsset } from "./assets.ts";
 import { csrfFor } from "./csrf.ts";
 import { errorPage } from "./error-page.ts";
 import { loadRouter } from "./router.ts";
 import { withSecurityHeaders } from "./security-headers.ts";
-import { clearSessionCookie, getSession, hasSessionCookie } from "./session.ts";
+import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";
 import { path, redirect } from "./url.ts";
 
 const match = await loadRouter();
@@ -32,6 +33,8 @@ async function handle(req: Request, remoteAddress: string | undefined): Promise<
     return errorPage(400);
   }
   if (url.hash !== "") return errorPage(400);
+  // 静的ファイルはログインの有無で内容が変わらないため、セッションや CSRF を確かめない
+  if (url.pathname.startsWith(ASSETS_PREFIX)) return serveAsset(req, url);
 
   const route = match(url.pathname);
   if (!route) return errorPage(404);

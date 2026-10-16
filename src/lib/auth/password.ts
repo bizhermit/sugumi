@@ -3,7 +3,7 @@
  * パラメータも一緒に保存しているため、PARAMS を強くしても既存のハッシュはそのまま検証できる。
  */
 import { scrypt } from "node:crypto";
-import { timingSafeEqual } from "./crypto.ts";
+import { timingSafeEqual } from "../crypto.ts";
 
 // OWASP が同等の強さとして挙げる組み合わせのうち、1 回のメモリが 32 MiB で済むもの。
 // ログインが同時に来るとその分だけメモリを使うため、メモリの少ない組み合わせにしている

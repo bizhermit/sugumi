@@ -3,7 +3,7 @@
  *
  *   deno task account:add <ユーザー名> <表示名>
  */
-import { createAccount } from "../src/accounts.ts";
+import { createAccount } from "../src/lib/auth/accounts.ts";
 
 const [username, displayName] = Deno.args;
 if (username === undefined || displayName === undefined) {

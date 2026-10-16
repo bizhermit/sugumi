@@ -1,0 +1,4 @@
+/* index.ts が追加するボタン */
+form label + button[aria-pressed] {
+  margin-inline-start: 0.5rem;
+}

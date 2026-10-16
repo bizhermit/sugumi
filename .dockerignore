@@ -2,4 +2,4 @@
 *
 !deno.json
 !src/
-!client/
+!scripts/
