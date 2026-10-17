@@ -43,7 +43,7 @@ scripts/          deno task から実行するスクリプト
     - HTML の組み立ては `view.ts`。メソッドごとに分けるなら `view.post.ts` のようにする。
 - 共通の部品は、必要になったときに作る。置き場所は使う範囲で決める。
   - 同じディレクトリ配下の画面だけで使うもの：そのディレクトリに置く。
-    - メソッドのファイルと `before.ts`・`before.tree.ts` 以外のファイルはルートにならない。
+    - メソッドのファイルと `before`・`layout` のファイル以外はルートにならない。
   - ディレクトリをまたいで使うもの：`lib/` に置く。
   - サーバーとクライアントの両方で使うもの：使う範囲の `_shared/` に置く（後述）。
     - ディレクトリをまたいで使うものは `lib/_shared/` に置く。
@@ -83,6 +83,16 @@ scripts/          deno task から実行するスクリプト
   - `_assets/` を新しく作ったら `deno task dev` を起動し直す。エントリーは起動時に決まるため。
 - ページの HTML は `src/web/html-document.ts` の `htmlDocument()` で組み立てる。
   - `page` には、ページのディレクトリにあるファイル（`view.ts` など）の `import.meta.url` を渡す。
+  - 本文は `slots.main` に渡す。layout が使う差し込み位置があれば、`slots` にほかのキーで渡す。
+  - `layout.tree.ts`・`layout.ts` が、ページの HTML を外側から包む。
+    - 適用する範囲と順番は `before.tree.ts`・`before.ts` と同じ。
+    - default export は `Layout`（`title` と `render`）。
+    - `render` は `slots` を受け取り、差し込んだ HTML を返す。
+    - 内側の layout が返した HTML は、外側の layout の `main` になる。
+    - layout を外すページは、`htmlDocument()` に `layout: false` を渡す。
+  - `title` は、layout・ページのどちらも任意で、文字列か `(外側のタイトル) => 文字列` を渡す。
+    - 外側の layout から順に決め、最後にページの `title` を適用する。
+    - タイトルが決まらないときと、外側のタイトルがないのに関数を渡したときは例外になる。
   - 全ページ共通の `src/web/_assets/` と、そのページの `_assets/` のエントリーが読み込まれる。
   - CSS を JS より先に、共通のものをページのものより先に読み込む。
 - 静的ファイルの URL は `src/web/assets.ts` の `asset()`・`assetsOf()` で作る。

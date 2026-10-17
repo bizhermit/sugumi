@@ -13,6 +13,8 @@
  * before.tree.ts は before.ts と同じ形で、置いたディレクトリとその配下のすべてのルートに適用する。
  * ルートでないディレクトリにも置ける。routes/ に近いものから順に呼び、最後に before.ts を呼ぶ。
  * 405 を返すときは、どの before も呼ばない。
+ * layout.ts・layout.tree.ts は、html-document.ts の htmlDocument() がページの HTML を包むのに使う。
+ * 適用する範囲と順番は before.ts・before.tree.ts と同じで、layout.ts だけがあるディレクトリも例外になる。
  *
  * これら以外のファイルはルートにしないため、ページ専用の部品は同じディレクトリに置ける。
  * `_` や `.` で始まるディレクトリは走査しない。ページの JS・CSS は `_assets/` に置く（assets.ts を参照）。
@@ -25,6 +27,7 @@
  * `/%61dmin` も `/admin` と同じページに照合されるため、アクセス制御は生の pathname ではなく照合結果で判定すること。
  */
 import type { Session } from "../lib/auth/session.ts";
+import type { Layout } from "./html-document.ts";
 
 export type RouteContext = {
   params: Record<string, string>;
@@ -51,13 +54,15 @@ export type RouteMatch = {
 export type Segment = { literal: string } | { param: string };
 /**
  * relative は src/routes/ からのディレクトリの相対パス（例："foo/"、ルートは ""）。
- * methods はメソッドのファイル名。befores は呼ぶ順に並べた before のファイルの、src/routes/ からの相対パス。
+ * methods はメソッドのファイル名。befores・layouts は、適用する before・layout のファイルの src/routes/ からの
+ * 相対パスを、外側（src/routes/ に近いもの）から順に並べたもの。
  */
 export type RouteDir = {
   relative: string;
   segments: Segment[];
   methods: string[];
   befores: string[];
+  layouts: string[];
 };
 type Route = { methods: Map<string, RouteHandler>; allow: string[] };
 type DynamicRoute = { segments: Segment[]; route: Route };
@@ -73,18 +78,21 @@ const METHOD_FILES: Record<string, string> = {
 };
 const BEFORE_FILE = "before.ts";
 const TREE_BEFORE_FILE = "before.tree.ts";
+const LAYOUT_FILE = "layout.ts";
+const TREE_LAYOUT_FILE = "layout.tree.ts";
 
-/** ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合は例外を投げる。 */
+// キーはディレクトリのデコード済みの pathname。loadRouter で設定する
+const layoutChains = new Map<string, Layout[]>();
+
+/**
+ * ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合、
+ * before.ts・layout.ts があるのにメソッドのファイルがない場合は例外を投げる。
+ */
 export async function scanRoutes(): Promise<RouteDir[]> {
   const routes: RouteDir[] = [];
   const sources = new Map<string, string>();
-  for await (const dir of walk(ROUTES_DIR, "", [])) {
+  for await (const dir of walk(ROUTES_DIR, "", { befores: [], layouts: [] })) {
     const { relative } = dir;
-    if (dir.methods.length === 0) {
-      throw new Error(
-        `routes/${relative}${BEFORE_FILE}: 同じディレクトリにメソッドのファイルがありません`,
-      );
-    }
     const segments = parseSegments(relative);
     // /assets/ は assets.ts が静的ファイルの配信に使う
     if (segments[0] && "literal" in segments[0] && segments[0].literal === "assets") {
@@ -101,14 +109,19 @@ export async function scanRoutes(): Promise<RouteDir[]> {
   return routes;
 }
 
-/** scanRoutes の例外に加え、ルートのファイルの default export が関数でない場合も例外を投げる。 */
+/**
+ * scanRoutes の例外に加え、ルートのファイルの default export が関数でない場合や、
+ * layout のファイルの default export が Layout の形でない場合も例外を投げる。
+ */
 export async function loadRouter(): Promise<
   (pathname: string, method: string) => RouteMatch | undefined
 > {
   const statics = new Map<string, Route>();
   const dynamics: DynamicRoute[] = [];
+  layoutChains.clear();
   for (const dir of await scanRoutes()) {
     const route = await loadRoute(dir);
+    layoutChains.set(decodeURIComponent(urlOf(dir.relative).pathname), await loadLayouts(dir));
     if (dir.segments.some((s) => "param" in s)) {
       dynamics.push({ segments: dir.segments, route });
     } else {
@@ -139,11 +152,39 @@ export async function loadRouter(): Promise<
   };
 }
 
+/**
+ * moduleUrl のディレクトリに適用する layout を、外側から順に返す。moduleUrl には呼び出し側の import.meta.url を渡す。
+ * ルートのディレクトリでない場合や、loadRouter の前に呼んだ場合は例外を投げる。
+ */
+export function layoutsOf(moduleUrl: string): Layout[] {
+  const layouts = layoutChains.get(decodeURIComponent(new URL(".", moduleUrl).pathname));
+  if (!layouts) throw new Error(`${moduleUrl} はルートのディレクトリにありません`);
+  return layouts;
+}
+
+function urlOf(relative: string): URL {
+  return new URL(relative.split("/").map(encodeURIComponent).join("/"), ROUTES_DIR);
+}
+
+async function loadLayouts(dir: RouteDir): Promise<Layout[]> {
+  const layouts: Layout[] = [];
+  for (const relative of dir.layouts) {
+    const layout = (await import(urlOf(relative).href)).default;
+    const title = layout?.title;
+    if (
+      typeof layout?.render !== "function" ||
+      !(title === undefined || typeof title === "string" || typeof title === "function")
+    ) {
+      throw new Error(`routes/${relative}: default export が Layout の形になっていません`);
+    }
+    layouts.push(layout);
+  }
+  return layouts;
+}
+
 async function loadRoute(dir: RouteDir): Promise<Route> {
   const load = async (relative: string) => {
-    const mod = await import(
-      new URL(relative.split("/").map(encodeURIComponent).join("/"), ROUTES_DIR).href
-    );
+    const mod = await import(urlOf(relative).href);
     if (typeof mod.default !== "function") {
       throw new Error(`routes/${relative}: default export にハンドラがありません`);
     }
@@ -219,32 +260,43 @@ function compareSpecificity(a: Segment[], b: Segment[]): number {
 }
 
 /**
- * メソッドのファイルか before.ts があるディレクトリを返す。
- * treeBefores は、上のディレクトリにある before.tree.ts の相対パスを routes/ に近い順に並べたもの。
+ * メソッドのファイルがあるディレクトリを返す。
+ * inherited は、上のディレクトリにある before.tree.ts・layout.tree.ts の相対パスを routes/ に近い順に並べたもの。
  */
 async function* walk(
   dir: URL,
   relative: string,
-  treeBefores: string[],
-): AsyncGenerator<{ relative: string; methods: string[]; befores: string[] }> {
+  inherited: { befores: string[]; layouts: string[] },
+): AsyncGenerator<{ relative: string; methods: string[]; befores: string[]; layouts: string[] }> {
   const files: string[] = [];
   const subdirs: string[] = [];
   for await (const entry of Deno.readDir(dir)) {
     if (entry.isDirectory && !/^[_.]/.test(entry.name)) subdirs.push(entry.name);
     else if (entry.isFile) files.push(entry.name);
   }
-  const befores = files.includes(TREE_BEFORE_FILE)
-    ? [...treeBefores, relative + TREE_BEFORE_FILE]
-    : treeBefores;
+  const append = (chain: string[], name: string) =>
+    files.includes(name) ? [...chain, relative + name] : chain;
+  const tree = {
+    befores: append(inherited.befores, TREE_BEFORE_FILE),
+    layouts: append(inherited.layouts, TREE_LAYOUT_FILE),
+  };
   const methods = files.filter((name) => Object.hasOwn(METHOD_FILES, name)).sort();
-  if (methods.length > 0 || files.includes(BEFORE_FILE)) {
+  if (methods.length > 0) {
     yield {
       relative,
       methods,
-      befores: files.includes(BEFORE_FILE) ? [...befores, relative + BEFORE_FILE] : befores,
+      befores: append(tree.befores, BEFORE_FILE),
+      layouts: append(tree.layouts, LAYOUT_FILE),
     };
+  } else {
+    const orphan = [BEFORE_FILE, LAYOUT_FILE].find((name) => files.includes(name));
+    if (orphan) {
+      throw new Error(
+        `routes/${relative}${orphan}: 同じディレクトリにメソッドのファイルがありません`,
+      );
+    }
   }
   for (const name of subdirs) {
-    yield* walk(new URL(`${encodeURIComponent(name)}/`, dir), `${relative}${name}/`, befores);
+    yield* walk(new URL(`${encodeURIComponent(name)}/`, dir), `${relative}${name}/`, tree);
   }
 }

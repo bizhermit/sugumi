@@ -12,15 +12,18 @@ export default async function (_req: Request, ctx: RouteContext): Promise<Respon
 }
 
 async function confirmPage(ctx: RouteContext): Promise<Response> {
-  const html = htmlDocument({
+  const html = await htmlDocument(ctx, {
     title: "ログアウト",
-    body: `<h1>ログアウト</h1>
+    page: import.meta.url,
+    slots: {
+      main: `<h1>ログアウト</h1>
 <p>ログアウトしますか？</p>
 <form method="post" action="${escapeHtml(path("/logout"))}">
 ${csrfInput(await ctx.csrfToken())}
 <button>ログアウト</button>
 </form>
 <p><a href="${escapeHtml(path("/home"))}">ホームに戻る</a></p>`,
+    },
   });
   return new Response(html, {
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },

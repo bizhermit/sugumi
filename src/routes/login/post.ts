@@ -33,7 +33,7 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
       audit("account_locked", { accountId, remoteAddress });
     }
     // どの失敗かを区別して見せると、アカウントの有無やロックの状態が分かってしまう
-    return loginForm(await ctx.csrfToken(), {
+    return await loginForm(ctx, {
       status: 401,
       username,
       message: "ユーザー名またはパスワードが違うか、アカウントがロックされています。",
