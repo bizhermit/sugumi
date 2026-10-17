@@ -13,8 +13,10 @@
  * before.tree.ts は before.ts と同じ形で、置いたディレクトリとその配下のすべてのルートに適用する。
  * ルートでないディレクトリにも置ける。routes/ に近いものから順に呼び、最後に before.ts を呼ぶ。
  * 405 を返すときは、どの before も呼ばない。
- * layout.ts・layout.tree.ts は、html-document.ts の htmlDocument() がページの HTML を包むのに使う。
+ * layout.ts・layout.tree.ts は、html-document.tsx の htmlDocument() がページの HTML を包むのに使う。
  * 適用する範囲と順番は before.ts・before.tree.ts と同じで、layout.ts だけがあるディレクトリも例外になる。
+ *
+ * これらのファイルの拡張子は .ts か .tsx（JSX を書くとき）で、同じ名前で両方を置くと例外になる。
  *
  * これら以外のファイルはルートにしないため、ページ専用の部品は同じディレクトリに置ける。
  * `_` や `.` で始まるディレクトリは走査しない。ページの JS・CSS は `_assets/` に置く（assets.ts を参照）。
@@ -28,7 +30,7 @@
  */
 import type { Session } from "../lib/auth/session.ts";
 import type { RoutePath } from "../routes.gen.ts";
-import type { Layout } from "./html-document.ts";
+import type { Layout } from "./html-document.tsx";
 
 export type RouteContext = {
   /**
@@ -76,24 +78,27 @@ type DynamicRoute = { segments: Segment[]; route: Route };
 
 const ROUTES_DIR = new URL("../routes/", import.meta.url);
 
+// キーは拡張子を除いたファイル名
 const METHOD_FILES: Record<string, string> = {
-  "get.ts": "GET",
-  "post.ts": "POST",
-  "put.ts": "PUT",
-  "patch.ts": "PATCH",
-  "delete.ts": "DELETE",
+  get: "GET",
+  post: "POST",
+  put: "PUT",
+  patch: "PATCH",
+  delete: "DELETE",
 };
-const BEFORE_FILE = "before.ts";
-const TREE_BEFORE_FILE = "before.tree.ts";
-const LAYOUT_FILE = "layout.ts";
-const TREE_LAYOUT_FILE = "layout.tree.ts";
+const BEFORE_FILE = "before";
+const TREE_BEFORE_FILE = "before.tree";
+const LAYOUT_FILE = "layout";
+const TREE_LAYOUT_FILE = "layout.tree";
+const EXTENSIONS = [".ts", ".tsx"];
 
 // キーはディレクトリのデコード済みの pathname。loadRouter で設定する
 const layoutChains = new Map<string, Layout[]>();
 
 /**
  * ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合、
- * before.ts・layout.ts があるのにメソッドのファイルがない場合、シンボリックリンクがある場合は例外を投げる。
+ * before.ts・layout.ts があるのにメソッドのファイルがない場合、同じ名前の .ts と .tsx がある場合、
+ * シンボリックリンクがある場合は例外を投げる。
  */
 export async function scanRoutes(): Promise<RouteDir[]> {
   const routes: RouteDir[] = [];
@@ -204,7 +209,7 @@ async function loadRoute(dir: RouteDir): Promise<Route> {
   for (const name of dir.methods) {
     const handler: RouteHandler = await load(dir.relative + name);
     methods.set(
-      METHOD_FILES[name],
+      METHOD_FILES[name.slice(0, name.lastIndexOf("."))],
       befores.length === 0 ? handler : async (req, ctx) => {
         for (const before of befores) {
           const res = await before(req, ctx);
@@ -293,13 +298,22 @@ async function* walk(
     if (entry.isDirectory && !/^[_.]/.test(entry.name)) subdirs.push(entry.name);
     else if (entry.isFile) files.push(entry.name);
   }
-  const append = (chain: string[], name: string) =>
-    files.includes(name) ? [...chain, relative + name] : chain;
+  const find = (base: string): string | undefined => {
+    const found = EXTENSIONS.map((ext) => base + ext).filter((name) => files.includes(name));
+    if (found.length > 1) {
+      throw new Error(`routes/${relative}${base}: ${found.join(" と ")} の両方があります`);
+    }
+    return found[0];
+  };
+  const append = (chain: string[], base: string) => {
+    const name = find(base);
+    return name ? [...chain, relative + name] : chain;
+  };
   const tree = {
     befores: append(inherited.befores, TREE_BEFORE_FILE),
     layouts: append(inherited.layouts, TREE_LAYOUT_FILE),
   };
-  const methods = files.filter((name) => Object.hasOwn(METHOD_FILES, name)).sort();
+  const methods = Object.keys(METHOD_FILES).flatMap((base) => find(base) ?? []).sort();
   if (methods.length > 0) {
     yield {
       relative,
@@ -308,7 +322,7 @@ async function* walk(
       layouts: append(tree.layouts, LAYOUT_FILE),
     };
   } else {
-    const orphan = [BEFORE_FILE, LAYOUT_FILE].find((name) => files.includes(name));
+    const orphan = [BEFORE_FILE, LAYOUT_FILE].map(find).find(Boolean);
     if (orphan) {
       throw new Error(
         `routes/${relative}${orphan}: 同じディレクトリにメソッドのファイルがありません`,
