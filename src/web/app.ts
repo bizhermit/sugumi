@@ -1,6 +1,6 @@
 import { ASSETS_PREFIX, serveAsset } from "./assets.ts";
 import { csrfFor } from "./csrf.ts";
-import { errorPage } from "./error-page.ts";
+import { errorPage, methodNotAllowed } from "./error-page.ts";
 import { loadRouter } from "./router.ts";
 import { withSecurityHeaders } from "./security-headers.ts";
 import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";
@@ -36,8 +36,10 @@ async function handle(req: Request, remoteAddress: string | undefined): Promise<
   // 静的ファイルはログインの有無で内容が変わらないため、セッションや CSRF を確かめない
   if (url.pathname.startsWith(ASSETS_PREFIX)) return serveAsset(req, url);
 
-  const route = match(url.pathname);
+  const route = match(url.pathname, req.method);
   if (!route) return errorPage(404);
+  const { handler: pageHandler } = route;
+  if (!pageHandler) return methodNotAllowed(route.allow);
   const buffered = await bufferBody(req, MAX_BODY_BYTES);
   if (!buffered) return errorPage(413);
 
@@ -57,7 +59,7 @@ async function handle(req: Request, remoteAddress: string | undefined): Promise<
 
   let res: Response;
   try {
-    res = await route.handler(buffered, {
+    res = await pageHandler(buffered, {
       params: route.params,
       session,
       csrfToken: csrf.token,

@@ -8,7 +8,9 @@ src/
   routes.gen.ts   ルートの型（生成物）
   pages/          画面ごとの処理。ディレクトリと URL が対応する
     login/
-      page.ts     /login のページ
+      get.ts      GET /login の処理（HEAD も受ける）
+      post.ts     POST /login の処理
+      view.ts     HTML の組み立て（慣例の名前。get.ts と post.ts から使う）
       _assets/    /login で読み込む JS・CSS（index.ts・index.css がエントリー）
   web/            HTTP の土台（app・ルーター・URL・CSRF・セキュリティヘッダー・レイアウト・静的ファイル）
     _assets/      全ページで読み込む JS・CSS
@@ -21,10 +23,17 @@ scripts/          deno task から実行するスクリプト
 
 - 依存の向きは `pages → web → lib` の一方向にする。逆向きに import しない。
   - pages は lib も直接使ってよい。
-- 画面の処理は、その画面の `page.ts` に書く。SQL もページから直接実行してよい。
+- 画面の処理は、そのディレクトリのメソッドのファイルに書く。SQL もページから直接実行してよい。
+  - メソッドのファイル（`get.ts`・`post.ts`・`put.ts`・`patch.ts`・`delete.ts`）に振り分けられる。
+    - HEAD は `get.ts` で処理する。ファイルのないメソッドには 405 を返す。
+    - メソッドの判定や 405 をページで書かない。
+  - `before.ts` を置くと、そのディレクトリのどのメソッドでも、メソッドのファイルより前に実行する。
+    - `Response` を返すとそれを応答にする。`undefined` を返すとメソッドのファイルに進む。
+  - メソッドのファイル以外の名前は自由。次の慣例に揃える。
+    - HTML の組み立ては `view.ts`。メソッドごとに分けるなら `view.post.ts` のようにする。
 - 共通の部品は、必要になったときに作る。置き場所は使う範囲で決める。
   - 同じディレクトリ配下の画面だけで使うもの：そのディレクトリに置く。
-    - `page.ts` 以外のファイルはルートにならない。
+    - メソッドのファイルと `before.ts` 以外のファイルはルートにならない。
   - ディレクトリをまたいで使うもの：`lib/` に置く。
   - サーバーとクライアントの両方で使うもの：使う範囲の `_shared/` に置く（後述）。
     - ディレクトリをまたいで使うものは `lib/_shared/` に置く。
@@ -56,14 +65,14 @@ scripts/          deno task から実行するスクリプト
 ## JS・CSS
 
 - JS は段階的な機能拡張に使う。JS がなくてもフォームの送信や画面の移動ができるようにする。
-- ページの JS・CSS は、`page.ts` と同じディレクトリの `_assets/` に置く。
+- ページの JS・CSS は、メソッドのファイルと同じディレクトリの `_assets/` に置く。
   - `_assets/` 直下の `index.ts`・`index.css` がエントリーになる。
   - エントリーは `deno task build` でバンドルされる。
   - それ以外のファイルは部品として、`index.ts` から import し、`index.css` から `@import` する。
     - 実行・適用される順番は、import の順で決まる。
   - `_assets/` を新しく作ったら `deno task dev` を起動し直す。エントリーは起動時に決まるため。
 - ページの HTML は `src/web/layout.ts` の `layout()` で組み立てる。
-  - `page` には `import.meta.url` を渡す。
+  - `page` には、ページのディレクトリにあるファイル（`view.ts` など）の `import.meta.url` を渡す。
   - 全ページ共通の `src/web/_assets/` と、そのページの `_assets/` のエントリーが読み込まれる。
   - CSS を JS より先に、共通のものをページのものより先に読み込む。
 - 静的ファイルの URL は `src/web/assets.ts` の `asset()`・`assetsOf()` で作る。
@@ -80,7 +89,7 @@ scripts/          deno task から実行するスクリプト
 
 - `_assets/` の中はクライアント専用、`_shared/` の中は両方で使う部品、それ以外はサーバー専用。
 - `_shared/` は `src/` の直下以外のどの階層にも置ける。置き場所は使う範囲で決める。
-  - 例：`src/pages/orders/_shared/` は orders/ 配下の `page.ts` と `_assets/` から使う。
+  - 例：`src/pages/orders/_shared/` は orders/ 配下のページと `_assets/` から使う。
   - 例：`src/lib/_shared/` はディレクトリをまたいで使う。
 - import してよい先は次のとおり。`deno task check:imports` で確かめる。
   - `_assets/` の中：同じ `_assets/` の中と `_shared/`

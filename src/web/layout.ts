@@ -6,7 +6,7 @@ export type LayoutOptions = {
   /** エスケープ済みの HTML。 */
   body: string;
   /**
-   * ページファイルの import.meta.url。同じディレクトリの `_assets/` の index.css と index.ts を、
+   * ページのディレクトリにあるファイルの import.meta.url。同じディレクトリの `_assets/` の index.css と index.ts を、
    * 全ページ共通の src/web/_assets/ のものに続けて読み込む。
    */
   page?: string;

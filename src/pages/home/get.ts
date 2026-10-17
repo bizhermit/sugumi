@@ -1,13 +1,11 @@
 import { findAccount } from "../../lib/auth/accounts.ts";
 import { csrfInput } from "../../web/csrf.ts";
-import { methodNotAllowed } from "../../web/error-page.ts";
 import { escapeHtml } from "../../lib/html.ts";
 import { layout } from "../../web/layout.ts";
 import type { PageContext } from "../../web/router.ts";
 import { path, redirect } from "../../web/url.ts";
 
-export default async function (req: Request, ctx: PageContext): Promise<Response> {
-  if (req.method !== "GET" && req.method !== "HEAD") return methodNotAllowed(["GET", "HEAD"]);
+export default async function (_req: Request, ctx: PageContext): Promise<Response> {
   const account = ctx.session && findAccount(ctx.session.accountId);
   if (!account) return redirect(path("/login"));
 

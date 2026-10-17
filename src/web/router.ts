@@ -1,12 +1,17 @@
 /**
- * src/pages/ のディレクトリを URL に対応させる。各ディレクトリの page.ts が default export でハンドラを公開する。
+ * src/pages/ のディレクトリを URL に対応させる。ディレクトリにあるメソッドのファイルが、そのメソッドのリクエストを処理する。
  *
- *   src/pages/page.ts            → /
- *   src/pages/foo/page.ts        → /foo
- *   src/pages/foo/bar/page.ts    → /foo/bar
- *   src/pages/user/[id]/page.ts  → /user/123（ctx.params.id は "123"）
+ *   src/pages/get.ts             → GET /
+ *   src/pages/foo/get.ts         → GET /foo
+ *   src/pages/foo/post.ts        → POST /foo
+ *   src/pages/user/[id]/get.ts   → GET /user/123（ctx.params.id は "123"）
  *
- * page.ts 以外のファイルはルートにしないため、ページ専用の部品は同じディレクトリに置ける。
+ * メソッドのファイルは get.ts・post.ts・put.ts・patch.ts・delete.ts で、default export でハンドラを公開する。
+ * HEAD は get.ts で処理する。ファイルのないメソッドには、ハンドラを呼ばずに 405 を返す。
+ * before.ts があれば、その default export をメソッドのハンドラより前に呼ぶ。Response を返すとそれを応答にし、
+ * メソッドのハンドラは呼ばない。before.ts だけがあるディレクトリはルートにならず、例外になる。
+ *
+ * これら以外のファイルはルートにしないため、ページ専用の部品は同じディレクトリに置ける。
  * `_` や `.` で始まるディレクトリは走査しない。ページの JS・CSS は `_assets/` に置く（assets.ts を参照）。
  * `/assets/` は静的ファイルの配信に使うため、`pages/assets/` は作れない。
  *
@@ -28,65 +33,123 @@ export type PageContext = {
   remoteAddress: string | undefined;
 };
 export type PageHandler = (req: Request, ctx: PageContext) => Response | Promise<Response>;
-export type RouteMatch = { handler: PageHandler; params: Record<string, string> };
+/** Response を返すとそれを応答にする。undefined を返すとメソッドのハンドラに進む。 */
+export type BeforeHandler = (
+  req: Request,
+  ctx: PageContext,
+) => Response | undefined | Promise<Response | undefined>;
+/** handler は、メソッドのファイルがなければ undefined。allow は 405 の Allow ヘッダーに使う。 */
+export type RouteMatch = {
+  handler: PageHandler | undefined;
+  allow: string[];
+  params: Record<string, string>;
+};
 
 export type Segment = { literal: string } | { param: string };
-export type PageFile = { url: URL; relative: string; segments: Segment[] };
-type DynamicRoute = { segments: Segment[]; handler: PageHandler };
+/** relative は src/pages/ からのディレクトリの相対パス（例："foo/"、ルートは ""）。files はルートのファイル名。 */
+export type PageDir = { url: URL; relative: string; segments: Segment[]; files: string[] };
+type Route = { methods: Map<string, PageHandler>; allow: string[] };
+type DynamicRoute = { segments: Segment[]; route: Route };
 
 const PAGES_DIR = new URL("../pages/", import.meta.url);
 
+const METHOD_FILES: Record<string, string> = {
+  "get.ts": "GET",
+  "post.ts": "POST",
+  "put.ts": "PUT",
+  "patch.ts": "PATCH",
+  "delete.ts": "DELETE",
+};
+const BEFORE_FILE = "before.ts";
+
 /** ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合は例外を投げる。 */
-export async function scanPages(): Promise<PageFile[]> {
-  const pages: PageFile[] = [];
+export async function scanPages(): Promise<PageDir[]> {
+  const pages: PageDir[] = [];
   const sources = new Map<string, string>();
-  for await (const { url, relative } of walk(PAGES_DIR, "")) {
+  for await (const page of walk(PAGES_DIR, "")) {
+    const { relative } = page;
+    if (!page.files.some((name) => name in METHOD_FILES)) {
+      throw new Error(
+        `pages/${relative}${BEFORE_FILE}: 同じディレクトリにメソッドのファイルがありません`,
+      );
+    }
     const segments = parseSegments(relative);
     // /assets/ は assets.ts が静的ファイルの配信に使う
     if (segments[0] && "literal" in segments[0] && segments[0].literal === "assets") {
-      throw new Error(`${relative}: assets はページの URL に使えません`);
+      throw new Error(`pages/${relative}: assets はページの URL に使えません`);
     }
     const key = JSON.stringify(segments.map((s) => "param" in s ? null : s.literal));
     const existing = sources.get(key);
-    if (existing) throw new Error(`${relative}: ${existing} と同じ URL に対応しています`);
+    if (existing) {
+      throw new Error(`pages/${relative}: pages/${existing} と同じ URL に対応しています`);
+    }
     sources.set(key, relative);
-    pages.push({ url, relative, segments });
+    pages.push({ ...page, segments });
   }
   return pages;
 }
 
-/** scanPages の例外に加え、ページの default export が関数でない場合も例外を投げる。 */
-export async function loadRouter(): Promise<(pathname: string) => RouteMatch | undefined> {
-  const statics = new Map<string, PageHandler>();
+/** scanPages の例外に加え、ルートのファイルの default export が関数でない場合も例外を投げる。 */
+export async function loadRouter(): Promise<
+  (pathname: string, method: string) => RouteMatch | undefined
+> {
+  const statics = new Map<string, Route>();
   const dynamics: DynamicRoute[] = [];
-  for (const { url, relative, segments } of await scanPages()) {
-    const mod = await import(url.href);
-    if (typeof mod.default !== "function") {
-      throw new Error(`${relative}: default export にリクエストハンドラがありません`);
-    }
-    if (segments.some((s) => "param" in s)) {
-      dynamics.push({ segments, handler: mod.default });
+  for (const page of await scanPages()) {
+    const route = await loadRoute(page);
+    if (page.segments.some((s) => "param" in s)) {
+      dynamics.push({ segments: page.segments, route });
     } else {
       // リクエストの区切りをデコードした配列と同じ形のキーで引く
       statics.set(
-        JSON.stringify(segments.flatMap((s) => "literal" in s ? [s.literal] : [])),
-        mod.default,
+        JSON.stringify(page.segments.flatMap((s) => "literal" in s ? [s.literal] : [])),
+        route,
       );
     }
   }
   dynamics.sort((a, b) => compareSpecificity(a.segments, b.segments));
 
-  return (pathname) => {
+  const found = (route: Route, params: Record<string, string>, method: string): RouteMatch => ({
+    handler: route.methods.get(method === "HEAD" ? "GET" : method),
+    allow: route.allow,
+    params,
+  });
+  return (pathname, method) => {
     const parts = splitPath(pathname);
     if (!parts) return undefined;
-    const handler = statics.get(JSON.stringify(parts));
-    if (handler) return { handler, params: {} };
-    for (const route of dynamics) {
-      const params = matchSegments(route.segments, parts);
-      if (params) return { handler: route.handler, params };
+    const route = statics.get(JSON.stringify(parts));
+    if (route) return found(route, {}, method);
+    for (const { segments, route } of dynamics) {
+      const params = matchSegments(segments, parts);
+      if (params) return found(route, params, method);
     }
     return undefined;
   };
+}
+
+async function loadRoute({ url, relative, files }: PageDir): Promise<Route> {
+  const load = async (name: string) => {
+    const mod = await import(new URL(name, url).href);
+    if (typeof mod.default !== "function") {
+      throw new Error(`pages/${relative}${name}: default export にハンドラがありません`);
+    }
+    return mod.default;
+  };
+  const before: BeforeHandler | undefined = files.includes(BEFORE_FILE)
+    ? await load(BEFORE_FILE)
+    : undefined;
+  const methods = new Map<string, PageHandler>();
+  for (const name of files) {
+    const method = METHOD_FILES[name];
+    if (!method) continue;
+    const handler: PageHandler = await load(name);
+    methods.set(
+      method,
+      before ? async (req, ctx) => (await before(req, ctx)) ?? await handler(req, ctx) : handler,
+    );
+  }
+  const allow = [...methods.keys()].flatMap((m) => m === "GET" ? ["GET", "HEAD"] : [m]);
+  return { methods, allow };
 }
 
 function parseSegments(relative: string): Segment[] {
@@ -95,8 +158,10 @@ function parseSegments(relative: string): Segment[] {
   return names.map((name) => {
     if (!/[[\]]/.test(name)) return { literal: name };
     const param = name.match(/^\[(\w+)\]$/)?.[1];
-    if (!param) throw new Error(`${relative}: "${name}" はパスの名前に使えません`);
-    if (seen.has(param)) throw new Error(`${relative}: パラメータ "${param}" が重複しています`);
+    if (!param) throw new Error(`pages/${relative}: "${name}" はパスの名前に使えません`);
+    if (seen.has(param)) {
+      throw new Error(`pages/${relative}: パラメータ "${param}" が重複しています`);
+    }
     seen.add(param);
     return { param };
   });
@@ -136,12 +201,18 @@ function compareSpecificity(a: Segment[], b: Segment[]): number {
   return 0;
 }
 
-async function* walk(dir: URL, prefix: string): AsyncGenerator<{ url: URL; relative: string }> {
+/** ルートのファイルが 1 つでもあるディレクトリを返す。 */
+async function* walk(
+  dir: URL,
+  relative: string,
+): AsyncGenerator<{ url: URL; relative: string; files: string[] }> {
+  const files: string[] = [];
   for await (const entry of Deno.readDir(dir)) {
     if (entry.isDirectory && !/^[_.]/.test(entry.name)) {
-      yield* walk(new URL(`${encodeURIComponent(entry.name)}/`, dir), `${prefix}${entry.name}/`);
-    } else if (entry.isFile && entry.name === "page.ts") {
-      yield { url: new URL(entry.name, dir), relative: prefix + entry.name };
+      yield* walk(new URL(`${encodeURIComponent(entry.name)}/`, dir), `${relative}${entry.name}/`);
+    } else if (entry.isFile && (entry.name in METHOD_FILES || entry.name === BEFORE_FILE)) {
+      files.push(entry.name);
     }
   }
+  if (files.length > 0) yield { url: dir, relative, files: files.sort() };
 }
