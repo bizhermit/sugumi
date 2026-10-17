@@ -6,11 +6,13 @@
 src/
   main.ts
   routes.gen.ts   ルートの型（生成物）
-  pages/          画面ごとの処理。ディレクトリと URL が対応する
+  routes/         URL ごとの処理。ディレクトリと URL が対応する
     login/
-      page.ts     /login のページ
+      get.ts      GET /login の処理（HEAD も受ける）
+      post.ts     POST /login の処理
+      view.ts     HTML の組み立て（慣例の名前。get.ts と post.ts から使う）
       _assets/    /login で読み込む JS・CSS（index.ts・index.css がエントリー）
-  web/            HTTP の土台（app・ルーター・URL・CSRF・セキュリティヘッダー・レイアウト・静的ファイル）
+  web/            HTTP の土台（app・ルーター・URL・CSRF・セキュリティヘッダー・HTML 文書・静的ファイル）
     _assets/      全ページで読み込む JS・CSS
   lib/            複数のディレクトリの画面で使う部品
     auth/         アカウント・パスワード・セッション
@@ -19,12 +21,31 @@ src/
 scripts/          deno task から実行するスクリプト
 ```
 
-- 依存の向きは `pages → web → lib` の一方向にする。逆向きに import しない。
-  - pages は lib も直接使ってよい。
-- 画面の処理は、その画面の `page.ts` に書く。SQL もページから直接実行してよい。
+- 依存の向きは `routes → web → lib` の一方向にする。逆向きに import しない。
+  - routes は lib も直接使ってよい。
+- 画面の処理は、そのディレクトリのメソッドのファイルに書く。SQL もページから直接実行してよい。
+  - メソッドのファイル（`get.ts`・`post.ts`・`put.ts`・`patch.ts`・`delete.ts`）に振り分けられる。
+    - HEAD は `get.ts` で処理する。ファイルのないメソッドには 405 を返す。
+    - メソッドの判定や 405 をページで書かない。
+  - `before.ts` を置くと、そのディレクトリのどのメソッドでも、メソッドのファイルより前に実行する。
+    - `Response` を返すとそれを応答にする。`undefined` を返すとメソッドのファイルに進む。
+  - `before.tree.ts` は `before.ts` と同じ形で、置いたディレクトリと配下のすべてのルートに適用する。
+    - ルートでないディレクトリにも置ける。
+    - `src/routes/` に近いものから順に実行し、最後に `before.ts` を実行する。
+    - 置いたディレクトリ自身を除きたいときは、`before.tree.ts` の中で `ctx.route` を見て分岐する。
+      - `ctx.route` は照合したルートのパターン（例：`"/admin"`、`"/user/[id]"`）。
+      - `req.url` の pathname で判定しない。`/%61dmin` も `/admin` に照合されるため。
+  - 405 を返すときは、どの before も実行しない。
+  - before で用意した値を後に渡すときは、`src/web/slot.ts` の `slot()` を使う。
+    - `ctx` に値を書き足さない。
+    - `slot()` は、set する before と同じディレクトリのファイルで定義する。
+    - set する before を必ず通るなら `get`（なければ例外）で受け取る。
+    - 通らないこともあるなら `find`（なければ undefined）で受け取る。
+  - メソッドのファイル以外の名前は自由。次の慣例に揃える。
+    - HTML の組み立ては `view.ts`。メソッドごとに分けるなら `view.post.ts` のようにする。
 - 共通の部品は、必要になったときに作る。置き場所は使う範囲で決める。
   - 同じディレクトリ配下の画面だけで使うもの：そのディレクトリに置く。
-    - `page.ts` 以外のファイルはルートにならない。
+    - メソッドのファイルと `before`・`layout` のファイル以外はルートにならない。
   - ディレクトリをまたいで使うもの：`lib/` に置く。
   - サーバーとクライアントの両方で使うもの：使う範囲の `_shared/` に置く（後述）。
     - ディレクトリをまたいで使うものは `lib/_shared/` に置く。
@@ -56,14 +77,24 @@ scripts/          deno task から実行するスクリプト
 ## JS・CSS
 
 - JS は段階的な機能拡張に使う。JS がなくてもフォームの送信や画面の移動ができるようにする。
-- ページの JS・CSS は、`page.ts` と同じディレクトリの `_assets/` に置く。
+- ページの JS・CSS は、メソッドのファイルと同じディレクトリの `_assets/` に置く。
   - `_assets/` 直下の `index.ts`・`index.css` がエントリーになる。
   - エントリーは `deno task build` でバンドルされる。
   - それ以外のファイルは部品として、`index.ts` から import し、`index.css` から `@import` する。
     - 実行・適用される順番は、import の順で決まる。
   - `_assets/` を新しく作ったら `deno task dev` を起動し直す。エントリーは起動時に決まるため。
-- ページの HTML は `src/web/layout.ts` の `layout()` で組み立てる。
-  - `page` には `import.meta.url` を渡す。
+- ページの HTML は `src/web/html-document.ts` の `htmlDocument()` で組み立てる。
+  - `page` には、ページのディレクトリにあるファイル（`view.ts` など）の `import.meta.url` を渡す。
+  - 本文は `slots.main` に渡す。layout が使う差し込み位置があれば、`slots` にほかのキーで渡す。
+  - `layout.tree.ts`・`layout.ts` が、ページの HTML を外側から包む。
+    - 適用する範囲と順番は `before.tree.ts`・`before.ts` と同じ。
+    - default export は `Layout`（`title` と `render`）。
+    - `render` は `slots` を受け取り、差し込んだ HTML を返す。
+    - 内側の layout が返した HTML は、外側の layout の `main` になる。
+    - layout を外すページは、`htmlDocument()` に `layout: false` を渡す。
+  - `title` は、layout・ページのどちらも任意で、文字列か `(外側のタイトル) => 文字列` を渡す。
+    - 外側の layout から順に決め、最後にページの `title` を適用する。
+    - タイトルが決まらないときと、外側のタイトルがないのに関数を渡したときは例外になる。
   - 全ページ共通の `src/web/_assets/` と、そのページの `_assets/` のエントリーが読み込まれる。
   - CSS を JS より先に、共通のものをページのものより先に読み込む。
 - 静的ファイルの URL は `src/web/assets.ts` の `asset()`・`assetsOf()` で作る。
@@ -80,7 +111,7 @@ scripts/          deno task から実行するスクリプト
 
 - `_assets/` の中はクライアント専用、`_shared/` の中は両方で使う部品、それ以外はサーバー専用。
 - `_shared/` は `src/` の直下以外のどの階層にも置ける。置き場所は使う範囲で決める。
-  - 例：`src/pages/orders/_shared/` は orders/ 配下の `page.ts` と `_assets/` から使う。
+  - 例：`src/routes/orders/_shared/` は orders/ 配下のルートと `_assets/` から使う。
   - 例：`src/lib/_shared/` はディレクトリをまたいで使う。
 - import してよい先は次のとおり。`deno task check:imports` で確かめる。
   - `_assets/` の中：同じ `_assets/` の中と `_shared/`

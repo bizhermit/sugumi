@@ -14,7 +14,7 @@
       ]
     },
     "gen": {
-      "read": ["src/pages", "src/routes.gen.ts"],
+      "read": ["src/routes", "src/routes.gen.ts"],
       "write": ["src/routes.gen.ts"]
     },
     "check-imports": {
@@ -37,7 +37,7 @@
     }
   },
   "tasks": {
-    "dev": "deno task build && (deno task gen --watch & deno task bundle --watch & deno run --watch=src/pages/,dist/public/ -P src/main.ts)",
+    "dev": "deno task build && (deno task gen --watch & deno task bundle --watch & deno run --watch=src/routes/,dist/public/ -P src/main.ts)",
     "gen": "deno run -P=gen scripts/gen-routes.ts",
     "start": "deno run -P src/main.ts",
     "build": "rm -rf dist/public && deno task check:imports && deno task bundle && deno task check:bundle",
