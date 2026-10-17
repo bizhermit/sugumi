@@ -1,7 +1,6 @@
 import { findAccount } from "../../lib/auth/accounts.ts";
-import { csrfInput } from "../../web/csrf.ts";
-import { escapeHtml } from "../../lib/html.ts";
-import { htmlDocument } from "../../web/html-document.ts";
+import { CsrfInput } from "../../web/csrf.tsx";
+import { htmlDocument } from "../../web/html-document.tsx";
 import type { RouteContext } from "../../web/router.ts";
 import { path, redirect } from "../../web/url.ts";
 
@@ -13,12 +12,16 @@ export default async function (_req: Request, ctx: RouteContext): Promise<Respon
     title: "ホーム",
     page: import.meta.url,
     slots: {
-      main: `<h1>ホーム</h1>
-<p>${escapeHtml(account.displayName)}としてログインしています。</p>
-<form id="logout" method="post" action="${escapeHtml(path("/logout"))}">
-${csrfInput(await ctx.csrfToken())}
-<button>ログアウト</button>
-</form>`,
+      main: (
+        <>
+          <h1>ホーム</h1>
+          <p>{account.displayName}としてログインしています。</p>
+          <form id="logout" method="post" action={path("/logout")}>
+            <CsrfInput token={await ctx.csrfToken()} />
+            <button type="submit">ログアウト</button>
+          </form>
+        </>
+      ),
     },
   });
   return new Response(html, {

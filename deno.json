@@ -1,4 +1,11 @@
 {
+  "compilerOptions": {
+    "jsx": "precompile",
+    "jsxImportSource": "#jsx"
+  },
+  "imports": {
+    "#jsx/jsx-runtime": "./src/lib/jsx-runtime.ts"
+  },
   "permissions": {
     "default": {
       "net": true,
@@ -45,6 +52,11 @@
     "check:imports": "deno run -P=check-imports scripts/check-imports.ts",
     "check:bundle": "deno run -P=check-bundle scripts/check-bundle.ts",
     "account:add": "deno run -P=account scripts/add-account.ts"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["jsx-key"]
+    }
   },
   "fmt": {
     "lineWidth": 100

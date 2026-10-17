@@ -1,6 +1,6 @@
 import { ASSETS_PREFIX, serveAsset } from "./assets.ts";
-import { csrfFor } from "./csrf.ts";
-import { errorPage, methodNotAllowed } from "./error-page.ts";
+import { csrfFor } from "./csrf.tsx";
+import { errorPage, methodNotAllowed } from "./error-page.tsx";
 import { loadRouter } from "./router.ts";
 import { withSecurityHeaders } from "./security-headers.ts";
 import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";

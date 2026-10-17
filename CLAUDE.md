@@ -10,13 +10,14 @@ src/
     login/
       get.ts      GET /login の処理（HEAD も受ける）
       post.ts     POST /login の処理
-      view.ts     HTML の組み立て（慣例の名前。get.ts と post.ts から使う）
+      view.tsx    HTML の組み立て（慣例の名前。get.ts と post.ts から使う）
       _assets/    /login で読み込む JS・CSS（index.ts・index.css がエントリー）
   web/            HTTP の土台（app・ルーター・URL・CSRF・セキュリティヘッダー・HTML 文書・静的ファイル）
     _assets/      全ページで読み込む JS・CSS
   lib/            複数のディレクトリの画面で使う部品
     auth/         アカウント・パスワード・セッション
     db.ts         DB の接続と、全テーブルのスキーマ
+    jsx-runtime.ts  JSX の変換先（deno.json の compilerOptions で指定）
     _shared/      サーバーとクライアントの両方で使う部品（必要になったら作る）
 scripts/          deno task から実行するスクリプト
 ```
@@ -26,6 +27,8 @@ scripts/          deno task から実行するスクリプト
 - 画面の処理は、そのディレクトリのメソッドのファイルに書く。SQL もページから直接実行してよい。
   - メソッドのファイル（`get.ts`・`post.ts`・`put.ts`・`patch.ts`・`delete.ts`）に振り分けられる。
     - HEAD は `get.ts` で処理する。ファイルのないメソッドには 405 を返す。
+    - JSX を書くファイルは拡張子を `.tsx` にする（`get.tsx` など。`before`・`layout` も同じ）。
+      - 同じ名前の `.ts` と `.tsx` は両方置けない。
     - メソッドの判定や 405 をページで書かない。
   - `before.ts` を置くと、そのディレクトリのどのメソッドでも、メソッドのファイルより前に実行する。
     - `Response` を返すとそれを応答にする。`undefined` を返すとメソッドのファイルに進む。
@@ -42,7 +45,7 @@ scripts/          deno task から実行するスクリプト
     - set する before を必ず通るなら `get`（なければ例外）で受け取る。
     - 通らないこともあるなら `find`（なければ undefined）で受け取る。
   - メソッドのファイル以外の名前は自由。次の慣例に揃える。
-    - HTML の組み立ては `view.ts`。メソッドごとに分けるなら `view.post.ts` のようにする。
+    - HTML の組み立ては `view.tsx`。メソッドごとに分けるなら `view.post.tsx` のようにする。
 - 共通の部品は、必要になったときに作る。置き場所は使う範囲で決める。
   - 同じディレクトリ配下の画面だけで使うもの：そのディレクトリに置く。
     - メソッドのファイルと `before`・`layout` のファイル以外はルートにならない。
@@ -83,8 +86,15 @@ scripts/          deno task から実行するスクリプト
   - それ以外のファイルは部品として、`index.ts` から import し、`index.css` から `@import` する。
     - 実行・適用される順番は、import の順で決まる。
   - `_assets/` を新しく作ったら `deno task dev` を起動し直す。エントリーは起動時に決まるため。
-- ページの HTML は `src/web/html-document.ts` の `htmlDocument()` で組み立てる。
-  - `page` には、ページのディレクトリにあるファイル（`view.ts` など）の `import.meta.url` を渡す。
+- HTML は JSX で書く。文字列の連結やテンプレート文字列で HTML を作らない。
+  - `{...}` で埋め込んだ値はエスケープされる。JSX の値（型 `Html`）はそのまま埋め込まれる。
+  - 属性を型チェックするのは `src/lib/html-attributes.ts` にあるタグだけ。
+    - ほかのタグは、どの属性でも書ける。`-` を含む属性名はどのタグでもチェックされない。
+    - 型にない属性が必要になったら、仕様を確かめてから型に足す。
+  - `key` は付けない。HTML の属性として出力される。`deno lint` の `jsx-key` は外してある。
+  - JSX はサーバー専用。`_assets/`・`_shared/` に `.tsx` を置かない（`check:imports` で検出）。
+- ページの HTML は `src/web/html-document.tsx` の `htmlDocument()` で組み立てる。
+  - `page` には、ページのディレクトリにあるファイル（`view.tsx` など）の `import.meta.url` を渡す。
   - 本文は `slots.main` に渡す。layout が使う差し込み位置があれば、`slots` にほかのキーで渡す。
   - `layout.tree.ts`・`layout.ts` が、ページの HTML を外側から包む。
     - 適用する範囲と順番は `before.tree.ts`・`before.ts` と同じ。

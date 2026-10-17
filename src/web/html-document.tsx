@@ -1,4 +1,4 @@
-import { escapeHtml } from "../lib/html.ts";
+import type { Html } from "../lib/jsx-runtime.ts";
 import { assetsOf } from "./assets.ts";
 import { layoutsOf, type RouteContext } from "./router.ts";
 
@@ -9,16 +9,16 @@ import { layoutsOf, type RouteContext } from "./router.ts";
 export type Title = string | ((outer: string) => string);
 
 /**
- * layout に差し込むエスケープ済みの HTML。main はページの本文で、内側の layout が返した HTML は
+ * layout に差し込む HTML。main はページの本文で、内側の layout が返した HTML は
  * 外側の layout の main になる。それ以外のキーは、間の layout が使わなくても外側の layout まで届く。
  */
-export type Slots = { main: string; [name: string]: string | undefined };
+export type Slots = { main: Html; [name: string]: Html | undefined };
 
 /** layout.ts・layout.tree.ts が default export で公開する。 */
 export type Layout = {
   title?: Title;
-  /** slots を差し込んだエスケープ済みの HTML を返す。 */
-  render: (slots: Slots, ctx: RouteContext) => string | Promise<string>;
+  /** slots を差し込んだ HTML を返す。 */
+  render: (slots: Slots, ctx: RouteContext) => Html | Promise<Html>;
 };
 
 export type HtmlDocumentOptions = {
@@ -58,25 +58,19 @@ export async function htmlDocument(
 
   const common = assetsOf(import.meta.url);
   const own = assetsOf(page);
-  const tags = [
-    ...[common.style, own.style].map((url) =>
-      url && `<link rel="stylesheet" href="${escapeHtml(url)}">`
-    ),
-    ...[common.script, own.script].map((url) =>
-      url && `<script type="module" src="${escapeHtml(url)}"></script>`
-    ),
-  ].filter(Boolean).join("\n");
-  return `<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(resolved)}</title>
-${tags}
-</head>
-<body>
-${current.main}
-</body>
-</html>
-`;
+  const html = (
+    <html lang="ja">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{resolved}</title>
+        {common.style && <link rel="stylesheet" href={common.style} />}
+        {own.style && <link rel="stylesheet" href={own.style} />}
+        {common.script && <script type="module" src={common.script}></script>}
+        {own.script && <script type="module" src={own.script}></script>}
+      </head>
+      <body>{current.main}</body>
+    </html>
+  );
+  return `<!doctype html>\n${html.value}\n`;
 }

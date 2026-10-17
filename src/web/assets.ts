@@ -9,7 +9,7 @@
  * リクエストのパスからファイルパスを組み立てないため、`../` などで dist/public/ 外のファイルには届かない。
  * 起動後にビルドし直した内容は、再起動するまで反映されない。
  */
-import { errorPage, methodNotAllowed } from "./error-page.ts";
+import { errorPage, methodNotAllowed } from "./error-page.tsx";
 
 // deno.json の permissions と Dockerfile で、dist/public/ の読み取りを許可している
 const PUBLIC_DIR = new URL("../../dist/public/", import.meta.url);

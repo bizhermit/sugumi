@@ -10,7 +10,6 @@ import { clearHostCookie, hostCookie, readCookie } from "../lib/cookie.ts";
 import { randomToken, timingSafeEqual } from "../lib/crypto.ts";
 import { secret } from "../lib/db.ts";
 import { PRE_LOGIN_CSRF_TIMEOUT_MINUTES } from "../lib/env.ts";
-import { escapeHtml } from "../lib/html.ts";
 import type { Session } from "../lib/auth/session.ts";
 
 const FIELD_NAME = "_csrf";
@@ -75,8 +74,8 @@ export function clearPreLoginCookie(): string {
 }
 
 /** フォームの中に置く hidden input。 */
-export function csrfInput(token: string): string {
-  return `<input type="hidden" name="${FIELD_NAME}" value="${escapeHtml(token)}">`;
+export function CsrfInput({ token }: { token: string }) {
+  return <input type="hidden" name={FIELD_NAME} value={token} />;
 }
 
 function isFresh(value: string, now: number): boolean {

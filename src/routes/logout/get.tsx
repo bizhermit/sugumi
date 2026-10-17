@@ -1,6 +1,5 @@
-import { csrfInput } from "../../web/csrf.ts";
-import { escapeHtml } from "../../lib/html.ts";
-import { htmlDocument } from "../../web/html-document.ts";
+import { CsrfInput } from "../../web/csrf.tsx";
+import { htmlDocument } from "../../web/html-document.tsx";
 import type { RouteContext } from "../../web/router.ts";
 import { path, redirect } from "../../web/url.ts";
 
@@ -16,13 +15,19 @@ async function confirmPage(ctx: RouteContext): Promise<Response> {
     title: "ログアウト",
     page: import.meta.url,
     slots: {
-      main: `<h1>ログアウト</h1>
-<p>ログアウトしますか？</p>
-<form method="post" action="${escapeHtml(path("/logout"))}">
-${csrfInput(await ctx.csrfToken())}
-<button>ログアウト</button>
-</form>
-<p><a href="${escapeHtml(path("/home"))}">ホームに戻る</a></p>`,
+      main: (
+        <>
+          <h1>ログアウト</h1>
+          <p>ログアウトしますか？</p>
+          <form method="post" action={path("/logout")}>
+            <CsrfInput token={await ctx.csrfToken()} />
+            <button type="submit">ログアウト</button>
+          </form>
+          <p>
+            <a href={path("/home")}>ホームに戻る</a>
+          </p>
+        </>
+      ),
     },
   });
   return new Response(html, {

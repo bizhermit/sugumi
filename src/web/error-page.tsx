@@ -1,0 +1,24 @@
+export function errorPage(status: number): Response {
+  const html = (
+    <html lang="ja">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{status}</title>
+      </head>
+      <body>
+        <h1>{status}</h1>
+      </body>
+    </html>
+  );
+  return new Response(`<!doctype html>\n${html.value}\n`, {
+    status,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+export function methodNotAllowed(allow: string[]): Response {
+  const res = errorPage(405);
+  res.headers.set("allow", allow.join(", "));
+  return res;
+}

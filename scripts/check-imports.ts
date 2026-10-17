@@ -6,7 +6,8 @@
  *   `_shared/` の中（共有）        ：`_shared/` だけを import できる
  *   それ以外（サーバー）            ：`_assets/` を import できない
  *
- * あわせて、src/_shared/ とシンボリックリンクがないことを確かめる。
+ * あわせて、src/_shared/ とシンボリックリンクがないこと、`_assets/` と `_shared/` に JSX のファイルがないことを確かめる。
+ * JSX は src/lib/jsx-runtime.ts を暗黙に import し、指定子がソースに現れないため、ファイルの拡張子で判定する。
  * ディレクトリをまたぐ共有の部品は src/lib/_shared/ に置く。
  * シンボリックリンクは、リンクの置き場所とリンク先で取り決めの判定が食い違うため使わない。
  *
@@ -40,6 +41,9 @@ if (violations.length > 0) {
 async function checkFile(file: URL): Promise<void> {
   const from = relative(file);
   const fromKind = kindOf(from);
+  if (fromKind !== "server" && /x$/.test(file.pathname)) {
+    violations.push(`${from}: JSX はサーバー専用です`);
+  }
   const text = await Deno.readTextFile(file);
   const lineOf = (index: number) => text.slice(0, index).split("\n").length;
   for (const { 2: specifier, index } of text.matchAll(SPECIFIER)) {
