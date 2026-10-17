@@ -12,7 +12,7 @@ src/
       post.ts     POST /login の処理
       view.ts     HTML の組み立て（慣例の名前。get.ts と post.ts から使う）
       _assets/    /login で読み込む JS・CSS（index.ts・index.css がエントリー）
-  web/            HTTP の土台（app・ルーター・URL・CSRF・セキュリティヘッダー・レイアウト・静的ファイル）
+  web/            HTTP の土台（app・ルーター・URL・CSRF・セキュリティヘッダー・HTML 文書・静的ファイル）
     _assets/      全ページで読み込む JS・CSS
   lib/            複数のディレクトリの画面で使う部品
     auth/         アカウント・パスワード・セッション
@@ -76,7 +76,7 @@ scripts/          deno task から実行するスクリプト
   - それ以外のファイルは部品として、`index.ts` から import し、`index.css` から `@import` する。
     - 実行・適用される順番は、import の順で決まる。
   - `_assets/` を新しく作ったら `deno task dev` を起動し直す。エントリーは起動時に決まるため。
-- ページの HTML は `src/web/layout.ts` の `layout()` で組み立てる。
+- ページの HTML は `src/web/html-document.ts` の `htmlDocument()` で組み立てる。
   - `page` には、ページのディレクトリにあるファイル（`view.ts` など）の `import.meta.url` を渡す。
   - 全ページ共通の `src/web/_assets/` と、そのページの `_assets/` のエントリーが読み込まれる。
   - CSS を JS より先に、共通のものをページのものより先に読み込む。

@@ -1,7 +1,7 @@
 import { escapeHtml } from "../lib/html.ts";
 import { assetsOf } from "./assets.ts";
 
-export type LayoutOptions = {
+export type HtmlDocumentOptions = {
   title: string;
   /** エスケープ済みの HTML。 */
   body: string;
@@ -13,7 +13,7 @@ export type LayoutOptions = {
 };
 
 /** ページの HTML 文書全体を返す。 */
-export function layout({ title, body, page }: LayoutOptions): string {
+export function htmlDocument({ title, body, page }: HtmlDocumentOptions): string {
   const common = assetsOf(import.meta.url);
   const own = page ? assetsOf(page) : {};
   const tags = [

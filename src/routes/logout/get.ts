@@ -1,6 +1,6 @@
 import { csrfInput } from "../../web/csrf.ts";
 import { escapeHtml } from "../../lib/html.ts";
-import { layout } from "../../web/layout.ts";
+import { htmlDocument } from "../../web/html-document.ts";
 import type { RouteContext } from "../../web/router.ts";
 import { path, redirect } from "../../web/url.ts";
 
@@ -12,7 +12,7 @@ export default async function (_req: Request, ctx: RouteContext): Promise<Respon
 }
 
 async function confirmPage(ctx: RouteContext): Promise<Response> {
-  const html = layout({
+  const html = htmlDocument({
     title: "ログアウト",
     body: `<h1>ログアウト</h1>
 <p>ログアウトしますか？</p>

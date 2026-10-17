@@ -1,6 +1,6 @@
 import { csrfInput } from "../../web/csrf.ts";
 import { escapeHtml } from "../../lib/html.ts";
-import { layout } from "../../web/layout.ts";
+import { htmlDocument } from "../../web/html-document.ts";
 import { path } from "../../web/url.ts";
 
 type FormState = { status?: number; username?: string; message?: string };
@@ -11,7 +11,7 @@ export function loginForm(
 ): Response {
   // パスワード欄の spellcheck などは、_assets/index.ts で表示に切り替えたときに
   // 入力がスペルチェックや予測変換に渡らないようにするため
-  const html = layout({
+  const html = htmlDocument({
     title: "ログイン",
     page: import.meta.url,
     body: `<h1>ログイン</h1>
