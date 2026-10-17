@@ -60,6 +60,7 @@ async function handle(req: Request, remoteAddress: string | undefined): Promise<
   let res: Response;
   try {
     res = await pageHandler(buffered, {
+      route: route.route,
       params: route.params,
       session,
       csrfToken: csrf.token,

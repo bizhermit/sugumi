@@ -32,7 +32,9 @@ scripts/          deno task から実行するスクリプト
   - `before.tree.ts` は `before.ts` と同じ形で、置いたディレクトリと配下のすべてのルートに適用する。
     - ルートでないディレクトリにも置ける。
     - `src/routes/` に近いものから順に実行し、最後に `before.ts` を実行する。
-    - 置いたディレクトリ自身を除きたいときは、`before.tree.ts` の中で分岐する。
+    - 置いたディレクトリ自身を除きたいときは、`before.tree.ts` の中で `ctx.route` を見て分岐する。
+      - `ctx.route` は照合したルートのパターン（例：`"/admin"`、`"/user/[id]"`）。
+      - `req.url` の pathname で判定しない。`/%61dmin` も `/admin` に照合されるため。
   - 405 を返すときは、どの before も実行しない。
   - before で用意した値を後に渡すときは、`src/web/slot.ts` の `slot()` を使う。
     - `ctx` に値を書き足さない。

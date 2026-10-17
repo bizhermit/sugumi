@@ -27,9 +27,15 @@
  * `/%61dmin` も `/admin` と同じページに照合されるため、アクセス制御は生の pathname ではなく照合結果で判定すること。
  */
 import type { Session } from "../lib/auth/session.ts";
+import type { RoutePath } from "../routes.gen.ts";
 import type { Layout } from "./html-document.ts";
 
 export type RouteContext = {
+  /**
+   * 照合したルートのパターン（例："/user/[id]"）。before.tree.ts で、置いたディレクトリ自身を除くときなどに使う。
+   * `/%61dmin` も `/admin` に照合されるため、生の pathname で判定してはいけない。
+   */
+  route: RoutePath;
   params: Record<string, string>;
   /** ログインしていなければ undefined。 */
   session: Session | undefined;
@@ -46,6 +52,7 @@ export type BeforeHandler = (
 ) => Response | undefined | Promise<Response | undefined>;
 /** handler は、メソッドのファイルがなければ undefined。allow は 405 の Allow ヘッダーに使う。 */
 export type RouteMatch = {
+  route: RoutePath;
   handler: RouteHandler | undefined;
   allow: string[];
   params: Record<string, string>;
@@ -64,7 +71,7 @@ export type RouteDir = {
   befores: string[];
   layouts: string[];
 };
-type Route = { methods: Map<string, RouteHandler>; allow: string[] };
+type Route = { pattern: RoutePath; methods: Map<string, RouteHandler>; allow: string[] };
 type DynamicRoute = { segments: Segment[]; route: Route };
 
 const ROUTES_DIR = new URL("../routes/", import.meta.url);
@@ -135,6 +142,7 @@ export async function loadRouter(): Promise<
   dynamics.sort((a, b) => compareSpecificity(a.segments, b.segments));
 
   const found = (route: Route, params: Record<string, string>, method: string): RouteMatch => ({
+    route: route.pattern,
     handler: route.methods.get(method === "HEAD" ? "GET" : method),
     allow: route.allow,
     params,
@@ -207,7 +215,13 @@ async function loadRoute(dir: RouteDir): Promise<Route> {
     );
   }
   const allow = [...methods.keys()].flatMap((m) => m === "GET" ? ["GET", "HEAD"] : [m]);
-  return { methods, allow };
+  // routes.gen.ts は scanRoutes の結果から patternOf で生成するため、生成し直していればこの値は RoutePath に含まれる
+  return { pattern: patternOf(dir.segments) as RoutePath, methods, allow };
+}
+
+/** ルートのパターン（例："/user/[id]"）を返す。routes.gen.ts の RoutePath の各値になる。 */
+export function patternOf(segments: Segment[]): string {
+  return "/" + segments.map((s) => "param" in s ? `[${s.param}]` : s.literal).join("/");
 }
 
 function parseSegments(relative: string): Segment[] {

@@ -2,17 +2,13 @@
  * src/routes/ からルートの一覧を型 RoutePath として src/routes.gen.ts に書き出す。
  * `--watch` を付けると、生成したあと src/routes/ の変更を監視して生成し直す。
  */
-import { scanRoutes } from "../src/web/router.ts";
+import { patternOf, scanRoutes } from "../src/web/router.ts";
 
 const ROUTES_DIR = new URL("../src/routes/", import.meta.url);
 const OUT = new URL("../src/routes.gen.ts", import.meta.url);
 
 async function generate(): Promise<void> {
-  const patterns = (await scanRoutes())
-    .map(({ segments }) =>
-      "/" + segments.map((s) => "param" in s ? `[${s.param}]` : s.literal).join("/")
-    )
-    .sort();
+  const patterns = (await scanRoutes()).map(({ segments }) => patternOf(segments)).sort();
   const union = patterns.length === 0
     ? " never"
     : patterns.map((p) => `\n  | ${JSON.stringify(p)}`).join("");
