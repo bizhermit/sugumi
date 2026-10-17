@@ -91,6 +91,13 @@ const TREE_BEFORE_FILE = "before.tree";
 const LAYOUT_FILE = "layout";
 const TREE_LAYOUT_FILE = "layout.tree";
 const EXTENSIONS = [".ts", ".tsx"];
+const SPECIAL_FILES = [
+  ...Object.keys(METHOD_FILES),
+  BEFORE_FILE,
+  TREE_BEFORE_FILE,
+  LAYOUT_FILE,
+  TREE_LAYOUT_FILE,
+];
 
 // キーはディレクトリのデコード済みの pathname。loadRouter で設定する
 const layoutChains = new Map<string, Layout[]>();
@@ -98,6 +105,7 @@ const layoutChains = new Map<string, Layout[]>();
 /**
  * ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合、
  * before.ts・layout.ts があるのにメソッドのファイルがない場合、同じ名前の .ts と .tsx がある場合、
+ * メソッド・before・layout のファイルの名前の大文字小文字や拡張子が違う場合、
  * シンボリックリンクがある場合は例外を投げる。
  */
 export async function scanRoutes(): Promise<RouteDir[]> {
@@ -296,7 +304,10 @@ async function* walk(
       throw new Error(`routes/${relative}${entry.name}: シンボリックリンクは置けません`);
     }
     if (entry.isDirectory && !/^[_.]/.test(entry.name)) subdirs.push(entry.name);
-    else if (entry.isFile) files.push(entry.name);
+    else if (entry.isFile) {
+      checkSpecialName(relative, entry.name);
+      files.push(entry.name);
+    }
   }
   const find = (base: string): string | undefined => {
     const found = EXTENSIONS.map((ext) => base + ext).filter((name) => files.includes(name));
@@ -332,4 +343,16 @@ async function* walk(
   for (const name of subdirs) {
     yield* walk(new URL(`${encodeURIComponent(name)}/`, dir), `${relative}${name}/`, tree);
   }
+}
+
+// before.jsx や Before.ts のような名前は黙って無視され、アクセス制御が外れる
+function checkSpecialName(relative: string, name: string): void {
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return;
+  const [stem, ext] = [name.slice(0, dot), name.slice(dot)];
+  if (!SPECIAL_FILES.includes(stem.toLowerCase())) return;
+  if (SPECIAL_FILES.includes(stem) && EXTENSIONS.includes(ext)) return;
+  throw new Error(
+    `routes/${relative}${name}: 名前は小文字、拡張子は ${EXTENSIONS.join("・")} にしてください`,
+  );
 }

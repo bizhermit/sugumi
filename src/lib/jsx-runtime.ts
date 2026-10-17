@@ -28,7 +28,8 @@ const VOID_ELEMENTS = new Set([
 // HTML の構文で属性名に使えない文字
 const INVALID_ATTR_NAME = /[\s"'>/=\p{Cc}]/u;
 
-// クラスは型だけを公開し、文字列から Html を作れないようにしている。エスケープを経ない HTML を混ぜないため
+// クラスは型だけを公開し、ページのコードで文字列から Html を作りにくくしている。
+// constructor を辿ったり jsxTemplate を直接呼んだりすれば作れるため、偽造を防ぐ仕組みではない
 class Html {
   constructor(readonly value: string) {}
 }
@@ -74,7 +75,10 @@ export function jsxEscape(value: unknown): string {
   throw new TypeError(`JSX に埋め込めない値です：${Object.prototype.toString.call(value)}`);
 }
 
-/** true は属性名だけ、false・null・undefined は属性を出力しない。 */
+/**
+ * true は属性名だけ、false・null・undefined は属性を出力しない。
+ * aria-* は値のない形を true と扱わないため、true・false を文字列で出力する。
+ */
 export function jsxAttr(name: string, value: unknown): string {
   if (INVALID_ATTR_NAME.test(name)) throw new TypeError(`属性名に使えません：${name}`);
   switch (typeof value) {
@@ -83,6 +87,7 @@ export function jsxAttr(name: string, value: unknown): string {
     case "bigint":
       return `${name}="${escapeHtml(String(value))}"`;
     case "boolean":
+      if (name.startsWith("aria-")) return `${name}="${value}"`;
       return value ? name : "";
     case "undefined":
       return "";
@@ -93,8 +98,10 @@ export function jsxAttr(name: string, value: unknown): string {
 
 export function jsx(
   type: string | ((props: Record<string, unknown>) => unknown),
-  props: Record<string, unknown>,
+  // precompile は、属性のないコンポーネント（<C />）には null を渡す
+  props: Record<string, unknown> | null,
 ): Html {
+  props ??= {};
   // コンポーネントが文字列を返しても、HTML としては扱わずエスケープする
   if (typeof type === "function") return new Html(jsxEscape(type(props)));
   const { children, ...attrs } = props;
