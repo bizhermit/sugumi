@@ -93,7 +93,7 @@ const layoutChains = new Map<string, Layout[]>();
 
 /**
  * ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合、
- * before.ts・layout.ts があるのにメソッドのファイルがない場合は例外を投げる。
+ * before.ts・layout.ts があるのにメソッドのファイルがない場合、シンボリックリンクがある場合は例外を投げる。
  */
 export async function scanRoutes(): Promise<RouteDir[]> {
   const routes: RouteDir[] = [];
@@ -285,6 +285,11 @@ async function* walk(
   const files: string[] = [];
   const subdirs: string[] = [];
   for await (const entry of Deno.readDir(dir)) {
+    // readDir はリンクを isFile・isDirectory のどちらにもしないため、before.tree.ts などがリンクだと
+    // 黙って無視され、アクセス制御が外れる
+    if (entry.isSymlink) {
+      throw new Error(`routes/${relative}${entry.name}: シンボリックリンクは置けません`);
+    }
     if (entry.isDirectory && !/^[_.]/.test(entry.name)) subdirs.push(entry.name);
     else if (entry.isFile) files.push(entry.name);
   }
