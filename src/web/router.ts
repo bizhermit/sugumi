@@ -10,6 +10,9 @@
  * HEAD は get.ts で処理する。ファイルのないメソッドには、ハンドラを呼ばずに 405 を返す。
  * before.ts があれば、その default export をメソッドのハンドラより前に呼ぶ。Response を返すとそれを応答にし、
  * メソッドのハンドラは呼ばない。before.ts だけがあるディレクトリはルートにならず、例外になる。
+ * before.tree.ts は before.ts と同じ形で、置いたディレクトリとその配下のすべてのルートに適用する。
+ * ルートでないディレクトリにも置ける。pages/ に近いものから順に呼び、最後に before.ts を呼ぶ。
+ * 405 を返すときは、どの before も呼ばない。
  *
  * これら以外のファイルはルートにしないため、ページ専用の部品は同じディレクトリに置ける。
  * `_` や `.` で始まるディレクトリは走査しない。ページの JS・CSS は `_assets/` に置く（assets.ts を参照）。
@@ -46,8 +49,16 @@ export type RouteMatch = {
 };
 
 export type Segment = { literal: string } | { param: string };
-/** relative は src/pages/ からのディレクトリの相対パス（例："foo/"、ルートは ""）。files はルートのファイル名。 */
-export type PageDir = { url: URL; relative: string; segments: Segment[]; files: string[] };
+/**
+ * relative は src/pages/ からのディレクトリの相対パス（例："foo/"、ルートは ""）。
+ * methods はメソッドのファイル名。befores は呼ぶ順に並べた before のファイルの、src/pages/ からの相対パス。
+ */
+export type PageDir = {
+  relative: string;
+  segments: Segment[];
+  methods: string[];
+  befores: string[];
+};
 type Route = { methods: Map<string, PageHandler>; allow: string[] };
 type DynamicRoute = { segments: Segment[]; route: Route };
 
@@ -61,14 +72,15 @@ const METHOD_FILES: Record<string, string> = {
   "delete.ts": "DELETE",
 };
 const BEFORE_FILE = "before.ts";
+const TREE_BEFORE_FILE = "before.tree.ts";
 
 /** ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合は例外を投げる。 */
 export async function scanPages(): Promise<PageDir[]> {
   const pages: PageDir[] = [];
   const sources = new Map<string, string>();
-  for await (const page of walk(PAGES_DIR, "")) {
+  for await (const page of walk(PAGES_DIR, "", [])) {
     const { relative } = page;
-    if (!page.files.some((name) => name in METHOD_FILES)) {
+    if (page.methods.length === 0) {
       throw new Error(
         `pages/${relative}${BEFORE_FILE}: 同じディレクトリにメソッドのファイルがありません`,
       );
@@ -127,25 +139,30 @@ export async function loadRouter(): Promise<
   };
 }
 
-async function loadRoute({ url, relative, files }: PageDir): Promise<Route> {
-  const load = async (name: string) => {
-    const mod = await import(new URL(name, url).href);
+async function loadRoute(page: PageDir): Promise<Route> {
+  const load = async (relative: string) => {
+    const mod = await import(
+      new URL(relative.split("/").map(encodeURIComponent).join("/"), PAGES_DIR).href
+    );
     if (typeof mod.default !== "function") {
-      throw new Error(`pages/${relative}${name}: default export にハンドラがありません`);
+      throw new Error(`pages/${relative}: default export にハンドラがありません`);
     }
     return mod.default;
   };
-  const before: BeforeHandler | undefined = files.includes(BEFORE_FILE)
-    ? await load(BEFORE_FILE)
-    : undefined;
+  const befores: BeforeHandler[] = [];
+  for (const relative of page.befores) befores.push(await load(relative));
   const methods = new Map<string, PageHandler>();
-  for (const name of files) {
-    const method = METHOD_FILES[name];
-    if (!method) continue;
-    const handler: PageHandler = await load(name);
+  for (const name of page.methods) {
+    const handler: PageHandler = await load(page.relative + name);
     methods.set(
-      method,
-      before ? async (req, ctx) => (await before(req, ctx)) ?? await handler(req, ctx) : handler,
+      METHOD_FILES[name],
+      befores.length === 0 ? handler : async (req, ctx) => {
+        for (const before of befores) {
+          const res = await before(req, ctx);
+          if (res) return res;
+        }
+        return await handler(req, ctx);
+      },
     );
   }
   const allow = [...methods.keys()].flatMap((m) => m === "GET" ? ["GET", "HEAD"] : [m]);
@@ -201,18 +218,33 @@ function compareSpecificity(a: Segment[], b: Segment[]): number {
   return 0;
 }
 
-/** ルートのファイルが 1 つでもあるディレクトリを返す。 */
+/**
+ * メソッドのファイルか before.ts があるディレクトリを返す。
+ * treeBefores は、上のディレクトリにある before.tree.ts の相対パスを pages/ に近い順に並べたもの。
+ */
 async function* walk(
   dir: URL,
   relative: string,
-): AsyncGenerator<{ url: URL; relative: string; files: string[] }> {
+  treeBefores: string[],
+): AsyncGenerator<{ relative: string; methods: string[]; befores: string[] }> {
   const files: string[] = [];
+  const subdirs: string[] = [];
   for await (const entry of Deno.readDir(dir)) {
-    if (entry.isDirectory && !/^[_.]/.test(entry.name)) {
-      yield* walk(new URL(`${encodeURIComponent(entry.name)}/`, dir), `${relative}${entry.name}/`);
-    } else if (entry.isFile && (entry.name in METHOD_FILES || entry.name === BEFORE_FILE)) {
-      files.push(entry.name);
-    }
+    if (entry.isDirectory && !/^[_.]/.test(entry.name)) subdirs.push(entry.name);
+    else if (entry.isFile) files.push(entry.name);
   }
-  if (files.length > 0) yield { url: dir, relative, files: files.sort() };
+  const befores = files.includes(TREE_BEFORE_FILE)
+    ? [...treeBefores, relative + TREE_BEFORE_FILE]
+    : treeBefores;
+  const methods = files.filter((name) => Object.hasOwn(METHOD_FILES, name)).sort();
+  if (methods.length > 0 || files.includes(BEFORE_FILE)) {
+    yield {
+      relative,
+      methods,
+      befores: files.includes(BEFORE_FILE) ? [...befores, relative + BEFORE_FILE] : befores,
+    };
+  }
+  for (const name of subdirs) {
+    yield* walk(new URL(`${encodeURIComponent(name)}/`, dir), `${relative}${name}/`, befores);
+  }
 }
