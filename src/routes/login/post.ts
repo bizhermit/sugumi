@@ -3,11 +3,11 @@ import { createSession, destroySession, sessionCookie } from "../../lib/auth/ses
 import { audit } from "../../lib/audit.ts";
 import { clearPreLoginCookie } from "../../web/csrf.ts";
 import { errorPage } from "../../web/error-page.ts";
-import type { PageContext } from "../../web/router.ts";
+import type { RouteContext } from "../../web/router.ts";
 import { path, redirect } from "../../web/url.ts";
 import { loginForm } from "./view.ts";
 
-export default async function (req: Request, ctx: PageContext): Promise<Response> {
+export default async function (req: Request, ctx: RouteContext): Promise<Response> {
   let form: FormData;
   try {
     form = await req.formData();

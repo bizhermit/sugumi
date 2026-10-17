@@ -3,7 +3,7 @@
  * そのファイルを /assets/ で配信する。`_assets/` の中のそれ以外のファイルは、index から読み込まれる部品になる。
  *
  * deno bundle はエントリーに共通する親ディレクトリを基準に出力する。
- * src/web/_assets/ と src/pages/ にエントリーがあるため、dist/public/ は src/ と同じ構成になる。
+ * src/web/_assets/ と src/routes/ にエントリーがあるため、dist/public/ は src/ と同じ構成になる。
  *
  * ファイルは起動時にすべて読み込み、リクエストはその表で引くだけにする。
  * リクエストのパスからファイルパスを組み立てないため、`../` などで dist/public/ 外のファイルには届かない。
@@ -30,7 +30,7 @@ const assets = await loadAssets();
  * dist/public/ からの相対パス name のファイルを読み込む URL を返す。
  * name のファイルがなければ例外を投げる。
  *
- *   asset("pages/login/_assets/login.js") // "/assets/pages/login/_assets/login.js?v=..."
+ *   asset("routes/login/_assets/login.js") // "/assets/routes/login/_assets/login.js?v=..."
  */
 export function asset(name: string): string {
   const found = assets.get(name);

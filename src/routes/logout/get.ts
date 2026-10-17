@@ -1,17 +1,17 @@
 import { csrfInput } from "../../web/csrf.ts";
 import { escapeHtml } from "../../lib/html.ts";
 import { layout } from "../../web/layout.ts";
-import type { PageContext } from "../../web/router.ts";
+import type { RouteContext } from "../../web/router.ts";
 import { path, redirect } from "../../web/url.ts";
 
-export default async function (_req: Request, ctx: PageContext): Promise<Response> {
+export default async function (_req: Request, ctx: RouteContext): Promise<Response> {
   if (!ctx.session) return redirect(path("/login"));
   // 外部サイトのリンクや、ブラウザの先読み・リンクを確認するツールが GET するだけで
   // ログアウトさせられないよう、GET では確認画面を出し、そこからの POST でだけログアウトする
   return await confirmPage(ctx);
 }
 
-async function confirmPage(ctx: PageContext): Promise<Response> {
+async function confirmPage(ctx: RouteContext): Promise<Response> {
   const html = layout({
     title: "ログアウト",
     body: `<h1>ログアウト</h1>

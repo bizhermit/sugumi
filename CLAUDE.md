@@ -6,7 +6,7 @@
 src/
   main.ts
   routes.gen.ts   ルートの型（生成物）
-  pages/          画面ごとの処理。ディレクトリと URL が対応する
+  routes/         URL ごとの処理。ディレクトリと URL が対応する
     login/
       get.ts      GET /login の処理（HEAD も受ける）
       post.ts     POST /login の処理
@@ -21,8 +21,8 @@ src/
 scripts/          deno task から実行するスクリプト
 ```
 
-- 依存の向きは `pages → web → lib` の一方向にする。逆向きに import しない。
-  - pages は lib も直接使ってよい。
+- 依存の向きは `routes → web → lib` の一方向にする。逆向きに import しない。
+  - routes は lib も直接使ってよい。
 - 画面の処理は、そのディレクトリのメソッドのファイルに書く。SQL もページから直接実行してよい。
   - メソッドのファイル（`get.ts`・`post.ts`・`put.ts`・`patch.ts`・`delete.ts`）に振り分けられる。
     - HEAD は `get.ts` で処理する。ファイルのないメソッドには 405 を返す。
@@ -31,7 +31,7 @@ scripts/          deno task から実行するスクリプト
     - `Response` を返すとそれを応答にする。`undefined` を返すとメソッドのファイルに進む。
   - `before.tree.ts` は `before.ts` と同じ形で、置いたディレクトリと配下のすべてのルートに適用する。
     - ルートでないディレクトリにも置ける。
-    - `src/pages/` に近いものから順に実行し、最後に `before.ts` を実行する。
+    - `src/routes/` に近いものから順に実行し、最後に `before.ts` を実行する。
     - 置いたディレクトリ自身を除きたいときは、`before.tree.ts` の中で分岐する。
   - 405 を返すときは、どの before も実行しない。
   - メソッドのファイル以外の名前は自由。次の慣例に揃える。
@@ -94,7 +94,7 @@ scripts/          deno task から実行するスクリプト
 
 - `_assets/` の中はクライアント専用、`_shared/` の中は両方で使う部品、それ以外はサーバー専用。
 - `_shared/` は `src/` の直下以外のどの階層にも置ける。置き場所は使う範囲で決める。
-  - 例：`src/pages/orders/_shared/` は orders/ 配下のページと `_assets/` から使う。
+  - 例：`src/routes/orders/_shared/` は orders/ 配下のルートと `_assets/` から使う。
   - 例：`src/lib/_shared/` はディレクトリをまたいで使う。
 - import してよい先は次のとおり。`deno task check:imports` で確かめる。
   - `_assets/` の中：同じ `_assets/` の中と `_shared/`

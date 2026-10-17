@@ -2,10 +2,10 @@ import { findAccount } from "../../lib/auth/accounts.ts";
 import { csrfInput } from "../../web/csrf.ts";
 import { escapeHtml } from "../../lib/html.ts";
 import { layout } from "../../web/layout.ts";
-import type { PageContext } from "../../web/router.ts";
+import type { RouteContext } from "../../web/router.ts";
 import { path, redirect } from "../../web/url.ts";
 
-export default async function (_req: Request, ctx: PageContext): Promise<Response> {
+export default async function (_req: Request, ctx: RouteContext): Promise<Response> {
   const account = ctx.session && findAccount(ctx.session.accountId);
   if (!account) return redirect(path("/login"));
 

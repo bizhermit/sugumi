@@ -1,9 +1,9 @@
 import { audit } from "../../lib/audit.ts";
 import { clearSessionCookie, destroySession } from "../../lib/auth/session.ts";
-import type { PageContext } from "../../web/router.ts";
+import type { RouteContext } from "../../web/router.ts";
 import { path, redirect } from "../../web/url.ts";
 
-export default async function (_req: Request, ctx: PageContext): Promise<Response> {
+export default async function (_req: Request, ctx: RouteContext): Promise<Response> {
   if (ctx.session) {
     await destroySession(ctx.session);
     audit("logged_out", { accountId: ctx.session.accountId, remoteAddress: ctx.remoteAddress });
