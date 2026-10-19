@@ -4,6 +4,15 @@
  */
 export const PORT = Number(Deno.env.get("PORT") ?? 3000);
 
+export type AppMode = "PROD" | "DEV" | "MOCK";
+const APP_MODES: readonly AppMode[] = ["PROD", "DEV", "MOCK"];
+
+/**
+ * 起動の仕方ではなく、アプリ自体のモード。既定は PROD。
+ * MOCK では src/routes/ の get.mock.ts などを get.ts などの代わりに使う（src/web/router.ts を参照）。
+ */
+export const APP_MODE: AppMode = appMode();
+
 /** ログインに続けて失敗してロックしたアカウントを、自動で解除するまでの分数。 */
 export const LOGIN_LOCKOUT_MINUTES = integer("LOGIN_LOCKOUT_MINUTES", 60, 1);
 
@@ -27,4 +36,14 @@ function integer(name: string, fallback: number, min: number): number {
     throw new Error(`環境変数 ${name} は ${min} 以上の整数にしてください: ${raw}`);
   }
   return value;
+}
+
+function appMode(): AppMode {
+  const raw = Deno.env.get("APP_MODE");
+  if (raw === undefined || raw === "") return "PROD";
+  const mode = APP_MODES.find((m) => m === raw);
+  if (!mode) {
+    throw new Error(`環境変数 APP_MODE は ${APP_MODES.join("・")} のどれかにしてください: ${raw}`);
+  }
+  return mode;
 }

@@ -6,6 +6,8 @@
  *   `_shared/` の中（共有）        ：`_shared/` だけを import できる
  *   それ以外（サーバー）            ：`_assets/` を import できない
  *
+ * また、`*.mock.*` は `*.mock.*` からだけ import できる。モックは本番のイメージに含めない（.dockerignore）ため。
+ *
  * あわせて、src/_shared/ とシンボリックリンクがないこと、`_assets/` と `_shared/` に JSX のファイルがないことを確かめる。
  * JSX は src/lib/jsx-runtime.ts を暗黙に import し、指定子がソースに現れないため、ファイルの拡張子で判定する。
  * ディレクトリをまたぐ共有の部品は src/lib/_shared/ に置く。
@@ -23,6 +25,7 @@ const ROOT_PATH = decodeURIComponent(ROOT.pathname);
 const SPECIFIER = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*(["'`])((?:(?!\1)[^\n])+)\1/g;
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*(?!["'`])/g;
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
+const MOCK_FILE = /\.mock\.[^/]*$/;
 
 const violations: string[] = [];
 if (await exists(new URL("src/_shared/", ROOT))) {
@@ -70,6 +73,9 @@ function check(from: string, fromKind: Kind, specifier: string, file: URL): stri
       : "_assets/ と _shared/ からは相対パスだけを import できます";
   }
   const to = relative(new URL(specifier, file));
+  if (MOCK_FILE.test(to) && !MOCK_FILE.test(from)) {
+    return "*.mock.* は *.mock.* からだけ import できます";
+  }
   const toKind = kindOf(to);
   switch (fromKind) {
     case "client":
