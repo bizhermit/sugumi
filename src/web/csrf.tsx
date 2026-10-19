@@ -31,11 +31,14 @@ const KEY = await crypto.subtle.importKey(
 export type Csrf = {
   /** ログイン前の Cookie が送られてきたが、期限切れか不正だったとき true。 */
   readonly stale: boolean;
-  /** 照合先がなければログイン前の Cookie を発行し、applyCookie() でレスポンスに載せる。 */
+  /** 照合先がなければログイン前の Cookie を発行し、apply() でレスポンスに載せる。 */
   token(): Promise<string>;
   /** トークンはフォームの `_csrf` か、fetch から送る場合は `X-CSRF-Token` ヘッダーで受け取る。 */
   verify(req: Request): Promise<boolean>;
-  applyCookie(res: Response): Response;
+  /**
+   * token() で発行した Cookie を載せる。token() を呼んでいれば、ページの指定によらず cache-control を no-store にする。
+   */
+  apply(res: Response): Response;
 };
 
 export function csrfFor(req: Request, session: Session | undefined): Csrf {
@@ -43,9 +46,11 @@ export function csrfFor(req: Request, session: Session | undefined): Csrf {
   const preLogin = raw !== undefined && isFresh(raw, Date.now()) ? raw : undefined;
   const binding = session ? `session:${session.id}` : preLogin && `pre:${preLogin}`;
   let issued: string | undefined;
+  let used = false;
   return {
     stale: raw !== undefined && preLogin === undefined,
     token() {
+      used = true;
       if (binding !== undefined) return sign(binding);
       issued ??= `${Date.now()}.${randomToken()}`;
       return sign(`pre:${issued}`);
@@ -56,10 +61,15 @@ export function csrfFor(req: Request, session: Session | undefined): Csrf {
       const token = req.headers.get(HEADER_NAME) ?? await readFormToken(req);
       return token !== undefined && timingSafeEqual(token, await sign(binding));
     },
-    applyCookie(res) {
-      if (issued === undefined) return res;
+    apply(res) {
+      if (!used) return res;
       const out = new Response(res.body, res);
-      out.headers.append("set-cookie", hostCookie(PRE_LOGIN_COOKIE, issued));
+      // トークンはセッションに結び付いているため、共有キャッシュに残ると別の利用者にトークンが渡り、
+      // ブラウザのキャッシュに残るとセッションが変わったあとの送信が失敗する
+      out.headers.set("cache-control", "no-store");
+      if (issued !== undefined) {
+        out.headers.append("set-cookie", hostCookie(PRE_LOGIN_COOKIE, issued));
+      }
       return out;
     },
   };

@@ -37,6 +37,8 @@ export function contentSecurityPolicy(overrides: CspDirectives = {}): string {
 const DEFAULT_HEADERS: [string, string][] = [
   ["content-security-policy", contentSecurityPolicy()],
   ["x-content-type-options", "nosniff"],
+  // ログイン後のページを共有 PC のブラウザやプロキシに残さないよう、キャッシュさせてよい応答のほうで設定させる
+  ["cache-control", "no-store"],
   // HTTPS で配信する前提。ブラウザは HTTP で受け取った HSTS を無視するため、開発中の http://localhost には影響しない
   ["strict-transport-security", "max-age=31536000; includeSubDomains"],
   // no-referrer にすると同一オリジンへの POST でも Origin が null になり、Origin による CSRF 対策ができない
