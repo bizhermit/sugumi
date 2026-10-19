@@ -1,14 +1,11 @@
-import { findAccount } from "../../lib/auth/accounts.ts";
 import { CsrfInput } from "../../web/csrf.tsx";
 import { htmlDocument } from "../../web/html-document.tsx";
-import { loginRedirect } from "../../web/login-redirect.ts";
 import type { RouteContext } from "../../web/router.ts";
 import { path } from "../../web/url.ts";
+import { loginAccount } from "../login-account.ts";
 
-export default async function (req: Request, ctx: RouteContext): Promise<Response> {
-  const account = ctx.session && findAccount(ctx.session.accountId);
-  if (!account) return loginRedirect(req);
-
+export default async function (_req: Request, ctx: RouteContext): Promise<Response> {
+  const account = loginAccount.get(ctx);
   const html = await htmlDocument(ctx, {
     title: "ホーム",
     page: import.meta.url,
