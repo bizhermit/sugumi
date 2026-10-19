@@ -1,13 +1,14 @@
 import { CsrfInput } from "../../web/csrf.tsx";
 import type { RouteContext } from "../../web/router.ts";
 import { htmlDocument } from "../../web/html-document.tsx";
-import { path } from "../../web/url.ts";
+import { type AppPath, path } from "../../web/url.ts";
 
-type FormState = { status?: number; username?: string; message?: string };
+/** to は、ログイン後の戻り先。appPathOf() で確かめた値を渡す。 */
+type FormState = { status?: number; username?: string; message?: string; to?: AppPath };
 
 export async function loginForm(
   ctx: RouteContext,
-  { status = 200, username = "", message }: FormState,
+  { status = 200, username = "", message, to }: FormState,
 ): Promise<Response> {
   // パスワード欄の spellcheck などは、_assets/index.ts で表示に切り替えたときに
   // 入力がスペルチェックや予測変換に渡らないようにするため
@@ -21,6 +22,7 @@ export async function loginForm(
           {message && <p role="alert">{message}</p>}
           <form method="post" action={path("/login")}>
             <CsrfInput token={await ctx.csrfToken()} />
+            {to && <input type="hidden" name="to" value={to} />}
             <p>
               <label>
                 ユーザー名{" "}

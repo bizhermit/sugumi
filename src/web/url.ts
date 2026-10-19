@@ -53,3 +53,23 @@ export function path<P extends RoutePath>(route: P, ...[options]: PathOptions<P>
 export function redirect(to: AppPath, status: 301 | 302 | 303 | 307 | 308 = 302): Response {
   return new Response(null, { status, headers: { location: to } });
 }
+
+/**
+ * 利用者から受け取ったパス（ログイン後の戻り先など）が、このサイトの中を指すときだけ AppPath にして返す。
+ * 別のサイトを指すか、パスとして読めなければ undefined を返す。フラグメントは捨てる。
+ */
+export function appPathOf(value: string | null): AppPath | undefined {
+  if (value === null || !value.startsWith("/")) return undefined;
+  // `//evil.example` や `/\evil.example` はブラウザが別のホストとして解釈するため、URL として解析して確かめる
+  const base = "http://app.invalid";
+  let url: URL;
+  try {
+    url = new URL(value, base);
+  } catch {
+    return undefined;
+  }
+  if (url.origin !== base) return undefined;
+  // `/.//evil.example` は正規化すると `//evil.example` になり、Location に入れると別のホストを指す
+  if (url.pathname.startsWith("//")) return undefined;
+  return (url.pathname + url.search) as AppPath;
+}
