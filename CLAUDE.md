@@ -39,6 +39,11 @@ scripts/          deno task から実行するスクリプト
       - `ctx.route` は照合したルートのパターン（例：`"/admin"`、`"/user/[id]"`）。
       - `req.url` の pathname で判定しない。`/%61dmin` も `/admin` に照合されるため。
   - 405 を返すときは、どの before も実行しない。
+  - すべてのルートは、既定でログインを求める（`src/routes/before.tree.ts`）。
+    - ログインなしで開けるページは、そのファイルの `PUBLIC_ROUTES` に足す。
+    - ページの中でログインを確かめない。
+    - ログイン中のアカウントは `src/routes/login-account.ts` の `loginAccount` で受け取る。
+      - `PUBLIC_ROUTES` のページでは設定されない。ログインの有無は `ctx.session` で判定する。
   - before で用意した値を後に渡すときは、`src/web/slot.ts` の `slot()` を使う。
     - `ctx` に値を書き足さない。
     - `slot()` は、set する before と同じディレクトリのファイルで定義する。
