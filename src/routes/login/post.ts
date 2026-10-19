@@ -4,7 +4,7 @@ import { audit } from "../../lib/audit.ts";
 import { clearPreLoginCookie } from "../../web/csrf.tsx";
 import { errorPage } from "../../web/error-page.tsx";
 import type { RouteContext } from "../../web/router.ts";
-import { path, redirect } from "../../web/url.ts";
+import { appPathOf, path, redirect } from "../../web/url.ts";
 import { loginForm } from "./view.tsx";
 
 export default async function (req: Request, ctx: RouteContext): Promise<Response> {
@@ -17,6 +17,8 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
   const username = form.get("username");
   const password = form.get("password");
   if (typeof username !== "string" || typeof password !== "string") return errorPage(400);
+  const toValue = form.get("to");
+  const to = typeof toValue === "string" ? appPathOf(toValue) : undefined;
 
   const result = await authenticate(username, password);
   const { remoteAddress } = ctx;
@@ -36,13 +38,14 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
     return await loginForm(ctx, {
       status: 401,
       username,
+      to,
       message: "ユーザー名またはパスワードが違うか、アカウントがロックされています。",
     });
   }
   // ログイン前と同じトークンを使い続けるとセッション固定攻撃を受けるため、ログインのたびに作り直す
   if (ctx.session) await destroySession(ctx.session);
   audit("login_succeeded", { accountId: result.account.id, remoteAddress });
-  const res = redirect(path("/home"), 303);
+  const res = redirect(to ?? path("/home"), 303);
   res.headers.append("set-cookie", sessionCookie(await createSession(result.account.id)));
   res.headers.append("set-cookie", clearPreLoginCookie());
   return res;
