@@ -9,7 +9,9 @@
 ## 開発
 
 ```sh
-deno task dev    # 開発サーバー（ファイル監視あり）
+deno task dev       # 開発サーバー（ファイル監視あり、APP_MODE=DEV）
+deno task dev:mock  # 開発サーバーを APP_MODE=MOCK で起動（routes の *.mock.* を使う）
+deno task dev:prod  # 開発サーバーを APP_MODE=PROD で起動
 deno task build  # クライアントコードをバンドル
 deno task start  # サーバー起動（先に deno task build が必要）
 deno task account:add <ユーザー名> <表示名>  # アカウントを追加（パスワードは入力を求める）

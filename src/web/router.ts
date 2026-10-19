@@ -17,6 +17,9 @@
  * 適用する範囲と順番は before.ts・before.tree.ts と同じで、layout.ts だけがあるディレクトリも例外になる。
  *
  * これらのファイルの拡張子は .ts か .tsx（JSX を書くとき）で、同じ名前で両方を置くと例外になる。
+ * get.mock.ts のように .mock を付けたファイルは、mock を指定したときに付けないファイルの代わりに使い、
+ * 指定しないときは無視する。付けないファイルがなければ、mock の指定によらず例外になる。
+ * mock の指定でルートの一覧が変わると、モードによらず生成する routes.gen.ts と食い違うため。
  *
  * これら以外のファイルはルートにしないため、ページ専用の部品は同じディレクトリに置ける。
  * `_` や `.` で始まるディレクトリは走査しない。ページの JS・CSS は `_assets/` に置く（assets.ts を参照）。
@@ -91,13 +94,14 @@ const TREE_BEFORE_FILE = "before.tree";
 const LAYOUT_FILE = "layout";
 const TREE_LAYOUT_FILE = "layout.tree";
 const EXTENSIONS = [".ts", ".tsx"];
+const MOCK_SUFFIX = ".mock";
 const SPECIAL_FILES = [
   ...Object.keys(METHOD_FILES),
   BEFORE_FILE,
   TREE_BEFORE_FILE,
   LAYOUT_FILE,
   TREE_LAYOUT_FILE,
-];
+].flatMap((name) => [name, name + MOCK_SUFFIX]);
 
 // キーはディレクトリのデコード済みの pathname。loadRouter で設定する
 const layoutChains = new Map<string, Layout[]>();
@@ -106,12 +110,15 @@ const layoutChains = new Map<string, Layout[]>();
  * ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合、
  * before.ts・layout.ts があるのにメソッドのファイルがない場合、同じ名前の .ts と .tsx がある場合、
  * メソッド・before・layout のファイルの名前の大文字小文字や拡張子が違う場合、
- * シンボリックリンクがある場合は例外を投げる。
+ * .mock を付けたファイルに付けないファイルがない場合、シンボリックリンクがある場合は例外を投げる。
+ * mock が true なら、.mock を付けたファイルがあればそちらを返す。
  */
-export async function scanRoutes(): Promise<RouteDir[]> {
+export async function scanRoutes(
+  { mock = false }: { mock?: boolean } = {},
+): Promise<RouteDir[]> {
   const routes: RouteDir[] = [];
   const sources = new Map<string, string>();
-  for await (const dir of walk(ROUTES_DIR, "", { befores: [], layouts: [] })) {
+  for await (const dir of walk(ROUTES_DIR, "", { befores: [], layouts: [] }, mock)) {
     const { relative } = dir;
     const segments = parseSegments(relative);
     // /assets/ は assets.ts が静的ファイルの配信に使う
@@ -132,14 +139,15 @@ export async function scanRoutes(): Promise<RouteDir[]> {
 /**
  * scanRoutes の例外に加え、ルートのファイルの default export が関数でない場合や、
  * layout のファイルの default export が Layout の形でない場合も例外を投げる。
+ * mock が true なら、.mock を付けたファイルがあればそちらを読み込む。
  */
-export async function loadRouter(): Promise<
-  (pathname: string, method: string) => RouteMatch | undefined
-> {
+export async function loadRouter(
+  { mock }: { mock: boolean },
+): Promise<(pathname: string, method: string) => RouteMatch | undefined> {
   const statics = new Map<string, Route>();
   const dynamics: DynamicRoute[] = [];
   layoutChains.clear();
-  for (const dir of await scanRoutes()) {
+  for (const dir of await scanRoutes({ mock })) {
     const route = await loadRoute(dir);
     layoutChains.set(decodeURIComponent(urlOf(dir.relative).pathname), await loadLayouts(dir));
     if (dir.segments.some((s) => "param" in s)) {
@@ -217,7 +225,7 @@ async function loadRoute(dir: RouteDir): Promise<Route> {
   for (const name of dir.methods) {
     const handler: RouteHandler = await load(dir.relative + name);
     methods.set(
-      METHOD_FILES[name.slice(0, name.lastIndexOf("."))],
+      METHOD_FILES[name.slice(0, name.indexOf("."))],
       befores.length === 0 ? handler : async (req, ctx) => {
         for (const before of befores) {
           const res = await before(req, ctx);
@@ -294,6 +302,7 @@ async function* walk(
   dir: URL,
   relative: string,
   inherited: { befores: string[]; layouts: string[] },
+  mock: boolean,
 ): AsyncGenerator<{ relative: string; methods: string[]; befores: string[]; layouts: string[] }> {
   const files: string[] = [];
   const subdirs: string[] = [];
@@ -309,12 +318,24 @@ async function* walk(
       files.push(entry.name);
     }
   }
-  const find = (base: string): string | undefined => {
+  const pick = (base: string): string | undefined => {
     const found = EXTENSIONS.map((ext) => base + ext).filter((name) => files.includes(name));
     if (found.length > 1) {
       throw new Error(`routes/${relative}${base}: ${found.join(" と ")} の両方があります`);
     }
     return found[0];
+  };
+  const find = (base: string): string | undefined => {
+    const real = pick(base);
+    const mocked = pick(base + MOCK_SUFFIX);
+    if (mocked && !real) {
+      throw new Error(
+        `routes/${relative}${mocked}: 同じディレクトリに ${
+          EXTENSIONS.map((ext) => base + ext).join("・")
+        } がありません`,
+      );
+    }
+    return mock && mocked ? mocked : real;
   };
   const append = (chain: string[], base: string) => {
     const name = find(base);
@@ -341,7 +362,7 @@ async function* walk(
     }
   }
   for (const name of subdirs) {
-    yield* walk(new URL(`${encodeURIComponent(name)}/`, dir), `${relative}${name}/`, tree);
+    yield* walk(new URL(`${encodeURIComponent(name)}/`, dir), `${relative}${name}/`, tree, mock);
   }
 }
 

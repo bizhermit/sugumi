@@ -5,8 +5,9 @@ import { loadRouter } from "./router.ts";
 import { withSecurityHeaders } from "./security-headers.ts";
 import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";
 import { path, redirect } from "./url.ts";
+import { APP_MODE } from "../lib/env.ts";
 
-const match = await loadRouter();
+const match = await loadRouter({ mock: APP_MODE === "MOCK" });
 
 // Deno の req.url は Host ヘッダーを検証せずに連結して作られるため、
 // Host に `/` や `#` を含めると URL として解析したときの pathname を差し替えられる。

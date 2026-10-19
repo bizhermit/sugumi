@@ -12,6 +12,7 @@
       "read": ["src", "dist/public", "data"],
       "write": ["data"],
       "env": [
+        "APP_MODE",
         "PORT",
         "LOGIN_LOCKOUT_MINUTES",
         "LOGIN_MAX_FAILED_ATTEMPTS",
@@ -34,6 +35,7 @@
       "read": ["src", "data"],
       "write": ["data"],
       "env": [
+        "APP_MODE",
         "PORT",
         "LOGIN_LOCKOUT_MINUTES",
         "LOGIN_MAX_FAILED_ATTEMPTS",
@@ -44,7 +46,10 @@
     }
   },
   "tasks": {
-    "dev": "deno task build && (deno task gen --watch & deno task bundle --watch & deno run --watch=src/routes/,dist/public/ -P src/main.ts)",
+    "dev": "APP_MODE=DEV deno task watch",
+    "dev:mock": "APP_MODE=MOCK deno task watch",
+    "dev:prod": "APP_MODE=PROD deno task watch",
+    "watch": "deno task build && (deno task gen --watch & deno task bundle --watch & deno run --watch=src/routes/,dist/public/ -P src/main.ts)",
     "gen": "deno run -P=gen scripts/gen-routes.ts",
     "start": "deno run -P src/main.ts",
     "build": "rm -rf dist/public && deno task check:imports && deno task bundle && deno task check:bundle",
