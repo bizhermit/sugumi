@@ -4,15 +4,17 @@
     "jsxImportSource": "#jsx"
   },
   "imports": {
-    "#jsx/jsx-runtime": "./src/lib/jsx-runtime.ts"
+    "#jsx/jsx-runtime": "./src/lib/jsx-runtime.ts",
+    "pg": "npm:pg@8.23.1"
   },
   "permissions": {
     "default": {
       "net": true,
-      "read": ["src", "dist/public", "data"],
-      "write": ["data"],
+      "read": ["src", "dist/public"],
       "env": [
         "APP_MODE",
+        "DATABASE_URL",
+        "PG*",
         "PORT",
         "LOGIN_LOCKOUT_MINUTES",
         "LOGIN_MAX_FAILED_ATTEMPTS",
@@ -32,10 +34,12 @@
       "read": ["dist/public"]
     },
     "account": {
-      "read": ["src", "data"],
-      "write": ["data"],
+      "read": ["src"],
+      "net": true,
       "env": [
         "APP_MODE",
+        "DATABASE_URL",
+        "PG*",
         "PORT",
         "LOGIN_LOCKOUT_MINUTES",
         "LOGIN_MAX_FAILED_ATTEMPTS",

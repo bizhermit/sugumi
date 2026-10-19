@@ -1,5 +1,5 @@
 import { randomToken } from "../crypto.ts";
-import { db } from "../db.ts";
+import { db, transaction } from "../db.ts";
 import { LOGIN_LOCKOUT_MINUTES, LOGIN_MAX_FAILED_ATTEMPTS } from "../env.ts";
 import {
   hashPassword,
@@ -9,7 +9,7 @@ import {
 } from "./password.ts";
 
 const USERNAME_MAX_LENGTH = 64;
-const SQLITE_CONSTRAINT_UNIQUE = 2067;
+const PG_UNIQUE_VIOLATION = "23505";
 
 export type Account = { id: number; username: string; displayName: string };
 
@@ -26,7 +26,7 @@ type AccountRow = {
   display_name: string;
   password_hash: string;
   failed_attempts: number;
-  locked_until: number | null;
+  locked_until: Date | null;
 };
 
 if (LOGIN_MAX_FAILED_ATTEMPTS === 0) {
@@ -37,9 +37,10 @@ const DUMMY_HASH = await hashPassword(randomToken());
 
 /** 呼び出し側は、どの失敗かを利用者に区別して見せないこと。アカウントの有無やロックの状態が分かってしまう。 */
 export async function authenticate(username: string, password: string): Promise<AuthResult> {
-  const row = db.prepare("SELECT * FROM accounts WHERE username = ?").get(username) as
-    | AccountRow
-    | undefined;
+  const { rows: [row] } = await db.query<AccountRow>(
+    "SELECT * FROM accounts WHERE username = $1",
+    [username],
+  );
   // 長い入力で重いハッシュを計算させ、CPU を使い切らせないため、上限を超えたら計算しない。
   // アカウントの有無に関わらず計算しないため、応答時間の差は出ない
   const checkable = password.length <= PASSWORD_MAX_LENGTH;
@@ -49,12 +50,13 @@ export async function authenticate(username: string, password: string): Promise<
     return { status: "unknown_user" };
   }
   const account = toAccount(row);
-  const attempt = reserveAttempt(row.id, Date.now());
+  const attempt = await reserveAttempt(row.id, Date.now());
   const ok = checkable && await verifyPassword(password, row.password_hash);
   if (!attempt) return { status: "locked", account };
   if (!ok) return { status: "wrong_password", account, locked: attempt.locks };
-  db.prepare("UPDATE accounts SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
-    .run(row.id);
+  await db.query("UPDATE accounts SET failed_attempts = 0, locked_until = NULL WHERE id = $1", [
+    row.id,
+  ]);
   return { status: "ok", account };
 }
 
@@ -63,22 +65,31 @@ export async function authenticate(username: string, password: string): Promise<
  * LOGIN_MAX_FAILED_ATTEMPTS が 0 なら数えず、それまでのロックも無視する。
  * 検証の後で数えると、検証中に並行して送られたリクエストが上限を超えて試せてしまうため。
  * 上限に達する回で先にロックするのは、検証中にプロセスが落ちてもロックが残るようにするため。
+ * 並行して送られたリクエストが同じ回数を読んで数え漏れないよう、行をロックして読む。
  */
-function reserveAttempt(id: number, now: number): { locks: boolean } | undefined {
+async function reserveAttempt(id: number, now: number): Promise<{ locks: boolean } | undefined> {
   if (LOGIN_MAX_FAILED_ATTEMPTS === 0) return { locks: false };
-  const { failed_attempts, locked_until } = db
-    .prepare("SELECT failed_attempts, locked_until FROM accounts WHERE id = ?")
-    .get(id) as Pick<AccountRow, "failed_attempts" | "locked_until">;
-  if (locked_until !== null && locked_until > now) return undefined;
-  const attempts = (locked_until === null ? failed_attempts : 0) + 1;
-  const locks = attempts >= LOGIN_MAX_FAILED_ATTEMPTS;
-  db.prepare("UPDATE accounts SET failed_attempts = ?, locked_until = ? WHERE id = ?")
-    .run(attempts, locks ? now + LOGIN_LOCKOUT_MINUTES * 60 * 1000 : null, id);
-  return { locks };
+  return await transaction(async (client) => {
+    const { rows: [{ failed_attempts, locked_until }] } = await client.query<
+      Pick<AccountRow, "failed_attempts" | "locked_until">
+    >("SELECT failed_attempts, locked_until FROM accounts WHERE id = $1 FOR UPDATE", [id]);
+    if (locked_until !== null && locked_until.getTime() > now) return undefined;
+    const attempts = (locked_until === null ? failed_attempts : 0) + 1;
+    const locks = attempts >= LOGIN_MAX_FAILED_ATTEMPTS;
+    await client.query(
+      "UPDATE accounts SET failed_attempts = $1, locked_until = $2 WHERE id = $3",
+      [
+        attempts,
+        locks ? new Date(now + LOGIN_LOCKOUT_MINUTES * 60 * 1000) : null,
+        id,
+      ],
+    );
+    return { locks };
+  });
 }
 
-export function findAccount(id: number): Account | undefined {
-  const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(id) as AccountRow | undefined;
+export async function findAccount(id: number): Promise<Account | undefined> {
+  const { rows: [row] } = await db.query<AccountRow>("SELECT * FROM accounts WHERE id = $1", [id]);
   return row && toAccount(row);
 }
 
@@ -99,14 +110,13 @@ export async function createAccount(
   }
   const hash = await hashPassword(password);
   try {
-    const row = db
-      .prepare(
-        "INSERT INTO accounts (username, display_name, password_hash) VALUES (?, ?, ?) RETURNING *",
-      )
-      .get(username, displayName, hash) as AccountRow;
+    const { rows: [row] } = await db.query<AccountRow>(
+      "INSERT INTO accounts (username, display_name, password_hash) VALUES ($1, $2, $3) RETURNING *",
+      [username, displayName, hash],
+    );
     return toAccount(row);
   } catch (e) {
-    if ((e as { errcode?: number }).errcode === SQLITE_CONSTRAINT_UNIQUE) {
+    if ((e as { code?: string }).code === PG_UNIQUE_VIOLATION) {
       throw new Error(`ユーザー名 ${username} は使われています`);
     }
     throw e;

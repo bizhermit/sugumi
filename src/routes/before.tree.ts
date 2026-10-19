@@ -10,10 +10,10 @@ import { loginAccount } from "./login-account.ts";
 // ここで送ると to=/logout が付き、ログインした直後にログアウトの確認画面が出てしまう
 const PUBLIC_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/", "/login", "/logout"]);
 
-export default function (req: Request, ctx: RouteContext): Response | undefined {
+export default async function (req: Request, ctx: RouteContext): Promise<Response | undefined> {
   if (!PUBLIC_ROUTES.has(ctx.route)) {
     // セッションが残っていても、アカウントが消されていればログインしていないものとして扱う
-    const account = ctx.session && findAccount(ctx.session.accountId);
+    const account = ctx.session && await findAccount(ctx.session.accountId);
     if (!account) return loginRedirect(req);
     loginAccount.set(ctx, account);
   }

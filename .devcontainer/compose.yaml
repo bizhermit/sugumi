@@ -3,6 +3,10 @@ services:
     env_file:
       - path: .env
         required: true
+    environment:
+      # 既定は開発用の DB。db サービスは compose のネットワークの中からだけ接続できる
+      # .env に書くと、その値で上書きできる（environment は env_file より優先されるため、ここで受け取る）
+      DATABASE_URL: ${DATABASE_URL:-postgres://app:app@db:5432/app}
     build:
       context: .
       dockerfile: Dockerfile
@@ -16,11 +20,23 @@ services:
       - ..:/workspace:cached
       - claude-config:/home/dev/.claude
       - gh-config:/home/dev/.config/gh
-      # SQLite のデータベース。Rebuild しても残し、ホストのリポジトリには置かない
-      - app-data:/workspace/data
+    depends_on:
+      - db
     command: sleep infinity
+
+  # 開発用の PostgreSQL。ポートはホストに公開しない
+  # 更新時は `docker buildx imagetools inspect postgres:<タグ>` で manifest list のダイジェストを取得して置き換える
+  db:
+    image: postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    volumes:
+      # Rebuild しても残す。PostgreSQL 18 のイメージは /var/lib/postgresql の下にバージョンごとのディレクトリを作る
+      - db-data:/var/lib/postgresql
 
 volumes:
   claude-config:
   gh-config:
-  app-data:
+  db-data:

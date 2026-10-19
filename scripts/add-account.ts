@@ -4,6 +4,7 @@
  *   deno task account:add <ユーザー名> <表示名>
  */
 import { createAccount } from "../src/lib/auth/accounts.ts";
+import { db } from "../src/lib/db.ts";
 
 const [username, displayName] = Deno.args;
 if (username === undefined || displayName === undefined) {
@@ -23,6 +24,8 @@ if (password !== await readHidden("パスワード（確認）: ")) {
 try {
   const account = await createAccount(username, displayName, password);
   console.log(`追加しました（id: ${account.id}）`);
+  // 接続を閉じないと、Pool が接続を持ったままプロセスが終わらない
+  await db.end();
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
   Deno.exit(1);

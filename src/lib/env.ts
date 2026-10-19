@@ -13,6 +13,13 @@ const APP_MODES: readonly AppMode[] = ["PROD", "DEV", "MOCK"];
  */
 export const APP_MODE: AppMode = appMode();
 
+/**
+ * PostgreSQL の接続先（例：postgres://user:password@host:5432/dbname）。パスワードを含むため、ログに出さないこと。
+ * パスワードは URL に含める。含めないと pg が ~/.pgpass を読もうとし、permissions で拒否される。
+ * pg は PGSSLMODE など PG で始まる環境変数も読むため、deno.json の permissions で PG* を許可している。
+ */
+export const DATABASE_URL = required("DATABASE_URL");
+
 /** ログインに続けて失敗してロックしたアカウントを、自動で解除するまでの分数。 */
 export const LOGIN_LOCKOUT_MINUTES = integer("LOGIN_LOCKOUT_MINUTES", 60, 1);
 
@@ -27,6 +34,12 @@ export const SESSION_ABSOLUTE_TIMEOUT_MINUTES = integer("SESSION_ABSOLUTE_TIMEOU
 
 /** ログイン前に表示したフォーム（ログイン画面など）の CSRF トークンが有効な分数。0 なら切れない。 */
 export const PRE_LOGIN_CSRF_TIMEOUT_MINUTES = integer("PRE_LOGIN_CSRF_TIMEOUT_MINUTES", 60, 0);
+
+function required(name: string): string {
+  const value = Deno.env.get(name);
+  if (value === undefined || value === "") throw new Error(`環境変数 ${name} を設定してください`);
+  return value;
+}
 
 function integer(name: string, fallback: number, min: number): number {
   const raw = Deno.env.get(name);
