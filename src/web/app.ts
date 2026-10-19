@@ -71,7 +71,7 @@ async function handle(req: Request, remoteAddress: string | undefined): Promise<
     console.error(e);
     return errorPage(500);
   }
-  return csrf.applyCookie(res);
+  return csrf.apply(res);
 }
 
 /**
