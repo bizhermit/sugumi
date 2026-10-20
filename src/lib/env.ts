@@ -1,6 +1,6 @@
 /**
  * Deno.env を参照するのはこのファイルだけにする。
- * 変数を追加したら deno.json の permissions の default.env と account.env にも追記すること。
+ * 変数を追加したら deno.json の permissions の default.env.allow と account.env.allow にも追記すること。
  */
 export const PORT = Number(Deno.env.get("PORT") ?? 3000);
 

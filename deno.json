@@ -11,17 +11,20 @@
     "default": {
       "net": true,
       "read": ["src", "dist/public"],
-      "env": [
-        "APP_MODE",
-        "DATABASE_URL",
-        "PG*",
-        "PORT",
-        "LOGIN_LOCKOUT_MINUTES",
-        "LOGIN_MAX_FAILED_ATTEMPTS",
-        "SESSION_IDLE_TIMEOUT_MINUTES",
-        "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
-        "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
-      ]
+      "env": {
+        "allow": [
+          "APP_MODE",
+          "DATABASE_URL",
+          "PG*",
+          "PORT",
+          "LOGIN_LOCKOUT_MINUTES",
+          "LOGIN_MAX_FAILED_ATTEMPTS",
+          "SESSION_IDLE_TIMEOUT_MINUTES",
+          "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
+          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
+        ],
+        "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
+      }
     },
     "gen": {
       "read": ["src/routes", "src/routes.gen.ts"],
@@ -36,17 +39,20 @@
     "account": {
       "read": ["src"],
       "net": true,
-      "env": [
-        "APP_MODE",
-        "DATABASE_URL",
-        "PG*",
-        "PORT",
-        "LOGIN_LOCKOUT_MINUTES",
-        "LOGIN_MAX_FAILED_ATTEMPTS",
-        "SESSION_IDLE_TIMEOUT_MINUTES",
-        "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
-        "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
-      ]
+      "env": {
+        "allow": [
+          "APP_MODE",
+          "DATABASE_URL",
+          "PG*",
+          "PORT",
+          "LOGIN_LOCKOUT_MINUTES",
+          "LOGIN_MAX_FAILED_ATTEMPTS",
+          "SESSION_IDLE_TIMEOUT_MINUTES",
+          "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
+          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
+        ],
+        "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
+      }
     }
   },
   "tasks": {
