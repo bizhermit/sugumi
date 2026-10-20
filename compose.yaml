@@ -1,0 +1,71 @@
+# 本番用。パスワードと設定を docker/.env に書き、--env-file で読み込んで起動する（README を参照）。
+#
+#   docker compose --env-file docker/.env up -d --build
+
+services:
+  app:
+    build:
+      # src/ などを含めるため、コンテキストはリポジトリのルートにする
+      context: .
+      dockerfile: docker/app/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://app@db:5432/app
+      DATABASE_PASSWORD_FILE: /run/secrets/db_app_password
+      # docker/.env の値を渡す。書いていなければ空になり、アプリの既定値を使う。
+      # env_file で渡さないのは、docker/.env のパスワードまでアプリの環境変数に入ってしまうため
+      LOGIN_LOCKOUT_MINUTES: ${LOGIN_LOCKOUT_MINUTES:-}
+      LOGIN_MAX_FAILED_ATTEMPTS: ${LOGIN_MAX_FAILED_ATTEMPTS:-}
+      SESSION_IDLE_TIMEOUT_MINUTES: ${SESSION_IDLE_TIMEOUT_MINUTES:-}
+      SESSION_ABSOLUTE_TIMEOUT_MINUTES: ${SESSION_ABSOLUTE_TIMEOUT_MINUTES:-}
+      PRE_LOGIN_CSRF_TIMEOUT_MINUTES: ${PRE_LOGIN_CSRF_TIMEOUT_MINUTES:-}
+    secrets:
+      - db_app_password
+    ports:
+      # Cookie に Secure を付けているため、HTTPS を受けるリバースプロキシを同じサーバーに置き、そこから転送する
+      - 127.0.0.1:3000:3000
+    networks:
+      - default
+      - db
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    build: ./docker/db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
+      POSTGRES_DB: app
+      APP_DB_PASSWORD_FILE: /run/secrets/db_app_password
+    secrets:
+      - db_admin_password
+      - db_app_password
+    volumes:
+      # PostgreSQL 18 のイメージは /var/lib/postgresql の下にバージョンごとのディレクトリを作る
+      - db-data:/var/lib/postgresql
+    networks:
+      - db
+    healthcheck:
+      # 初期化の途中は Unix ソケットだけで待ち受けるため、TCP で確かめて初期化の完了を待つ
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "admin", "-d", "app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  # DB はこのネットワークだけに置く。internal のため、外部とも通信できない
+  db:
+    internal: true
+
+volumes:
+  db-data:
+
+# 環境変数に置くと docker inspect などで見えるため、docker/.env の値からファイルを作り、/run/secrets/ に置く。
+# --env-file を付け忘れると、値がないため起動しない
+secrets:
+  db_admin_password:
+    environment: DB_ADMIN_PASSWORD
+  db_app_password:
+    environment: DB_APP_PASSWORD

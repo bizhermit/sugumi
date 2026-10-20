@@ -1,4 +1,5 @@
-# 本番用イメージ
+# 本番用のアプリのイメージ。compose.yaml から DB のイメージ（docker/db/）と一緒に起動する
+# コンテキストはリポジトリのルート。除外するファイルは、隣の Dockerfile.dockerignore に書く
 # 更新時は `docker buildx imagetools inspect denoland/deno:<タグ>` で manifest list のダイジェストを取得して置き換える
 
 # ---- build: ブラウザ側のコードをバンドルし、依存を取得する ----

@@ -20,6 +20,7 @@ src/
     jsx-runtime.ts  JSX の変換先（deno.json の compilerOptions で指定）
     _shared/      サーバーとクライアントの両方で使う部品（必要になったら作る）
 scripts/          deno task から実行するスクリプト
+docker/           コンテナのイメージ（app/・db/）と、本番の設定（.env。コミットしない）
 ```
 
 - 依存の向きは `routes → web → lib` の一方向にする。逆向きに import しない。
@@ -87,6 +88,8 @@ scripts/          deno task から実行するスクリプト
 - 読んだ値をもとに書き込むときは、`transaction()` の中で `SELECT ... FOR UPDATE` などを使って守る。
   - await のたびに別のリクエストの処理が割り込み、アプリが複数のインスタンスで動くこともあるため。
 - スキーマの変更は、`src/lib/db.ts` の `MIGRATIONS` の末尾に足す。適用済みの要素は書き換えない。
+- アプリは、スキーマ `app` だけを持つユーザーで接続する（`docker/db/init/`）。開発環境も同じ。
+  - 拡張の追加など、管理者の権限が要る変更はマイグレーションに書けない。管理者で実行する。
 
 ## コメント
 

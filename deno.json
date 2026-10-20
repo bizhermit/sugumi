@@ -10,11 +10,12 @@
   "permissions": {
     "default": {
       "net": true,
-      "read": ["src", "dist/public"],
+      "read": ["src", "dist/public", "/run/secrets"],
       "env": {
         "allow": [
           "APP_MODE",
           "DATABASE_URL",
+          "DATABASE_PASSWORD_FILE",
           "PG*",
           "PORT",
           "LOGIN_LOCKOUT_MINUTES",
@@ -37,12 +38,13 @@
       "read": ["dist/public"]
     },
     "account": {
-      "read": ["src"],
+      "read": ["src", "/run/secrets"],
       "net": true,
       "env": {
         "allow": [
           "APP_MODE",
           "DATABASE_URL",
+          "DATABASE_PASSWORD_FILE",
           "PG*",
           "PORT",
           "LOGIN_LOCKOUT_MINUTES",
