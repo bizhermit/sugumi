@@ -33,9 +33,15 @@ const SESSIONLESS_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/healthz
 export async function handler(req: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
   // X-Forwarded-For は利用者が書き換えられるため使わず、TCP の接続元を使う
   const addr = info?.remoteAddr;
-  return withSecurityHeaders(
-    await handle(req, addr && "hostname" in addr ? addr.hostname : undefined),
-  );
+  let res: Response;
+  try {
+    res = await handle(req, addr && "hostname" in addr ? addr.hostname : undefined);
+  } catch (e) {
+    // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける
+    console.error(e);
+    res = errorPage(500);
+  }
+  return withSecurityHeaders(res);
 }
 
 async function handle(req: Request, remoteAddress: string | undefined): Promise<Response> {
@@ -75,19 +81,13 @@ async function handle(req: Request, remoteAddress: string | undefined): Promise<
     return res;
   }
 
-  let res: Response;
-  try {
-    res = await pageHandler(buffered, {
-      route: route.route,
-      params: route.params,
-      session,
-      csrfToken: csrf.token,
-      remoteAddress,
-    });
-  } catch (e) {
-    console.error(e);
-    return errorPage(500);
-  }
+  const res = await pageHandler(buffered, {
+    route: route.route,
+    params: route.params,
+    session,
+    csrfToken: csrf.token,
+    remoteAddress,
+  });
   return csrf.apply(res);
 }
 
