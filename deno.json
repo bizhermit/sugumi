@@ -22,7 +22,8 @@
           "LOGIN_MAX_FAILED_ATTEMPTS",
           "SESSION_IDLE_TIMEOUT_MINUTES",
           "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
-          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
+          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES",
+          "TRUSTED_PROXIES"
         ],
         "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
       }
@@ -51,7 +52,8 @@
           "LOGIN_MAX_FAILED_ATTEMPTS",
           "SESSION_IDLE_TIMEOUT_MINUTES",
           "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
-          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
+          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES",
+          "TRUSTED_PROXIES"
         ],
         "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
       }

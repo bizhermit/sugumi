@@ -6,6 +6,7 @@ import { withSecurityHeaders } from "./security-headers.ts";
 import { serveStatic, staticPaths } from "./static.ts";
 import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";
 import { path, redirect } from "./url.ts";
+import { remoteAddressOf } from "./remote-address.ts";
 import { APP_MODE } from "../lib/env.ts";
 import type { RoutePath } from "../routes.gen.ts";
 
@@ -31,11 +32,11 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const SESSIONLESS_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/healthz"]);
 
 export async function handler(req: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
-  // X-Forwarded-For は利用者が書き換えられるため使わず、TCP の接続元を使う
   const addr = info?.remoteAddr;
+  const tcpAddress = addr && "hostname" in addr ? addr.hostname : undefined;
   let res: Response;
   try {
-    res = await handle(req, addr && "hostname" in addr ? addr.hostname : undefined);
+    res = await handle(req, remoteAddressOf(req, tcpAddress));
   } catch (e) {
     // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける
     console.error(e);
