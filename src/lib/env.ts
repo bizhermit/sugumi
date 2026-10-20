@@ -4,6 +4,8 @@
  * 本番で設定できるようにするなら、compose.yaml の app の environment と docker/.env.example にも追記すること。
  * ファイルのパスを受け取る変数は、そのファイルの読み込みも permissions で許可すること。
  */
+import { type Cidr, parseCidr } from "./ip.ts";
+
 export const PORT = Number(Deno.env.get("PORT") ?? 3000);
 
 export type AppMode = "PROD" | "DEV" | "MOCK";
@@ -38,6 +40,40 @@ export const SESSION_ABSOLUTE_TIMEOUT_MINUTES = integer("SESSION_ABSOLUTE_TIMEOU
 
 /** ログイン前に表示したフォーム（ログイン画面など）の CSRF トークンが有効な分数。0 なら切れない。 */
 export const PRE_LOGIN_CSRF_TIMEOUT_MINUTES = integer("PRE_LOGIN_CSRF_TIMEOUT_MINUTES", 60, 0);
+
+/**
+ * 信頼するリバースプロキシ・ロードバランサーの IP アドレス。カンマ区切り（例：192.0.2.10）。
+ * ロードバランサーのようにアドレスが変わるものは、CIDR（例：10.0.1.0/24）で書ける。
+ * TCP の接続元がこのどれかのときだけ、X-Forwarded-For から利用者のアドレスを読む（src/web/remote-address.ts）。
+ * 未指定なら X-Forwarded-For を読まない。
+ * 範囲の中の端末は、X-Forwarded-For を書いて送れば、プロキシを通しても通さなくても接続元を偽れる。
+ * そのため、プロキシのアドレスだけを最小の範囲で書く。
+ */
+export const TRUSTED_PROXIES: readonly Cidr[] = trustedProxies();
+
+function trustedProxies(): Cidr[] {
+  const raw = Deno.env.get("TRUSTED_PROXIES");
+  if (raw === undefined || raw.trim() === "") return [];
+  return raw.split(",").map((item) => {
+    const cidr = parseCidr(item.trim());
+    // 末尾のカンマなどで空になった値も分かるよう、引用符で囲んで示す
+    const shown = JSON.stringify(item);
+    if (!cidr) {
+      throw new Error(
+        `環境変数 TRUSTED_PROXIES に IP アドレスか CIDR（ホスト部が 0）でない値があります: ${shown}`,
+      );
+    }
+    // 0.0.0.0/0 や、0.0.0.0/1,128.0.0.0/1 のように分けて全体を信頼する書き間違いを防ぐ。
+    // プロキシのアドレスの範囲は、クラウドのロードバランサーのサブネットでもこれより狭い
+    const min = cidr.bytes.length === 4 ? 8 : 32;
+    if (cidr.prefix < min) {
+      throw new Error(
+        `環境変数 TRUSTED_PROXIES の範囲が広すぎます（/${min} 以上にしてください）: ${shown}`,
+      );
+    }
+    return cidr;
+  });
+}
 
 function databaseUrl(): string {
   const raw = required("DATABASE_URL");

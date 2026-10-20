@@ -19,10 +19,13 @@ services:
       SESSION_IDLE_TIMEOUT_MINUTES: ${SESSION_IDLE_TIMEOUT_MINUTES:-}
       SESSION_ABSOLUTE_TIMEOUT_MINUTES: ${SESSION_ABSOLUTE_TIMEOUT_MINUTES:-}
       PRE_LOGIN_CSRF_TIMEOUT_MINUTES: ${PRE_LOGIN_CSRF_TIMEOUT_MINUTES:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
     secrets:
       - db_app_password
     ports:
-      # Cookie に Secure を付けているため、HTTPS を受けるリバースプロキシを同じサーバーに置き、そこから転送する
+      # Cookie に Secure を付けているため、HTTPS を受けるリバースプロキシを同じサーバーに置き、そこから転送する。
+      # このポートへの接続は、どこからでも APP_NETWORK_GATEWAY から届いたように見える。
+      # TRUSTED_PROXIES を書いたまま 127.0.0.1 以外にも公開すると、外から X-Forwarded-For で接続元を偽れる
       - 127.0.0.1:3000:3000
     networks:
       - default
@@ -55,6 +58,14 @@ services:
       retries: 10
 
 networks:
+  # 同じサーバーのリバースプロキシから 127.0.0.1:3000 への接続は、アプリにはこのネットワークのゲートウェイから届く。
+  # 作り直すたびにアドレスが変わると TRUSTED_PROXIES と合わなくなるため、固定する。
+  # サーバーのほかのネットワークと重ならない範囲はサーバーごとに違うため、docker/.env で指定する
+  default:
+    ipam:
+      config:
+        - subnet: ${APP_NETWORK_SUBNET:?docker/.env に APP_NETWORK_SUBNET を書いてください}
+          gateway: ${APP_NETWORK_GATEWAY:?docker/.env に APP_NETWORK_GATEWAY を書いてください}
   # DB はこのネットワークだけに置く。internal のため、外部とも通信できない
   db:
     internal: true

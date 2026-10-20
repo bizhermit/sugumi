@@ -47,7 +47,10 @@ export type RouteContext = {
   session: Session | undefined;
   /** フォームに埋め込む CSRF トークン。 */
   csrfToken: () => Promise<string>;
-  /** 接続元の IP アドレス。リバースプロキシの裏ではプロキシのアドレスになる。 */
+  /**
+   * 接続元の IP アドレス。同じアドレスは常に同じ文字列になる（src/lib/ip.ts の formatIp の表記）。分からなければ undefined。
+   * リバースプロキシの裏では、環境変数 TRUSTED_PROXIES を設定しないとプロキシのアドレスになる。
+   */
   remoteAddress: string | undefined;
 };
 export type RouteHandler = (req: Request, ctx: RouteContext) => Response | Promise<Response>;
