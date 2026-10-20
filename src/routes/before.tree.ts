@@ -8,7 +8,12 @@ import { loginAccount } from "./login-account.ts";
 // ログインを求めるルートではなく、ログインなしで開けるルートのほうを列挙する。
 // /logout は、ログインしていなければ各メソッドのファイルがログイン画面へ送る。
 // ここで送ると to=/logout が付き、ログインした直後にログアウトの確認画面が出てしまう
-const PUBLIC_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/", "/login", "/logout"]);
+const PUBLIC_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>([
+  "/",
+  "/healthz",
+  "/login",
+  "/logout",
+]);
 
 export default async function (req: Request, ctx: RouteContext): Promise<Response | undefined> {
   if (!PUBLIC_ROUTES.has(ctx.route)) {
