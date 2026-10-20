@@ -3,6 +3,7 @@
 !deno.json
 !deno.lock
 !src/
+!static/
 !scripts/
 # モックは開発用のため、本番のイメージに含めない
 **/*.mock.*

@@ -20,6 +20,7 @@ FROM denoland/deno:distroless-2.9.7@sha256:16583ef81ce73d6fdf806174fbda68bf4c57e
 WORKDIR /app
 COPY deno.json deno.lock ./
 COPY src/ ./src/
+COPY static/ ./static/
 COPY --from=build /app/dist/ ./dist/
 COPY --from=build /deno-dir/ /deno-dir/
 
