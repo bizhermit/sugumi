@@ -20,8 +20,8 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
   const toValue = form.get("to");
   const to = typeof toValue === "string" ? appPathOf(toValue) : undefined;
 
-  const result = await authenticate(username, password);
   const { remoteAddress } = ctx;
+  const result = await authenticate(username, password, remoteAddress);
   if (result.status !== "ok") {
     const accountId = "account" in result ? result.account.id : undefined;
     // 巨大な値でログを埋められないよう切り詰める
@@ -34,7 +34,10 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
     if (result.status === "wrong_password" && result.locked) {
       audit("account_locked", { accountId, remoteAddress });
     }
-    // どの失敗かを区別して見せると、アカウントの有無やロックの状態が分かってしまう
+    if (result.status === "address_blocked" && result.blocks) {
+      audit("address_blocked", { blockedAddress: result.blockedAddress, remoteAddress });
+    }
+    // どの失敗かを区別して見せると、アカウントの有無やロックの状態、接続元の制限が分かってしまう
     return await loginForm(ctx, {
       status: 401,
       username,

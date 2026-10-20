@@ -1,6 +1,7 @@
 import { randomToken } from "../crypto.ts";
 import { db, transaction } from "../db.ts";
 import { LOGIN_LOCKOUT_MINUTES, LOGIN_MAX_FAILED_ATTEMPTS } from "../env.ts";
+import * as loginThrottle from "./login-throttle.ts";
 import {
   hashPassword,
   PASSWORD_MAX_LENGTH,
@@ -18,7 +19,12 @@ export type AuthResult =
   /** locked はこの失敗でロックしたとき true。 */
   | { status: "wrong_password"; account: Account; locked: boolean }
   | { status: "locked"; account: Account }
-  | { status: "unknown_user" };
+  | { status: "unknown_user" }
+  /**
+   * 接続元からの失敗が多く、パスワードを確かめなかった。blocks はこの回で制限を始めたとき true。
+   * blockedAddress は制限した単位（IPv6 は /64）で、login_throttles の address。
+   */
+  | { status: "address_blocked"; blocks: boolean; blockedAddress: string };
 
 type AccountRow = {
   id: number;
@@ -35,15 +41,28 @@ if (LOGIN_MAX_FAILED_ATTEMPTS === 0) {
 
 const DUMMY_HASH = await hashPassword(randomToken());
 
-/** 呼び出し側は、どの失敗かを利用者に区別して見せないこと。アカウントの有無やロックの状態が分かってしまう。 */
-export async function authenticate(username: string, password: string): Promise<AuthResult> {
+/**
+ * 呼び出し側は、どの失敗かを利用者に区別して見せないこと。アカウントの有無やロックの状態が分かってしまう。
+ * remoteAddress は ctx.remoteAddress。undefined なら接続元ごとには数えない。
+ */
+export async function authenticate(
+  username: string,
+  password: string,
+  remoteAddress: string | undefined,
+): Promise<AuthResult> {
+  // 長い入力で重いハッシュを計算させ、CPU を使い切らせないため、上限を超えたら計算しない。
+  // アカウントの有無に関わらず計算しないため、応答時間の差は出ない
+  const checkable = password.length <= PASSWORD_MAX_LENGTH;
+  const reserved = await loginThrottle.reserveAttempt(remoteAddress, Date.now());
+  if (reserved.status === "blocked") {
+    // 確かめたときと同じだけ時間をかけ、応答時間から制限中だと見分けられないようにする
+    if (checkable) await verifyPassword(password, DUMMY_HASH);
+    return { status: "address_blocked", blocks: reserved.blocks, blockedAddress: reserved.key };
+  }
   const { rows: [row] } = await db.query<AccountRow>(
     "SELECT * FROM accounts WHERE username = $1",
     [username],
   );
-  // 長い入力で重いハッシュを計算させ、CPU を使い切らせないため、上限を超えたら計算しない。
-  // アカウントの有無に関わらず計算しないため、応答時間の差は出ない
-  const checkable = password.length <= PASSWORD_MAX_LENGTH;
   if (!row) {
     // アカウントがあるときと同じだけ時間をかけ、応答時間からアカウントの有無を見分けられないようにする
     if (checkable) await verifyPassword(password, DUMMY_HASH);
@@ -57,6 +76,7 @@ export async function authenticate(username: string, password: string): Promise<
   await db.query("UPDATE accounts SET failed_attempts = 0, locked_until = NULL WHERE id = $1", [
     row.id,
   ]);
+  await loginThrottle.refundAttempt(reserved.attempt);
   return { status: "ok", account };
 }
 
