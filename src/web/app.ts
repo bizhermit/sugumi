@@ -7,6 +7,7 @@ import { serveStatic, staticPaths } from "./static.ts";
 import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";
 import { path, redirect } from "./url.ts";
 import { APP_MODE } from "../lib/env.ts";
+import type { RoutePath } from "../routes.gen.ts";
 
 const match = await loadRouter({ mock: APP_MODE === "MOCK" });
 
@@ -25,6 +26,9 @@ const VALID_HOST = /^(?:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*|\[[0-9A-Fa-f:.]+\])(?:
 
 // ファイルのアップロードなど大きな本文を受けるルートを作るときは、ルートごとに上限を変えられるようにすること
 const MAX_BODY_BYTES = 1024 * 1024;
+
+// ctx.session が常に undefined になるため、src/routes/before.tree.ts の PUBLIC_ROUTES にも入れること
+const SESSIONLESS_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/healthz"]);
 
 export async function handler(req: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
   // X-Forwarded-For は利用者が書き換えられるため使わず、TCP の接続元を使う
@@ -56,7 +60,8 @@ async function handle(req: Request, remoteAddress: string | undefined): Promise<
   const buffered = await bufferBody(req, MAX_BODY_BYTES);
   if (!buffered) return errorPage(413);
 
-  const session = await getSession(buffered);
+  // ヘルスチェックは DB が止まっていても応答させるため、Cookie が付いていてもセッションを引かない
+  const session = SESSIONLESS_ROUTES.has(route.route) ? undefined : await getSession(buffered);
   const csrf = csrfFor(buffered, session);
   if (!(await csrf.verify(buffered))) {
     if (session) return errorPage(403);
