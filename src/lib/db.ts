@@ -34,6 +34,14 @@ const MIGRATIONS = [
     value bytea NOT NULL
   );
   `,
+  `
+  CREATE TABLE login_throttles (
+    address text PRIMARY KEY,
+    window_started_at timestamptz NOT NULL,
+    failed_attempts integer NOT NULL,
+    blocked_until timestamptz
+  );
+  `,
 ];
 
 // 複数のインスタンスが同時に起動しても、マイグレーションを 1 つずつ適用するためのロックの番号

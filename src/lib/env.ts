@@ -32,6 +32,19 @@ export const LOGIN_LOCKOUT_MINUTES = integer("LOGIN_LOCKOUT_MINUTES", 60, 1);
 /** ログインに続けてこの回数だけ失敗するとロックする。0 ならロックしない。 */
 export const LOGIN_MAX_FAILED_ATTEMPTS = integer("LOGIN_MAX_FAILED_ATTEMPTS", 5, 0);
 
+/**
+ * 同じ接続元から LOGIN_IP_WINDOW_MINUTES の間にこの回数だけログインに失敗すると、それ以降はその接続元からのログインを受け付けない。
+ * 0 なら制限しない。アカウントを問わずに数えるため、多数のアカウントに少しずつ試す攻撃も遅らせられる。
+ * NAT の裏の利用者は同じ接続元として数えるため、利用者の数に合わせて余裕を持たせる。
+ */
+export const LOGIN_IP_MAX_FAILED_ATTEMPTS = integer("LOGIN_IP_MAX_FAILED_ATTEMPTS", 20, 0);
+
+/** LOGIN_IP_MAX_FAILED_ATTEMPTS の回数を数える時間の分数。最初の失敗から数え始める。 */
+export const LOGIN_IP_WINDOW_MINUTES = integer("LOGIN_IP_WINDOW_MINUTES", 10, 1);
+
+/** LOGIN_IP_MAX_FAILED_ATTEMPTS を超えた接続元からのログインを受け付けない分数。 */
+export const LOGIN_IP_LOCKOUT_MINUTES = integer("LOGIN_IP_LOCKOUT_MINUTES", 30, 1);
+
 /** ログイン中に操作がないまま、この分数が経つとセッションが切れる。0 なら切れない。 */
 export const SESSION_IDLE_TIMEOUT_MINUTES = integer("SESSION_IDLE_TIMEOUT_MINUTES", 30, 0);
 
