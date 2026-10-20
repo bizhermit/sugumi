@@ -1,7 +1,7 @@
 /**
  * Deno.env を参照するのはこのファイルだけにする。
  * 変数を追加したら deno.json の permissions の default.env.allow と account.env.allow にも追記すること。
- * 本番で設定できるようにするなら、compose.yaml の app の environment と docker/.env.example にも追記すること。
+ * 本番で設定できるようにするなら、compose.yaml の app の environment、docker/.env.example、docker/README.md にも追記すること。
  * ファイルのパスを受け取る変数は、そのファイルの読み込みも permissions で許可すること。
  */
 import { type Cidr, parseCidr } from "./ip.ts";

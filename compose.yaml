@@ -1,4 +1,4 @@
-# 本番用。パスワードと設定を docker/.env に書き、--env-file で読み込んで起動する（README を参照）。
+# 本番用。パスワードと設定を docker/.env に書き、--env-file で読み込んで起動する（docker/README.md を参照）。
 #
 #   docker compose --env-file docker/.env up -d --build
 
