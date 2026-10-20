@@ -73,8 +73,11 @@ async function loadAssets(): Promise<Map<string, Asset>> {
   const assets = new Map<string, Asset>();
   try {
     await Deno.stat(PUBLIC_DIR);
-  } catch {
-    throw new Error("dist/public/ がありません。deno task build を実行してください");
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) {
+      throw new Error("dist/public/ がありません。deno task build を実行してください");
+    }
+    throw e;
   }
   for await (const relative of walk(PUBLIC_DIR, "")) {
     // ソースマップは check-bundle.ts の検査のために出力している。配信するとコメントを含むソースが公開される

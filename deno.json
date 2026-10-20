@@ -10,7 +10,7 @@
   "permissions": {
     "default": {
       "net": true,
-      "read": ["src", "dist/public", "/run/secrets"],
+      "read": ["src", "dist/public", "static", "/run/secrets"],
       "env": {
         "allow": [
           "APP_MODE",
@@ -61,7 +61,7 @@
     "dev": "APP_MODE=DEV deno task watch",
     "dev:mock": "APP_MODE=MOCK deno task watch",
     "dev:prod": "APP_MODE=PROD deno task watch",
-    "watch": "deno task build && (deno task gen --watch & deno task bundle --watch & deno run --watch=src/routes/,dist/public/ -P src/main.ts)",
+    "watch": "deno task build && (deno task gen --watch & deno task bundle --watch & deno run --watch=src/routes/,dist/public/,static/ -P src/main.ts)",
     "gen": "deno run -P=gen scripts/gen-routes.ts",
     "start": "deno run -P src/main.ts",
     "build": "rm -rf dist/public && deno task check:imports && deno task bundle && deno task check:bundle",

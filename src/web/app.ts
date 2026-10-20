@@ -3,11 +3,21 @@ import { csrfFor } from "./csrf.tsx";
 import { errorPage, methodNotAllowed } from "./error-page.tsx";
 import { loadRouter } from "./router.ts";
 import { withSecurityHeaders } from "./security-headers.ts";
+import { serveStatic, staticPaths } from "./static.ts";
 import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";
 import { path, redirect } from "./url.ts";
 import { APP_MODE } from "../lib/env.ts";
 
 const match = await loadRouter({ mock: APP_MODE === "MOCK" });
+
+// 静的ファイルはルーターより先に引くため、同じ URL に照合するルートがあると、そのルートに届かなくなる
+for (const pathname of staticPaths()) {
+  if (pathname.startsWith(ASSETS_PREFIX) || match(pathname, "GET")) {
+    throw new Error(
+      `static${decodeURIComponent(pathname)}: ルートか /assets/ と同じ URL になります`,
+    );
+  }
+}
 
 // Deno の req.url は Host ヘッダーを検証せずに連結して作られるため、
 // Host に `/` や `#` を含めると URL として解析したときの pathname を差し替えられる。
@@ -36,6 +46,8 @@ async function handle(req: Request, remoteAddress: string | undefined): Promise<
   if (url.hash !== "") return errorPage(400);
   // 静的ファイルはログインの有無で内容が変わらないため、セッションや CSRF を確かめない
   if (url.pathname.startsWith(ASSETS_PREFIX)) return serveAsset(req, url);
+  const staticFile = serveStatic(req, url);
+  if (staticFile) return staticFile;
 
   const route = match(url.pathname, req.method);
   if (!route) return errorPage(404);

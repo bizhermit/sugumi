@@ -19,6 +19,7 @@ src/
     db.ts         DB の接続と、全テーブルのスキーマ
     jsx-runtime.ts  JSX の変換先（deno.json の compilerOptions で指定）
     _shared/      サーバーとクライアントの両方で使う部品（必要になったら作る）
+static/           URL が外部の取り決めで決まるファイル（favicon.ico・robots.txt など）。同じパスで配信する
 scripts/          deno task から実行するスクリプト
 docker/           コンテナのイメージ（app/・db/）と、本番の設定（.env。コミットしない）
 ```
@@ -146,6 +147,15 @@ docker/           コンテナのイメージ（app/・db/）と、本番の設�
   - CSS を JS より先に、共通のものをページのものより先に読み込む。
 - 静的ファイルの URL は `src/web/assets.ts` の `asset()`・`assetsOf()` で作る。
   - URL に内容のハッシュが付き、ブラウザにずっとキャッシュされる。
+- `favicon.ico`・`robots.txt` など URL が決まっているファイルは、直下の `static/` に置く。
+  - `static/robots.txt` は `/robots.txt` で配信される。ログインなしで誰でも取得できる。
+  - URL にハッシュを付けられないため、毎回 ETag で確かめさせる。
+    - ページから読み込むものは `_assets/` に置く。
+  - 置ける種類は `src/web/static.ts` の `CONTENT_TYPES` の拡張子だけ。HTML・SVG・XML は置けない。
+    - このオリジンでスクリプトを実行できる文書になるため。
+  - `.` で始まるものは、`.well-known/` を除いて配信しない。
+  - ルートや `/assets/` と同じ URL になるファイルは、起動時に例外になる。
+  - 起動時に読み込むため、変更したら起動し直す（`deno task dev` は自動で起動し直す）。
 - `_assets/` の `.ts` は、先頭に `/// <reference lib="dom" />` を書く。
 - CSP（`script-src 'self'` と Trusted Types）のため、次のことはできない。
   - インラインの `<script>` や `onclick` などの属性：`addEventListener` を使う。
