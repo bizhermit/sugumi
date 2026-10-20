@@ -4,22 +4,28 @@
     "jsxImportSource": "#jsx"
   },
   "imports": {
-    "#jsx/jsx-runtime": "./src/lib/jsx-runtime.ts"
+    "#jsx/jsx-runtime": "./src/lib/jsx-runtime.ts",
+    "pg": "npm:pg@8.23.1"
   },
   "permissions": {
     "default": {
       "net": true,
-      "read": ["src", "dist/public", "data"],
-      "write": ["data"],
-      "env": [
-        "APP_MODE",
-        "PORT",
-        "LOGIN_LOCKOUT_MINUTES",
-        "LOGIN_MAX_FAILED_ATTEMPTS",
-        "SESSION_IDLE_TIMEOUT_MINUTES",
-        "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
-        "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
-      ]
+      "read": ["src", "dist/public", "/run/secrets"],
+      "env": {
+        "allow": [
+          "APP_MODE",
+          "DATABASE_URL",
+          "DATABASE_PASSWORD_FILE",
+          "PG*",
+          "PORT",
+          "LOGIN_LOCKOUT_MINUTES",
+          "LOGIN_MAX_FAILED_ATTEMPTS",
+          "SESSION_IDLE_TIMEOUT_MINUTES",
+          "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
+          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
+        ],
+        "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
+      }
     },
     "gen": {
       "read": ["src/routes", "src/routes.gen.ts"],
@@ -32,17 +38,23 @@
       "read": ["dist/public"]
     },
     "account": {
-      "read": ["src", "data"],
-      "write": ["data"],
-      "env": [
-        "APP_MODE",
-        "PORT",
-        "LOGIN_LOCKOUT_MINUTES",
-        "LOGIN_MAX_FAILED_ATTEMPTS",
-        "SESSION_IDLE_TIMEOUT_MINUTES",
-        "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
-        "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
-      ]
+      "read": ["src", "/run/secrets"],
+      "net": true,
+      "env": {
+        "allow": [
+          "APP_MODE",
+          "DATABASE_URL",
+          "DATABASE_PASSWORD_FILE",
+          "PG*",
+          "PORT",
+          "LOGIN_LOCKOUT_MINUTES",
+          "LOGIN_MAX_FAILED_ATTEMPTS",
+          "SESSION_IDLE_TIMEOUT_MINUTES",
+          "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
+          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES"
+        ],
+        "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
+      }
     }
   },
   "tasks": {

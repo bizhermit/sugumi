@@ -22,7 +22,7 @@ const PRE_LOGIN_TTL_MS = PRE_LOGIN_CSRF_TIMEOUT_MINUTES * 60 * 1000;
 // トークンは照合先のセッション ID か Cookie の値も知らなければ作れないため、DB が漏れただけでは偽造できない。
 const KEY = await crypto.subtle.importKey(
   "raw",
-  secret("csrf_hmac_key", 32),
+  await secret("csrf_hmac_key", 32),
   { name: "HMAC", hash: "SHA-256" },
   false,
   ["sign"],
