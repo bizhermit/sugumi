@@ -1,54 +1,6 @@
 import assert from "node:assert/strict";
 import { loadRouter, type RouteContext, scanRoutes } from "../../src/web/router.ts";
-
-// ルートのファイルは import されて動くため、routes/ と同じ形のディレクトリを作って読み込ませる。
-// deno.json の permissions の test で、dist/test/ の読み書きを許可している
-const FIXTURES_DIR = new URL("../../dist/test/", import.meta.url);
-
-type Calls = { calls: string[] };
-const calls = (globalThis as unknown as Calls).calls = [];
-
-/** 呼ばれたら name を記録して undefined を返す before。 */
-function before(name: string): string {
-  return `export default () => { (globalThis as unknown as { calls: string[] }).calls.push(${
-    JSON.stringify(name)
-  }); };`;
-}
-
-/** 呼ばれたら name を記録し、name を本文にして返すハンドラ。 */
-function handler(name: string): string {
-  return `export default () => { (globalThis as unknown as { calls: string[] }).calls.push(${
-    JSON.stringify(name)
-  }); return new Response(${JSON.stringify(name)}); };`;
-}
-
-/** files（routes/ からの相対パス → 内容）でディレクトリを作り、その URL を返す。 */
-async function fixture(files: Record<string, string>): Promise<URL> {
-  await Deno.mkdir(FIXTURES_DIR, { recursive: true });
-  const root = new URL(
-    `${await Deno.makeTempDir({ dir: decodeURIComponent(FIXTURES_DIR.pathname) })}/`,
-    "file://",
-  );
-  for (const [relative, content] of Object.entries(files)) {
-    const file = new URL(relative, root);
-    await Deno.mkdir(new URL(".", file), { recursive: true });
-    await Deno.writeTextFile(file, content);
-  }
-  return root;
-}
-
-async function withFixture(
-  files: Record<string, string>,
-  fn: (root: URL) => Promise<void>,
-): Promise<void> {
-  const root = await fixture(files);
-  calls.length = 0;
-  try {
-    await fn(root);
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
-}
+import { before, calls, handler, withFixture } from "../_support/routes.ts";
 
 async function call(
   match: Awaited<ReturnType<typeof loadRouter>>,

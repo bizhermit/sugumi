@@ -36,8 +36,36 @@ export type HtmlDocumentOptions = {
 /** ページの HTML 文書全体を返す。タイトルが決まらない場合は例外を投げる。 */
 export async function htmlDocument(
   ctx: RouteContext,
-  { title, slots, page, layout }: HtmlDocumentOptions,
+  options: HtmlDocumentOptions,
 ): Promise<string> {
+  const { title, main } = await composePage(ctx, options);
+  const common = assetsOf(import.meta.url);
+  const own = assetsOf(options.page);
+  const html = (
+    <html lang="ja">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{title}</title>
+        {common.style && <link rel="stylesheet" href={common.style} />}
+        {own.style && <link rel="stylesheet" href={own.style} />}
+        {common.script && <script type="module" src={common.script}></script>}
+        {own.script && <script type="module" src={own.script}></script>}
+      </head>
+      <body>{main}</body>
+    </html>
+  );
+  return `<!doctype html>\n${html.value}\n`;
+}
+
+/**
+ * page のディレクトリに適用する layout で slots を包み、タイトルと本文を返す。タイトルが決まらない場合は例外を投げる。
+ * htmlDocument() と違い、src/ の外のページも渡せる（静的ファイルの URL を引かないため）。
+ */
+export async function composePage(
+  ctx: RouteContext,
+  { title, slots, page, layout }: HtmlDocumentOptions,
+): Promise<{ title: string; main: Html }> {
   const layouts = layout === false ? [] : layoutsOf(page);
   let resolved: string | undefined;
   for (const t of [...layouts.map((l) => l.title), title]) {
@@ -55,22 +83,5 @@ export async function htmlDocument(
   for (const { render } of layouts.toReversed()) {
     current = { ...current, main: await render(current, ctx) };
   }
-
-  const common = assetsOf(import.meta.url);
-  const own = assetsOf(page);
-  const html = (
-    <html lang="ja">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{resolved}</title>
-        {common.style && <link rel="stylesheet" href={common.style} />}
-        {own.style && <link rel="stylesheet" href={own.style} />}
-        {common.script && <script type="module" src={common.script}></script>}
-        {own.script && <script type="module" src={own.script}></script>}
-      </head>
-      <body>{current.main}</body>
-    </html>
-  );
-  return `<!doctype html>\n${html.value}\n`;
+  return { title: resolved, main: current.main };
 }
