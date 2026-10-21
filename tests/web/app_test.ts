@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { createSession, sessionCookie } from "../../src/lib/auth/session.ts";
 import { randomToken } from "../../src/lib/crypto.ts";
 import { PRE_LOGIN_CSRF_TIMEOUT_MINUTES } from "../../src/lib/env.ts";
-import { handler } from "../../src/web/app.ts";
+import { createApp } from "../../src/web/app.ts";
 import { asset } from "../../src/web/assets.ts";
 import { cookiePair } from "../_support/cookie.ts";
 import { addAccount, resetDb } from "../_support/db.ts";
+
+const handler = await createApp({ mock: false });
 
 // src/web/app.ts の MAX_BODY_BYTES
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -117,4 +119,19 @@ Deno.test("app: 静的ファイルと /assets/ は、ログインなしで取得
   const js = await head(asset("web/_assets/index.js"));
   assert.equal(js.status, 200);
   assert.equal(js.headers.get("cache-control"), "public, max-age=31536000, immutable");
+});
+
+Deno.test("app: ページは CSS を JS より先に、共通のものをページのものより先に読み込む", async () => {
+  await resetDb();
+  const html = await (await handler(new Request("http://localhost/login"))).text();
+  const order = [
+    asset("web/_assets/index.css"),
+    asset("routes/login/_assets/index.css"),
+    asset("web/_assets/index.js"),
+    asset("routes/login/_assets/index.js"),
+  ].map((url) => html.indexOf(`"${url}"`));
+  assert.ok(order.every((index) => index > 0), String(order));
+  assert.deepEqual(order, order.toSorted((a, b) => a - b));
+  assert.match(html, /^<!doctype html>\n<html lang="ja"><head><meta charset="utf-8">/);
+  assert.match(html, /<title>ログイン<\/title>/);
 });

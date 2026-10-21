@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { authenticate } from "../../../src/lib/auth/accounts.ts";
+import { authenticate, createAccount, findAccount } from "../../../src/lib/auth/accounts.ts";
 import { reserveAttempt } from "../../../src/lib/auth/login-throttle.ts";
 import { PASSWORD_MAX_LENGTH } from "../../../src/lib/auth/password.ts";
 import { db } from "../../../src/lib/db.ts";
@@ -125,4 +125,28 @@ Deno.test({
     const { rows } = await db.query("SELECT failed_attempts FROM login_throttles");
     assert.deepEqual(rows, [{ failed_attempts: 1 }]);
   },
+});
+
+Deno.test("accounts: createAccount は入力を確かめ、使われているユーザー名を断る", async () => {
+  await resetDb();
+  const ok = "valid password";
+  const invalid: [string, string, string, RegExp][] = [
+    ["", "表示名", ok, /ユーザー名は空白を含まない 64 文字以内/],
+    ["a b", "表示名", ok, /ユーザー名は空白を含まない/],
+    ["a\tb", "表示名", ok, /ユーザー名は空白を含まない/],
+    ["a\u0000b", "表示名", ok, /ユーザー名は空白を含まない/],
+    ["x".repeat(65), "表示名", ok, /64 文字以内/],
+    ["alice", " ", ok, /表示名を入力してください/],
+    ["alice", "表示名", "short", /パスワードは 8 文字以上 128 文字以内/],
+    ["alice", "表示名", "x".repeat(129), /パスワードは 8 文字以上 128 文字以内/],
+  ];
+  for (const [username, displayName, password, error] of invalid) {
+    await assert.rejects(createAccount(username, displayName, password), error, username);
+  }
+  const account = await createAccount("x".repeat(64), "表示名", "x".repeat(8));
+  assert.equal(account.username.length, 64);
+  assert.deepEqual(await findAccount(account.id), account);
+
+  await addAccount("alice");
+  await assert.rejects(addAccount("alice"), /ユーザー名 alice は使われています/);
 });

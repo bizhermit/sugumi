@@ -1,9 +1,9 @@
 /**
- * src/routes/ と同じ形のディレクトリを dist/test/ に作り、loadRouter({ root }) で読み込ませるための部品。
+ * src/routes/ と同じ形のディレクトリを作り、loadRouter({ root }) で読み込ませるための部品。
  * ルートのファイルは import されて動くため、ファイルとして書き出す必要がある。
- * deno.json の permissions の test で、dist/test/ の読み書きを許可している。
  */
-const FIXTURES_DIR = new URL("../../dist/test/", import.meta.url);
+import { withTempDir } from "./fixture.ts";
+
 const JSX_RUNTIME = new URL("../../src/lib/jsx-runtime.ts", import.meta.url).href;
 
 /** before・ハンドラ・layout が呼ばれた順に名前を記録する。withFixture() が空にする。 */
@@ -43,20 +43,6 @@ export async function withFixture(
   files: Record<string, string>,
   fn: (root: URL) => Promise<void>,
 ): Promise<void> {
-  await Deno.mkdir(FIXTURES_DIR, { recursive: true });
-  const root = new URL(
-    `${await Deno.makeTempDir({ dir: decodeURIComponent(FIXTURES_DIR.pathname) })}/`,
-    "file://",
-  );
-  for (const [relative, content] of Object.entries(files)) {
-    const file = new URL(relative, root);
-    await Deno.mkdir(new URL(".", file), { recursive: true });
-    await Deno.writeTextFile(file, content);
-  }
   calls.length = 0;
-  try {
-    await fn(root);
-  } finally {
-    await Deno.remove(root, { recursive: true });
-  }
+  await withTempDir(files, fn);
 }

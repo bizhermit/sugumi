@@ -7,33 +7,35 @@
  * ソースマップの sources で確かめる。シンボリックリンクは解決された先のパスで記録される。
  */
 
-const ROOT = new URL("../", import.meta.url);
-const ROOT_PATH = decodeURIComponent(ROOT.pathname);
-const PUBLIC_DIR = new URL("dist/public/", ROOT);
-
-const violations: string[] = [];
-let maps = 0;
-for await (const file of walk(PUBLIC_DIR)) {
-  if (!file.pathname.endsWith(".map")) continue;
-  maps++;
-  const { sources } = JSON.parse(await Deno.readTextFile(file)) as { sources: string[] };
-  for (const source of sources) {
-    const path = decodeURIComponent(new URL(source, file).pathname).slice(ROOT_PATH.length);
-    const segments = path.split("/");
-    const allowed = segments[0] === "src" &&
-      (segments.includes("_assets") || segments.includes("_shared"));
-    if (!allowed) violations.push(`${relative(file)}: ${path} がバンドルに含まれています`);
+if (import.meta.main) {
+  const violations = await checkBundle(new URL("../", import.meta.url));
+  if (violations.length > 0) {
+    console.error(violations.join("\n"));
+    Deno.exit(1);
   }
 }
-// ソースマップがなければ何も確かめられないため、出力の設定が変わったことに気づけるようにする
-if (maps === 0) violations.push("dist/public/ にソースマップがありません");
-if (violations.length > 0) {
-  console.error(violations.join("\n"));
-  Deno.exit(1);
-}
 
-function relative(url: URL): string {
-  return decodeURIComponent(url.pathname).slice(ROOT_PATH.length);
+/** root（リポジトリの直下）の dist/public/ を確かめ、違反の一覧を返す。root はテストで別のディレクトリを渡す。 */
+export async function checkBundle(root: URL): Promise<string[]> {
+  const rootPath = decodeURIComponent(root.pathname);
+  const relative = (url: URL) => decodeURIComponent(url.pathname).slice(rootPath.length);
+  const violations: string[] = [];
+  let maps = 0;
+  for await (const file of walk(new URL("dist/public/", root))) {
+    if (!file.pathname.endsWith(".map")) continue;
+    maps++;
+    const { sources } = JSON.parse(await Deno.readTextFile(file)) as { sources: string[] };
+    for (const source of sources) {
+      const path = relative(new URL(source, file));
+      const segments = path.split("/");
+      const allowed = segments[0] === "src" &&
+        (segments.includes("_assets") || segments.includes("_shared"));
+      if (!allowed) violations.push(`${relative(file)}: ${path} がバンドルに含まれています`);
+    }
+  }
+  // ソースマップがなければ何も確かめられないため、出力の設定が変わったことに気づけるようにする
+  if (maps === 0) violations.push("dist/public/ にソースマップがありません");
+  return violations;
 }
 
 async function* walk(dir: URL): AsyncGenerator<URL> {

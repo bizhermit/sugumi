@@ -1,8 +1,8 @@
-import { handler } from "./web/app.ts";
-import { PORT } from "./lib/env.ts";
+import { createApp } from "./web/app.ts";
+import { APP_MODE, PORT } from "./lib/env.ts";
 import { db } from "./lib/db.ts";
 
-const server = Deno.serve({ port: PORT }, handler);
+const server = Deno.serve({ port: PORT }, await createApp({ mock: APP_MODE === "MOCK" }));
 
 // 本文を送り終えないまま開けておかれた接続があると、shutdown() はクライアントが閉じるまで終わらない。
 // docker stop は 10 秒で SIGKILL を送るため、それより短くする

@@ -1,4 +1,4 @@
-import { cidrContains, formatIp, parseIp } from "../lib/ip.ts";
+import { type Cidr, cidrContains, formatIp, parseIp } from "../lib/ip.ts";
 import { TRUSTED_PROXIES } from "../lib/env.ts";
 
 /**
@@ -7,12 +7,17 @@ import { TRUSTED_PROXIES } from "../lib/env.ts";
  * X-Forwarded-For は利用者が書き換えられるため、TCP の接続元が信頼するプロキシのときだけ読む。
  * 信頼するプロキシは、受けた接続元を右端に追記する。そのため右から読み、信頼するプロキシでない最初のアドレスを使う。
  * それより左は、利用者が送ってきた値のままのため読まない。
+ * trustedProxies は既定で環境変数 TRUSTED_PROXIES の値。テストで別の値を渡す。
  */
-export function remoteAddressOf(req: Request, tcpAddress: string | undefined): string | undefined {
+export function remoteAddressOf(
+  req: Request,
+  tcpAddress: string | undefined,
+  trustedProxies: readonly Cidr[] = TRUSTED_PROXIES,
+): string | undefined {
   if (tcpAddress === undefined) return undefined;
   let ip = parseIp(tcpAddress);
   if (!ip) return undefined;
-  if (!isTrustedProxy(ip)) return formatIp(ip);
+  if (!isTrustedProxy(ip, trustedProxies)) return formatIp(ip);
   const header = req.headers.get("x-forwarded-for");
   if (header === null) return formatIp(ip);
   for (const entry of header.split(",").reverse()) {
@@ -20,13 +25,17 @@ export function remoteAddressOf(req: Request, tcpAddress: string | undefined): s
     // 信頼するプロキシは解析できる値しか書かないため、これより左は利用者が送った値
     if (!forwarded) break;
     ip = forwarded;
-    if (!isTrustedProxy(ip)) break;
+    if (!isTrustedProxy(ip, trustedProxies)) break;
   }
   return formatIp(ip);
 }
 
-function isTrustedProxy(ip: Uint8Array): boolean {
-  return TRUSTED_PROXIES.some((cidr) => cidrContains(cidr, ip));
+// リクエストごとに呼ぶため、some() のようにコールバックの関数を作らずにループで調べる
+function isTrustedProxy(ip: Uint8Array, trustedProxies: readonly Cidr[]): boolean {
+  for (const cidr of trustedProxies) {
+    if (cidrContains(cidr, ip)) return true;
+  }
+  return false;
 }
 
 // Azure Application Gateway など、ポートを付けて追記するプロキシがあるため

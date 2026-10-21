@@ -20,28 +20,37 @@
 
 type Kind = "client" | "shared" | "server";
 
-const ROOT = new URL("../", import.meta.url);
-const ROOT_PATH = decodeURIComponent(ROOT.pathname);
 const SPECIFIER = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*(["'`])((?:(?!\1)[^\n])+)\1/g;
 const DYNAMIC_IMPORT = /\bimport\s*\(\s*(?!["'`])/g;
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const MOCK_FILE = /\.mock\.[^/]*$/;
 
-const violations: string[] = [];
-if (await exists(new URL("src/_shared/", ROOT))) {
-  violations.push("src/_shared/: 作れません（src/lib/_shared/ に置いてください）");
-}
-for (const dir of ["src/", "scripts/"]) {
-  for await (const file of walk(new URL(dir, ROOT))) {
-    await checkFile(file);
+if (import.meta.main) {
+  const violations = await checkImports(new URL("../", import.meta.url));
+  if (violations.length > 0) {
+    console.error(violations.join("\n"));
+    Deno.exit(1);
   }
 }
-if (violations.length > 0) {
-  console.error(violations.join("\n"));
-  Deno.exit(1);
+
+/** root（リポジトリの直下）の src/ と scripts/ を確かめ、違反の一覧を返す。root はテストで別のディレクトリを渡す。 */
+export async function checkImports(root: URL): Promise<string[]> {
+  const violations: string[] = [];
+  const rootPath = decodeURIComponent(root.pathname);
+  const relative = (url: URL) => decodeURIComponent(url.pathname).slice(rootPath.length);
+  if (await exists(new URL("src/_shared/", root))) {
+    violations.push("src/_shared/: 作れません（src/lib/_shared/ に置いてください）");
+  }
+  for (const dir of ["src/", "scripts/"]) {
+    for await (const file of walk(new URL(dir, root), relative, violations)) {
+      violations.push(...await checkFile(file, relative));
+    }
+  }
+  return violations;
 }
 
-async function checkFile(file: URL): Promise<void> {
+async function checkFile(file: URL, relative: (url: URL) => string): Promise<string[]> {
+  const violations: string[] = [];
   const from = relative(file);
   const fromKind = kindOf(from);
   if (fromKind !== "server" && /x$/.test(file.pathname)) {
@@ -50,7 +59,7 @@ async function checkFile(file: URL): Promise<void> {
   const text = await Deno.readTextFile(file);
   const lineOf = (index: number) => text.slice(0, index).split("\n").length;
   for (const { 2: specifier, index } of text.matchAll(SPECIFIER)) {
-    const reason = check(from, fromKind, specifier, file);
+    const reason = check(from, fromKind, specifier, () => relative(new URL(specifier, file)));
     if (reason) {
       violations.push(`${from}:${lineOf(index)}: ${specifier} を import できません（${reason}）`);
     }
@@ -61,10 +70,16 @@ async function checkFile(file: URL): Promise<void> {
       violations.push(`${from}:${lineOf(index)}: import() には文字列を直接書いてください`);
     }
   }
+  return violations;
 }
 
-/** 違反なら理由を、問題なければ undefined を返す。 */
-function check(from: string, fromKind: Kind, specifier: string, file: URL): string | undefined {
+/** 違反なら理由を、問題なければ undefined を返す。resolve は相対パスの指定子を、リポジトリの直下からのパスにする。 */
+function check(
+  from: string,
+  fromKind: Kind,
+  specifier: string,
+  resolve: () => string,
+): string | undefined {
   const isRelative = specifier.startsWith("./") || specifier.startsWith("../");
   if (!isRelative) {
     // node: などはサーバーの API で、ブラウザでは動かない
@@ -72,7 +87,7 @@ function check(from: string, fromKind: Kind, specifier: string, file: URL): stri
       ? undefined
       : "_assets/ と _shared/ からは相対パスだけを import できます";
   }
-  const to = relative(new URL(specifier, file));
+  const to = resolve();
   if (MOCK_FILE.test(to) && !MOCK_FILE.test(from)) {
     return "*.mock.* は *.mock.* からだけ import できます";
   }
@@ -100,10 +115,6 @@ function assetsRoot(path: string): string {
   return path.slice(0, path.indexOf("/_assets/"));
 }
 
-function relative(url: URL): string {
-  return decodeURIComponent(url.pathname).slice(ROOT_PATH.length);
-}
-
 async function exists(url: URL): Promise<boolean> {
   try {
     await Deno.stat(url);
@@ -114,13 +125,17 @@ async function exists(url: URL): Promise<boolean> {
   }
 }
 
-async function* walk(dir: URL): AsyncGenerator<URL> {
+async function* walk(
+  dir: URL,
+  relative: (url: URL) => string,
+  violations: string[],
+): AsyncGenerator<URL> {
   for await (const entry of Deno.readDir(dir)) {
     const url = new URL(encodeURIComponent(entry.name), dir);
     if (entry.isSymlink) {
       violations.push(`${relative(url)}: シンボリックリンクは使えません`);
     } else if (entry.isDirectory) {
-      yield* walk(new URL(`${encodeURIComponent(entry.name)}/`, dir));
+      yield* walk(new URL(`${encodeURIComponent(entry.name)}/`, dir), relative, violations);
     } else if (entry.isFile && SOURCE_FILE.test(entry.name)) {
       yield url;
     }

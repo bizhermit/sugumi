@@ -3,23 +3,11 @@ import { csrfFor } from "./csrf.tsx";
 import { errorPage, methodNotAllowed } from "./error-page.tsx";
 import { loadRouter } from "./router.ts";
 import { withSecurityHeaders } from "./security-headers.ts";
-import { serveStatic, staticPaths } from "./static.ts";
+import { loadStatic, type StaticFiles } from "./static.ts";
 import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";
 import { path, redirect } from "./url.ts";
 import { remoteAddressOf } from "./remote-address.ts";
-import { APP_MODE } from "../lib/env.ts";
 import type { RoutePath } from "../routes.gen.ts";
-
-const match = await loadRouter({ mock: APP_MODE === "MOCK" });
-
-// 静的ファイルはルーターより先に引くため、同じ URL に照合するルートがあると、そのルートに届かなくなる
-for (const pathname of staticPaths()) {
-  if (pathname.startsWith(ASSETS_PREFIX) || match(pathname, "GET")) {
-    throw new Error(
-      `static${decodeURIComponent(pathname)}: ルートか /assets/ と同じ URL になります`,
-    );
-  }
-}
 
 // Deno の req.url は Host ヘッダーを検証せずに連結して作られるため、
 // Host に `/` や `#` を含めると URL として解析したときの pathname を差し替えられる。
@@ -31,21 +19,50 @@ const MAX_BODY_BYTES = 1024 * 1024;
 // ctx.session が常に undefined になるため、src/routes/before.tree.ts の PUBLIC_ROUTES にも入れること
 const SESSIONLESS_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/healthz"]);
 
-export async function handler(req: Request, info?: Deno.ServeHandlerInfo): Promise<Response> {
-  const addr = info?.remoteAddr;
-  const tcpAddress = addr && "hostname" in addr ? addr.hostname : undefined;
-  let res: Response;
-  try {
-    res = await handle(req, remoteAddressOf(req, tcpAddress));
-  } catch (e) {
-    // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける
-    console.error(e);
-    res = errorPage(500);
+export type Handler = (req: Request, info?: Deno.ServeHandlerInfo) => Promise<Response>;
+type Router = Awaited<ReturnType<typeof loadRouter>>;
+
+/**
+ * ルートと静的ファイルを読み込み、Deno.serve に渡すハンドラを返す。
+ * routes・staticDir は既定で src/routes/・static/ で、テストで別のディレクトリを渡す。
+ * 静的ファイルがルートか /assets/ と同じ URL になる場合は例外を投げる。
+ */
+export async function createApp(
+  { mock, routes, staticDir }: { mock: boolean; routes?: URL; staticDir?: URL },
+): Promise<Handler> {
+  const match = await loadRouter({ mock, root: routes });
+  const statics = await loadStatic(staticDir);
+
+  // 静的ファイルはルーターより先に引くため、同じ URL に照合するルートがあると、そのルートに届かなくなる
+  for (const pathname of statics.paths()) {
+    if (pathname.startsWith(ASSETS_PREFIX) || match(pathname, "GET")) {
+      throw new Error(
+        `static${decodeURIComponent(pathname)}: ルートか /assets/ と同じ URL になります`,
+      );
+    }
   }
-  return withSecurityHeaders(res);
+
+  return async (req, info) => {
+    const addr = info?.remoteAddr;
+    const tcpAddress = addr && "hostname" in addr ? addr.hostname : undefined;
+    let res: Response;
+    try {
+      res = await handle(match, statics, req, remoteAddressOf(req, tcpAddress));
+    } catch (e) {
+      // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける
+      console.error(e);
+      res = errorPage(500);
+    }
+    return withSecurityHeaders(res);
+  };
 }
 
-async function handle(req: Request, remoteAddress: string | undefined): Promise<Response> {
+async function handle(
+  match: Router,
+  statics: StaticFiles,
+  req: Request,
+  remoteAddress: string | undefined,
+): Promise<Response> {
   const host = req.headers.get("host");
   if (host !== null && !VALID_HOST.test(host)) return errorPage(400);
   let url: URL;
@@ -57,7 +74,7 @@ async function handle(req: Request, remoteAddress: string | undefined): Promise<
   if (url.hash !== "") return errorPage(400);
   // 静的ファイルはログインの有無で内容が変わらないため、セッションや CSRF を確かめない
   if (url.pathname.startsWith(ASSETS_PREFIX)) return serveAsset(req, url);
-  const staticFile = serveStatic(req, url);
+  const staticFile = statics.serve(req, url);
   if (staticFile) return staticFile;
 
   const route = match(url.pathname, req.method);

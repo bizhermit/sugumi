@@ -76,9 +76,12 @@ tests/            テスト。src/ と同じ構成で *_test.ts を置く
 ## テスト
 
 - `deno task test` で実行する。ファイルを指定すると、そのファイルだけを実行する。
-  - アプリのハンドラ（`src/web/app.ts`）を使うテストは、先に `deno task build` が要る。
-- `src/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`）。
+  - `dist/public/` を読み込むテスト（`src/web/app.ts` の `createApp()` や `src/web/assets.ts` を使うもの）は、先に `deno task build` が要る。
+- `src/`・`scripts/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`、`scripts/gen-routes.ts` → `tests/scripts/gen-routes_test.ts`）。
   - アサーションは `node:assert/strict` を使う。ライブラリは足さない。
+  - ディレクトリやファイルを読むものは、テスト用のものを `tests/_support/fixture.ts` の `withTempDir()` で `dist/test/` に作って渡す。
+    - そのため、読む場所を引数で受け取れるようにしておく（`loadRouter()` の `root`、`createApp()` の `routes`・`staticDir` など）。
+  - 環境変数の検証は、`src/lib/env.ts` の `parse` で始まる関数に値を渡して確かめる。
 - テストは環境変数 `TEST_DATABASE_URL` の DB を使う。開発用の DB とは分ける。
   - `deno task test` が `DATABASE_URL` を差し替えて実行する。`deno test` を直接実行しない。
   - DB を使うテストは、初めに `tests/_support/db.ts` の `resetDb()` で空にする。
