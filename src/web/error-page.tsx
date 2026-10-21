@@ -1,4 +1,18 @@
+// 404 などはリクエストのたびに返すため、HTML はステータスごとに 1 回だけ組み立てる。
+// status はコードに書いた値だけなので、種類は増えない
+const pages = new Map<number, string>();
+const HEADERS = { "content-type": "text/html; charset=utf-8" };
+
 export function errorPage(status: number): Response {
+  let html = pages.get(status);
+  if (html === undefined) {
+    html = render(status);
+    pages.set(status, html);
+  }
+  return new Response(html, { status, headers: HEADERS });
+}
+
+function render(status: number): string {
   const html = (
     <html lang="ja">
       <head>
@@ -11,10 +25,7 @@ export function errorPage(status: number): Response {
       </body>
     </html>
   );
-  return new Response(`<!doctype html>\n${html.value}\n`, {
-    status,
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
+  return `<!doctype html>\n${html.value}\n`;
 }
 
 export function methodNotAllowed(allow: string[]): Response {

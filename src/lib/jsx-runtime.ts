@@ -7,6 +7,8 @@
  *
  * 属性を型チェックするのは html-attributes.ts にあるタグだけで、ほかのタグはどの属性でも書ける。
  * 埋め込んだ値は、Html 以外はすべてエスケープする。
+ *
+ * ページの大きさに比例して呼ばれるため、コールバックや中間の配列を作らないようにループで書いている。
  */
 import type { HtmlElements } from "./html-attributes.ts";
 
@@ -51,7 +53,8 @@ export declare namespace JSX {
  */
 export function jsxTemplate(templates: string[], ...exprs: unknown[]): Html {
   let html = templates[0];
-  for (const [i, expr] of exprs.entries()) {
+  for (let i = 0; i < exprs.length; i++) {
+    const expr = exprs[i];
     html += (expr instanceof Html ? expr.value : expr ?? "") + templates[i + 1];
   }
   return new Html(html);
@@ -60,7 +63,11 @@ export function jsxTemplate(templates: string[], ...exprs: unknown[]): Html {
 /** 文字列・数値はエスケープし、Html はそのまま、true・false・null・undefined は空にする。配列は連結する。 */
 export function jsxEscape(value: unknown): string {
   if (value instanceof Html) return value.value;
-  if (Array.isArray(value)) return value.map(jsxEscape).join("");
+  if (Array.isArray(value)) {
+    let html = "";
+    for (let i = 0; i < value.length; i++) html += jsxEscape(value[i]);
+    return html;
+  }
   switch (typeof value) {
     case "string":
       return escapeHtml(value);
@@ -104,17 +111,48 @@ export function jsx(
   props ??= {};
   // コンポーネントが文字列を返しても、HTML としては扱わずエスケープする
   if (typeof type === "function") return new Html(jsxEscape(type(props)));
-  const { children, ...attrs } = props;
-  const open = [type, ...Object.entries(attrs).map(([k, v]) => jsxAttr(k, v))]
-    .filter(Boolean).join(" ");
-  if (VOID_ELEMENTS.has(type)) return new Html(`<${open}>`);
-  return new Html(`<${open}>${jsxEscape(children)}</${type}>`);
+  // Object.entries と同じく、自身の列挙できるプロパティだけを、同じ順番で読む
+  let open = "<" + type;
+  for (const name in props) {
+    if (name === "children" || !Object.hasOwn(props, name)) continue;
+    const attr = jsxAttr(name, props[name]);
+    if (attr !== "") open += " " + attr;
+  }
+  if (VOID_ELEMENTS.has(type)) return new Html(open + ">");
+  return new Html(`${open}>${jsxEscape(props.children)}</${type}>`);
 }
 
 export function Fragment({ children }: { children?: unknown }): Html {
   return new Html(jsxEscape(children));
 }
 
+// エスケープする文字のない値（ほとんどの値）は、新しい文字列を作らずにそのまま返す
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  let html = "";
+  let last = 0;
+  for (let i = 0; i < value.length; i++) {
+    let entity: string;
+    switch (value.charCodeAt(i)) {
+      case 0x26:
+        entity = "&#38;";
+        break;
+      case 0x3c:
+        entity = "&#60;";
+        break;
+      case 0x3e:
+        entity = "&#62;";
+        break;
+      case 0x22:
+        entity = "&#34;";
+        break;
+      case 0x27:
+        entity = "&#39;";
+        break;
+      default:
+        continue;
+    }
+    html += value.slice(last, i) + entity;
+    last = i + 1;
+  }
+  return last === 0 ? value : html + value.slice(last);
 }

@@ -125,3 +125,17 @@ Deno.test("layout: ルートでないディレクトリのページは例外に�
     );
   });
 });
+
+Deno.test("layout: 渡した slots は書き換えない", async () => {
+  await withFixture({
+    "layout.tree.ts": layout("outer", `"サイト"`),
+    "get.ts": handler("GET /"),
+  }, async (root) => {
+    await loadRouter({ mock: false, root });
+    const slots = { main };
+    const page = new URL("view.tsx", root).href;
+    const result = await composePage(ctx, { slots, page });
+    assert.equal(result.main.value, "[outer page]");
+    assert.equal(slots.main, main);
+  });
+});

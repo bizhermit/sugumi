@@ -3,8 +3,8 @@ import type { RouteContext } from "../../web/router.ts";
 import { appPathOf, path, redirect } from "../../web/url.ts";
 import { loginForm } from "./view.tsx";
 
-export default async function (req: Request, ctx: RouteContext): Promise<Response> {
-  const query = new URL(req.url).searchParams;
+export default async function (_req: Request, ctx: RouteContext): Promise<Response> {
+  const { query } = ctx;
   const to = appPathOf(query.get("to"));
   if (ctx.session) {
     // 別のアカウントでログインし直せるよう、開いただけでログアウトする。

@@ -20,12 +20,16 @@ export function remoteAddressOf(
   if (!isTrustedProxy(ip, trustedProxies)) return formatIp(ip);
   const header = req.headers.get("x-forwarded-for");
   if (header === null) return formatIp(ip);
-  for (const entry of header.split(",").reverse()) {
-    const forwarded = parseIp(withoutPort(entry.trim()));
+  // リクエストごとに読むため、split() で配列を作らずに右の , から順に探す
+  let end = header.length;
+  for (;;) {
+    const start = end === 0 ? -1 : header.lastIndexOf(",", end - 1);
+    const forwarded = parseIp(withoutPort(header.slice(start + 1, end).trim()));
     // 信頼するプロキシは解析できる値しか書かないため、これより左は利用者が送った値
     if (!forwarded) break;
     ip = forwarded;
-    if (!isTrustedProxy(ip, trustedProxies)) break;
+    if (!isTrustedProxy(ip, trustedProxies) || start === -1) break;
+    end = start;
   }
   return formatIp(ip);
 }

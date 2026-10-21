@@ -49,6 +49,8 @@ Deno.test("ip: IPv6 を解析し、RFC 5952 の表記に揃える", () => {
 Deno.test("ip: IPv4 射影アドレスは IPv4 にする", () => {
   assert.equal(normalize("::ffff:192.0.2.1"), "192.0.2.1");
   assert.equal(normalize("::FFFF:c000:0201"), "192.0.2.1");
+  // 先頭の 80 ビットがすべて 0 でなければ、IPv4 射影アドレスではない
+  assert.equal(normalize("::1:ffff:c000:201"), "::1:ffff:c000:201");
   assert.equal(parseIp("::ffff:192.0.2.1")?.length, 4);
 });
 

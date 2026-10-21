@@ -6,10 +6,12 @@ export function randomToken(): string {
   });
 }
 
+const encoder = new TextEncoder();
+
 /** 秘密の値の比較に使う。一致した文字数によって処理時間が変わらないようにしている。 */
 export function timingSafeEqual(a: string, b: string): boolean {
-  const x = new TextEncoder().encode(a);
-  const y = new TextEncoder().encode(b);
+  const x = encoder.encode(a);
+  const y = encoder.encode(b);
   let diff = x.length ^ y.length;
   for (let i = 0; i < x.length; i++) diff |= x[i] ^ (y[i] ?? 0);
   return diff === 0;

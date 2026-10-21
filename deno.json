@@ -101,7 +101,8 @@
     "check:imports": "deno run -P=check-imports scripts/check-imports.ts",
     "check:bundle": "deno run -P=check-bundle scripts/check-bundle.ts",
     "account:add": "deno run -P=account scripts/add-account.ts",
-    "test": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_DATABASE_URL deno test -P=test"
+    "test": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_DATABASE_URL deno test -P=test",
+    "bench": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_DATABASE_URL deno bench -P=test"
   },
   "lint": {
     "rules": {

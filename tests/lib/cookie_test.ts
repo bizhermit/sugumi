@@ -24,9 +24,23 @@ Deno.test("cookie: 名前が一致する Cookie の値を読む", () => {
   // 前方一致や、値のないものは読まない
   assert.equal(readCookie(withCookie("__Host-sidx=abc"), "__Host-sid"), undefined);
   assert.equal(readCookie(withCookie("x__Host-sid=abc"), "__Host-sid"), undefined);
+  assert.equal(readCookie(withCookie("abc=1"), "a"), undefined);
   assert.equal(readCookie(withCookie("__Host-sid="), "__Host-sid"), undefined);
   assert.equal(readCookie(withCookie("__Host-sid"), "__Host-sid"), undefined);
   assert.equal(readCookie(new Request("http://localhost/"), "__Host-sid"), undefined);
   // 同じ名前が複数あれば、最初のものを使う
   assert.equal(readCookie(withCookie("a=1; a=2"), "a"), "1");
+  // 値が空なら、同じ名前の次のものを使う
+  assert.equal(readCookie(withCookie("a=; a=2"), "a"), "2");
+});
+
+Deno.test("cookie: 前後の空白を除き、値は 2 つ目の = の手前までにする", () => {
+  assert.equal(readCookie(withCookie("\ta=1\t;  b=2  "), "a"), "1");
+  assert.equal(readCookie(withCookie("\ta=1\t;  b=2  "), "b"), "2");
+  // 名前と = の間に空白があれば、別の名前として扱う
+  assert.equal(readCookie(withCookie("a =1"), "a"), undefined);
+  assert.equal(readCookie(withCookie("a= 1"), "a"), " 1");
+  assert.equal(readCookie(withCookie("a=b=c"), "a"), "b");
+  assert.equal(readCookie(withCookie("a==c"), "a"), undefined);
+  assert.equal(readCookie(withCookie(";;a=1;;"), "a"), "1");
 });

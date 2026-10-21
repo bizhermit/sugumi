@@ -26,6 +26,10 @@ type Asset = { body: Uint8Array<ArrayBuffer>; contentType: string; hash: string 
 
 const assets = await loadAssets();
 
+type PageAssets = Readonly<{ style?: string; script?: string }>;
+// ページを出すたびに呼ぶため、結果を moduleUrl ごとに覚えておく。moduleUrl は import.meta.url なので、ファイルの数より増えない
+const pageAssets = new Map<string, PageAssets>();
+
 /**
  * dist/public/ からの相対パス name のファイルを読み込む URL を返す。
  * name のファイルがなければ例外を投げる。
@@ -42,13 +46,17 @@ export function asset(name: string): string {
  * moduleUrl と同じディレクトリの `_assets/` の index.css と index.ts をバンドルしたものの URL を返す。
  * ないものは undefined になる。moduleUrl には呼び出し側の import.meta.url を渡す。
  */
-export function assetsOf(moduleUrl: string): { style?: string; script?: string } {
+export function assetsOf(moduleUrl: string): PageAssets {
+  const cached = pageAssets.get(moduleUrl);
+  if (cached) return cached;
   const dir = decodeURIComponent(new URL("_assets/", moduleUrl).pathname);
   const src = decodeURIComponent(SRC_DIR.pathname);
   if (!dir.startsWith(src)) throw new Error(`${moduleUrl} は src/ の外にあります`);
   const prefix = dir.slice(src.length);
   const urlOf = (name: string) => assets.has(prefix + name) ? asset(prefix + name) : undefined;
-  return { style: urlOf("index.css"), script: urlOf("index.js") };
+  const found = Object.freeze({ style: urlOf("index.css"), script: urlOf("index.js") });
+  pageAssets.set(moduleUrl, found);
+  return found;
 }
 
 /** pathname が ASSETS_PREFIX で始まるリクエストに応答する。 */

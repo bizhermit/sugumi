@@ -1,4 +1,3 @@
-import { findAccount } from "../lib/auth/accounts.ts";
 import { loginRedirect } from "../web/login-redirect.ts";
 import type { RouteContext } from "../web/router.ts";
 import type { RoutePath } from "../routes.gen.ts";
@@ -15,12 +14,10 @@ const PUBLIC_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>([
   "/logout",
 ]);
 
-export default async function (req: Request, ctx: RouteContext): Promise<Response | undefined> {
+export default function (req: Request, ctx: RouteContext): Response | undefined {
   if (!PUBLIC_ROUTES.has(ctx.route)) {
-    // セッションが残っていても、アカウントが消されていればログインしていないものとして扱う
-    const account = ctx.session && await findAccount(ctx.session.accountId);
-    if (!account) return loginRedirect(req);
-    loginAccount.set(ctx, account);
+    if (!ctx.session) return loginRedirect(req);
+    loginAccount.set(ctx, ctx.session.account);
   }
   return undefined;
 }

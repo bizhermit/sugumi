@@ -19,7 +19,7 @@ function requestWith(session: Session): Request {
 
 async function newSession(): Promise<Session> {
   await resetDb();
-  return await createSession((await addAccount()).id);
+  return await createSession(await addAccount());
 }
 
 /** DB の時刻を ago ミリ秒前にずらし、時間が経ったことにする。 */
@@ -88,4 +88,11 @@ Deno.test("session: アカウントを消すとセッションも消える", asy
   const session = await newSession();
   await db.query("DELETE FROM accounts");
   assert.equal(await getSession(requestWith(session)), undefined);
+});
+
+Deno.test("session: アカウントはリクエストのたびに読み、変更は次のリクエストから反映される", async () => {
+  const session = await newSession();
+  assert.equal((await getSession(requestWith(session)))?.account.displayName, "alice の表示名");
+  await db.query("UPDATE accounts SET display_name = '変更後'");
+  assert.equal((await getSession(requestWith(session)))?.account.displayName, "変更後");
 });
