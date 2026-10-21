@@ -26,16 +26,30 @@ const DOT_NAMES = new Set([".well-known"]);
 
 type StaticFile = { body: Uint8Array<ArrayBuffer>; contentType: string; etag: string };
 
-// キーはリクエストの pathname と同じく、区切りごとにエンコードしたもの
-const files = await loadFiles();
+export type StaticFiles = {
+  /** 配信するファイルの pathname の一覧。ルートとの重複を確かめるのに使う。 */
+  paths(): string[];
+  /** pathname が static/ のファイルに当たれば応答を返し、当たらなければ undefined を返す。 */
+  serve(req: Request, url: URL): Response | undefined;
+};
 
-/** 配信するファイルの pathname の一覧。ルートとの重複を確かめるのに使う。 */
-export function staticPaths(): string[] {
-  return [...files.keys()];
+/**
+ * dir のファイルを読み込む。dir は既定で static/ で、テストで別のディレクトリを渡す。
+ * 配信できない種類のファイルやシンボリックリンクがあれば例外を投げる。
+ */
+export async function loadStatic(dir: URL = STATIC_DIR): Promise<StaticFiles> {
+  const files = await loadFiles(dir);
+  return {
+    paths: () => [...files.keys()],
+    serve: (req, url) => serveFile(files, req, url),
+  };
 }
 
-/** pathname が static/ のファイルに当たれば応答を返し、当たらなければ undefined を返す。 */
-export function serveStatic(req: Request, url: URL): Response | undefined {
+function serveFile(
+  files: Map<string, StaticFile>,
+  req: Request,
+  url: URL,
+): Response | undefined {
   const found = files.get(url.pathname);
   if (!found) return undefined;
   if (req.method !== "GET" && req.method !== "HEAD") return methodNotAllowed(["GET", "HEAD"]);
@@ -51,16 +65,16 @@ export function serveStatic(req: Request, url: URL): Response | undefined {
   return new Response(req.method === "HEAD" ? null : found.body, { headers });
 }
 
-/** 配信できない種類のファイルやシンボリックリンクがあれば例外を投げる。 */
-async function loadFiles(): Promise<Map<string, StaticFile>> {
+// キーはリクエストの pathname と同じく、区切りごとにエンコードしたもの
+async function loadFiles(dir: URL): Promise<Map<string, StaticFile>> {
   const files = new Map<string, StaticFile>();
   try {
-    await Deno.stat(STATIC_DIR);
+    await Deno.stat(dir);
   } catch (e) {
     if (e instanceof Deno.errors.NotFound) throw new Error("static/ がありません");
     throw e;
   }
-  for await (const names of walk(STATIC_DIR, [])) {
+  for await (const names of walk(dir, [])) {
     const name = names.at(-1)!;
     const dot = name.lastIndexOf(".");
     const contentType = dot > 0 ? CONTENT_TYPES[name.slice(dot)] : undefined;
@@ -68,7 +82,7 @@ async function loadFiles(): Promise<Map<string, StaticFile>> {
       throw new Error(`static/${names.join("/")}: この種類のファイルは配信できません`);
     }
     const encoded = names.map(encodeURIComponent).join("/");
-    const body = await Deno.readFile(new URL(encoded, STATIC_DIR));
+    const body = await Deno.readFile(new URL(encoded, dir));
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", body));
     const hash = Array.from(digest.slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("");
     files.set("/" + encoded, {

@@ -7,6 +7,8 @@ services:
       # 既定は開発用の DB。db サービスは compose のネットワークの中からだけ接続できる
       # .env に書くと、その値で上書きできる（environment は env_file より優先されるため、ここで受け取る）
       DATABASE_URL: ${DATABASE_URL:-postgres://app:app@db:5432/app}
+      # deno task test が使う DB。テストはテーブルを空にするため、開発用の DB とは分ける
+      TEST_DATABASE_URL: ${TEST_DATABASE_URL:-postgres://app:app@db-test:5432/app_test}
     build:
       context: .
       dockerfile: Dockerfile
@@ -15,13 +17,14 @@ services:
         GID: ${GID:-1000}
     user: root
     extra_hosts:
-      - 'host.docker.internal:host-gateway'
+      - "host.docker.internal:host-gateway"
     volumes:
       - ..:/workspace:cached
       - claude-config:/home/dev/.claude
       - gh-config:/home/dev/.config/gh
     depends_on:
       - db
+      - db-test
     command: sleep infinity
 
   # 開発用の PostgreSQL。権限を本番と揃えるため、本番と同じイメージ（docker/db/）を使う。ポートはホストに公開しない
@@ -36,6 +39,18 @@ services:
     volumes:
       # Rebuild しても残す。PostgreSQL 18 のイメージは /var/lib/postgresql の下にバージョンごとのディレクトリを作る
       - db-data:/var/lib/postgresql
+
+  # テスト用の PostgreSQL。db と同じイメージ・設定で、データは残さない。
+  # DB 名は _test で終わらせる。テストは、それ以外の名前の DB を空にしない（tests/_support/db.ts）
+  db-test:
+    build: ../docker/db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: app_test
+      APP_DB_PASSWORD: app
+    tmpfs:
+      - /var/lib/postgresql
 
 volumes:
   claude-config:

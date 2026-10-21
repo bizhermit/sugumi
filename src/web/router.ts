@@ -116,13 +116,14 @@ const layoutChains = new Map<string, Layout[]>();
  * メソッド・before・layout のファイルの名前の大文字小文字や拡張子が違う場合、
  * .mock を付けたファイルに付けないファイルがない場合、シンボリックリンクがある場合は例外を投げる。
  * mock が true なら、.mock を付けたファイルがあればそちらを返す。
+ * root は走査するディレクトリで、既定は src/routes/。テストで別のディレクトリを走査するときに渡す。
  */
 export async function scanRoutes(
-  { mock = false }: { mock?: boolean } = {},
+  { mock = false, root = ROUTES_DIR }: { mock?: boolean; root?: URL } = {},
 ): Promise<RouteDir[]> {
   const routes: RouteDir[] = [];
   const sources = new Map<string, string>();
-  for await (const dir of walk(ROUTES_DIR, "", { befores: [], layouts: [] }, mock)) {
+  for await (const dir of walk(root, "", { befores: [], layouts: [] }, mock)) {
     const { relative } = dir;
     const segments = parseSegments(relative);
     // /assets/ は assets.ts が静的ファイルの配信に使う
@@ -143,17 +144,20 @@ export async function scanRoutes(
 /**
  * scanRoutes の例外に加え、ルートのファイルの default export が関数でない場合や、
  * layout のファイルの default export が Layout の形でない場合も例外を投げる。
- * mock が true なら、.mock を付けたファイルがあればそちらを読み込む。
+ * mock が true なら、.mock を付けたファイルがあればそちらを読み込む。root は scanRoutes と同じ。
  */
 export async function loadRouter(
-  { mock }: { mock: boolean },
+  { mock, root = ROUTES_DIR }: { mock: boolean; root?: URL },
 ): Promise<(pathname: string, method: string) => RouteMatch | undefined> {
   const statics = new Map<string, Route>();
   const dynamics: DynamicRoute[] = [];
   layoutChains.clear();
-  for (const dir of await scanRoutes({ mock })) {
-    const route = await loadRoute(dir);
-    layoutChains.set(decodeURIComponent(urlOf(dir.relative).pathname), await loadLayouts(dir));
+  for (const dir of await scanRoutes({ mock, root })) {
+    const route = await loadRoute(root, dir);
+    layoutChains.set(
+      decodeURIComponent(urlOf(root, dir.relative).pathname),
+      await loadLayouts(root, dir),
+    );
     if (dir.segments.some((s) => "param" in s)) {
       dynamics.push({ segments: dir.segments, route });
     } else {
@@ -195,14 +199,14 @@ export function layoutsOf(moduleUrl: string): Layout[] {
   return layouts;
 }
 
-function urlOf(relative: string): URL {
-  return new URL(relative.split("/").map(encodeURIComponent).join("/"), ROUTES_DIR);
+function urlOf(root: URL, relative: string): URL {
+  return new URL(relative.split("/").map(encodeURIComponent).join("/"), root);
 }
 
-async function loadLayouts(dir: RouteDir): Promise<Layout[]> {
+async function loadLayouts(root: URL, dir: RouteDir): Promise<Layout[]> {
   const layouts: Layout[] = [];
   for (const relative of dir.layouts) {
-    const layout = (await import(urlOf(relative).href)).default;
+    const layout = (await import(urlOf(root, relative).href)).default;
     const title = layout?.title;
     if (
       typeof layout?.render !== "function" ||
@@ -215,9 +219,9 @@ async function loadLayouts(dir: RouteDir): Promise<Layout[]> {
   return layouts;
 }
 
-async function loadRoute(dir: RouteDir): Promise<Route> {
+async function loadRoute(root: URL, dir: RouteDir): Promise<Route> {
   const load = async (relative: string) => {
-    const mod = await import(urlOf(relative).href);
+    const mod = await import(urlOf(root, relative).href);
     if (typeof mod.default !== "function") {
       throw new Error(`routes/${relative}: default export にハンドラがありません`);
     }

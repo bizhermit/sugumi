@@ -22,6 +22,9 @@ src/
 static/           URL が外部の取り決めで決まるファイル（favicon.ico・robots.txt など）。同じパスで配信する
 scripts/          deno task から実行するスクリプト
 docker/           コンテナのイメージ（app/・db/）と、本番の設定（.env。コミットしない）・手順（README.md）
+tests/            テスト。src/ と同じ構成で *_test.ts を置く
+  _support/       複数のテストで使う部品
+.github/workflows/  CI
 ```
 
 - 依存の向きは `routes → web → lib` の一方向にする。逆向きに import しない。
@@ -69,6 +72,26 @@ docker/           コンテナのイメージ（app/・db/）と、本番の設�
 - 業務のルールがある書き込み（状態遷移の条件、ロック、ハッシュ化など）は、早めに共通の部品にする。
   - 同じテーブルを書き換える画面が 2 つ目になった時点で、共通の部品にする。
   - 画面ごとにルールが食い違うと、データが壊れるため。
+
+## テスト
+
+- `deno task test` で実行する。ファイルを指定すると、そのファイルだけを実行する。
+  - `dist/public/` を読み込むテスト（`src/web/app.ts` の `createApp()` や `src/web/assets.ts` を使うもの）は、先に `deno task build` が要る。
+- `src/`・`scripts/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`、`scripts/gen-routes.ts` → `tests/scripts/gen-routes_test.ts`）。
+  - アサーションは `node:assert/strict` を使う。ライブラリは足さない。
+  - ディレクトリやファイルを読むものは、テスト用のものを `tests/_support/fixture.ts` の `withTempDir()` で `dist/test/` に作って渡す。
+    - そのため、読む場所を引数で受け取れるようにしておく（`loadRouter()` の `root`、`createApp()` の `routes`・`staticDir` など）。
+  - 環境変数の検証は、`src/lib/env.ts` の `parse` で始まる関数に値を渡して確かめる。
+- テストは環境変数 `TEST_DATABASE_URL` の DB を使う。開発用の DB とは分ける。
+  - `deno task test` が `DATABASE_URL` を差し替えて実行する。`deno test` を直接実行しない。
+  - DB を使うテストは、初めに `tests/_support/db.ts` の `resetDb()` で空にする。
+  - テスト用の DB は、名前を `_test` で終わらせる。`resetDb()` は、それ以外の名前の DB を空にしない。
+- 失敗したテストの DB を確かめるときは、そのテストだけを実行してから接続する。
+  - ほかのテストも実行すると、次のテストの `resetDb()` で行が消える。
+  - `deno task test tests/routes/before.tree_test.ts --filter "テストの名前の一部"`
+  - DevContainer では `docker exec -it sugumi_devcontainer-db-test-1 psql -U app -d app_test` で接続する。
+- タイムアウトなどの値は、テストに書かず `src/lib/env.ts` の値を使う。開発環境で変えていても通るようにするため。
+- PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`・`routes.gen.ts` の差分・`deno task build`・`deno task test` を確かめる。
 
 ## ライブラリ
 
