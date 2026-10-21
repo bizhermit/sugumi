@@ -41,6 +41,30 @@
     "check-bundle": {
       "read": ["dist/public"]
     },
+    "test": {
+      "net": true,
+      "read": ["src", "dist/public", "dist/test", "static"],
+      "write": ["dist/test"],
+      "env": {
+        "allow": [
+          "APP_MODE",
+          "DATABASE_URL",
+          "DATABASE_PASSWORD_FILE",
+          "PG*",
+          "PORT",
+          "LOGIN_LOCKOUT_MINUTES",
+          "LOGIN_MAX_FAILED_ATTEMPTS",
+          "LOGIN_IP_MAX_FAILED_ATTEMPTS",
+          "LOGIN_IP_WINDOW_MINUTES",
+          "LOGIN_IP_LOCKOUT_MINUTES",
+          "SESSION_IDLE_TIMEOUT_MINUTES",
+          "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
+          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES",
+          "TRUSTED_PROXIES"
+        ],
+        "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
+      }
+    },
     "account": {
       "read": ["src", "/run/secrets"],
       "net": true,
@@ -76,7 +100,8 @@
     "bundle": "deno bundle --platform browser --minify --sourcemap=external --code-splitting --outdir dist/public src/**/_assets/index.ts src/**/_assets/index.css",
     "check:imports": "deno run -P=check-imports scripts/check-imports.ts",
     "check:bundle": "deno run -P=check-bundle scripts/check-bundle.ts",
-    "account:add": "deno run -P=account scripts/add-account.ts"
+    "account:add": "deno run -P=account scripts/add-account.ts",
+    "test": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_DATABASE_URL deno test -P=test"
   },
   "lint": {
     "rules": {
@@ -84,6 +109,7 @@
     }
   },
   "fmt": {
-    "lineWidth": 100
+    "lineWidth": 100,
+    "proseWrap": "preserve"
   }
 }
