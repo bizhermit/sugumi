@@ -11,6 +11,13 @@ export type PathOptions<P extends RoutePath> = [ParamNames<P>] extends [never]
   ? [options?: { query?: Query }]
   : [options: { params: Record<ParamNames<P>, string | number>; query?: Query }];
 
+/** エンコード済みの区切りか、パラメータの名前。 */
+type CompiledRoute = (string | { param: string })[];
+
+// リンクの数に比例して呼ばれるため、パターンの分解とエンコードはルートごとに 1 回だけ行う。
+// キーは RoutePath なので、ルートの数より増えない。パラメータのないルートはパスそのものを持つ
+const compiledRoutes = new Map<string, string | CompiledRoute>();
+
 /** path() で組み立てたアプリ内のパス。Location ヘッダーにはこの型の値だけを使う。 */
 export type AppPath = string & { readonly __brand: "AppPath" };
 
@@ -27,23 +34,53 @@ export function path<P extends RoutePath>(route: P, ...[options]: PathOptions<P>
     params?: Record<string, string | number>;
     query?: Query;
   };
-  const pathname = route === "/" ? "/" : "/" + route.slice(1).split("/").map((segment) => {
-    const name = segment.match(/^\[(\w+)\]$/)?.[1];
-    if (name === undefined) return encodeURIComponent(segment);
-    const value = params[name] === undefined ? "" : String(params[name]);
-    if (value === "" || value === "." || value === "..") {
-      throw new Error(`${route}: パラメータ "${name}" に "${value}" は使えません`);
-    }
-    return encodeURIComponent(value);
-  }).join("/");
-
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(query ?? {})) {
-    if (value === null || value === undefined) continue;
-    for (const v of Array.isArray(value) ? value : [value]) search.append(key, String(v));
+  let compiled = compiledRoutes.get(route);
+  if (compiled === undefined) {
+    compiled = compileRoute(route);
+    compiledRoutes.set(route, compiled);
   }
-  const qs = search.toString();
+  let pathname: string;
+  if (typeof compiled === "string") {
+    pathname = compiled;
+  } else {
+    pathname = "";
+    for (const part of compiled) {
+      if (typeof part === "string") {
+        pathname += "/" + part;
+        continue;
+      }
+      const value = params[part.param] === undefined ? "" : String(params[part.param]);
+      if (value === "" || value === "." || value === "..") {
+        throw new Error(`${route}: パラメータ "${part.param}" に "${value}" は使えません`);
+      }
+      pathname += "/" + encodeURIComponent(value);
+    }
+  }
+
+  // クエリのないリンクが多いため、値があるときだけ URLSearchParams を作る
+  let search: URLSearchParams | undefined;
+  for (const key in query) {
+    if (!Object.hasOwn(query, key)) continue;
+    const value = query[key];
+    if (value === null || value === undefined) continue;
+    search ??= new URLSearchParams();
+    if (Array.isArray(value)) {
+      for (const v of value) search.append(key, String(v));
+    } else {
+      search.append(key, String(value));
+    }
+  }
+  const qs = search === undefined ? "" : search.toString();
   return (qs === "" ? pathname : `${pathname}?${qs}`) as AppPath;
+}
+
+function compileRoute(route: string): string | CompiledRoute {
+  if (route === "/") return "/";
+  const parts: CompiledRoute = route.slice(1).split("/").map((segment) => {
+    const name = segment.match(/^\[(\w+)\]$/)?.[1];
+    return name === undefined ? encodeURIComponent(segment) : { param: name };
+  });
+  return parts.every((p) => typeof p === "string") ? "/" + parts.join("/") : parts;
 }
 
 /**

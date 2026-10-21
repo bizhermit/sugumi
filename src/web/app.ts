@@ -1,10 +1,16 @@
 import { ASSETS_PREFIX, serveAsset } from "./assets.ts";
-import { csrfFor } from "./csrf.tsx";
+import { type Csrf, csrfFor } from "./csrf.tsx";
 import { errorPage, methodNotAllowed } from "./error-page.tsx";
-import { loadRouter } from "./router.ts";
+import { InvalidFormError, parseForm } from "./form.ts";
+import { loadRouter, type RouteContext } from "./router.ts";
 import { withSecurityHeaders } from "./security-headers.ts";
 import { loadStatic, type StaticFiles } from "./static.ts";
-import { clearSessionCookie, getSession, hasSessionCookie } from "../lib/auth/session.ts";
+import {
+  clearSessionCookie,
+  getSession,
+  hasSessionCookie,
+  type Session,
+} from "../lib/auth/session.ts";
 import { path, redirect } from "./url.ts";
 import { remoteAddressOf } from "./remote-address.ts";
 import type { RoutePath } from "../routes.gen.ts";
@@ -18,6 +24,10 @@ const MAX_BODY_BYTES = 1024 * 1024;
 
 // ctx.session が常に undefined になるため、src/routes/before.tree.ts の PUBLIC_ROUTES にも入れること
 const SESSIONLESS_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/healthz"]);
+
+// ページの Response のヘッダーはその場で書き足す（response.ts）。同じ Response を使い回すページがあると、
+// 前のリクエストで足した Cookie などが次の利用者に渡るため、2 回目は書き足す前に例外にする
+const claimed = new WeakSet<Response>();
 
 export type Handler = (req: Request, info?: Deno.ServeHandlerInfo) => Promise<Response>;
 type Router = Awaited<ReturnType<typeof loadRouter>>;
@@ -47,7 +57,7 @@ export async function createApp(
     const tcpAddress = addr && "hostname" in addr ? addr.hostname : undefined;
     let res: Response;
     try {
-      res = await handle(match, statics, req, remoteAddressOf(req, tcpAddress));
+      res = await handle(match, statics, req, tcpAddress);
     } catch (e) {
       // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける
       console.error(e);
@@ -61,7 +71,7 @@ async function handle(
   match: Router,
   statics: StaticFiles,
   req: Request,
-  remoteAddress: string | undefined,
+  tcpAddress: string | undefined,
 ): Promise<Response> {
   const host = req.headers.get("host");
   if (host !== null && !VALID_HOST.test(host)) return errorPage(400);
@@ -99,13 +109,22 @@ async function handle(
     return res;
   }
 
-  const res = await pageHandler(buffered, {
-    route: route.route,
-    params: route.params,
-    session,
-    csrfToken: csrf.token,
-    remoteAddress,
-  });
+  let res: Response;
+  try {
+    res = await pageHandler(
+      buffered,
+      new Context(route.route, route.params, session, buffered, url, csrf, tcpAddress),
+    );
+  } catch (e) {
+    if (e instanceof InvalidFormError) return errorPage(400);
+    throw e;
+  }
+  if (claimed.has(res)) {
+    throw new Error(
+      `${route.route}: 同じ Response を 2 回返しました。リクエストごとに作ってください`,
+    );
+  }
+  claimed.add(res);
   return csrf.apply(res);
 }
 
@@ -123,6 +142,10 @@ async function bufferBody(req: Request, limit: number): Promise<Request | undefi
     if (size > limit) return undefined;
     chunks.push(chunk);
   }
+  // 小さな本文はほとんど 1 つの塊で届くため、そのときは複製しない。
+  // Content-Length で先に確保すると、大きく宣言して少しだけ送る接続ごとにメモリを確保させられるため、届いた分だけ使う
+  // Deno の本文の塊は ArrayBuffer の上にあるが、ストリームの型は SharedArrayBuffer も含むため型を絞る
+  if (chunks.length === 1) return new Request(req, { body: chunks[0] as Uint8Array<ArrayBuffer> });
   const body = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) {
@@ -130,4 +153,60 @@ async function bufferBody(req: Request, limit: number): Promise<Request | undefi
     offset += chunk.byteLength;
   }
   return new Request(req, { body });
+}
+
+/**
+ * ページに渡す ctx。リクエストごとに作るため、ページが使わない値（IP アドレスの解析など）は読まれたときに作る。
+ * 関数の値は、分割代入で取り出してから呼んでも動くよう、this を使わないものを読まれたときに作る。
+ */
+class Context implements RouteContext {
+  readonly #req: Request;
+  readonly #url: URL;
+  readonly #csrf: Csrf;
+  readonly #tcpAddress: string | undefined;
+  #remoteAddress: string | undefined;
+  #remoteAddressResolved = false;
+  #csrfToken: (() => Promise<string>) | undefined;
+  #form: (() => Promise<FormData>) | undefined;
+
+  constructor(
+    readonly route: RouteContext["route"],
+    readonly params: Record<string, string>,
+    readonly session: Session | undefined,
+    req: Request,
+    url: URL,
+    csrf: Csrf,
+    tcpAddress: string | undefined,
+  ) {
+    this.#req = req;
+    this.#url = url;
+    this.#csrf = csrf;
+    this.#tcpAddress = tcpAddress;
+  }
+
+  get query(): URLSearchParams {
+    return this.#url.searchParams;
+  }
+
+  get remoteAddress(): string | undefined {
+    if (!this.#remoteAddressResolved) {
+      this.#remoteAddress = remoteAddressOf(this.#req, this.#tcpAddress);
+      this.#remoteAddressResolved = true;
+    }
+    return this.#remoteAddress;
+  }
+
+  get csrfToken(): () => Promise<string> {
+    return this.#csrfToken ??= () => this.#csrf.token();
+  }
+
+  get form(): () => Promise<FormData> {
+    return this.#form ??= () => formOf(this.#req);
+  }
+}
+
+async function formOf(req: Request): Promise<FormData> {
+  const form = await parseForm(req);
+  if (!form) throw new InvalidFormError();
+  return form;
 }

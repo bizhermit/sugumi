@@ -86,13 +86,13 @@ Deno.test("csrf: 未来の時刻や形式の違う Cookie は stale になる", 
 Deno.test("csrf: ログイン中はセッションに結び付いたトークンだけを通す", async () => {
   await resetDb();
   const account = await addAccount();
-  const session = await createSession(account.id);
+  const session = await createSession(account);
   const token = await csrfFor(new Request(FORM_URL), session).token();
   const csrf = csrfFor(post(token), session);
   assert.equal(await csrf.verify(post(token)), true);
 
   // 別のセッションのトークンや、ログイン前のトークンは通さない
-  const otherSession = await createSession(account.id);
+  const otherSession = await createSession(account);
   assert.equal(await csrfFor(post(token), otherSession).verify(post(token)), false);
   const preLogin = await issuePreLogin();
   assert.equal(
@@ -121,4 +121,13 @@ Deno.test("csrf: token() を呼んだ応答は、ページの指定によらず 
   const res = again.apply(page());
   assert.equal(res.headers.get("cache-control"), "no-store");
   assert.equal(res.headers.get("set-cookie"), null);
+});
+
+Deno.test("csrf: ヘッダーが変更不可の Response にも、Cookie と no-store を付けられる", async () => {
+  const csrf = csrfFor(new Request(FORM_URL), undefined);
+  await csrf.token();
+  const res = csrf.apply(Response.redirect("http://localhost/", 302));
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get("cache-control"), "no-store");
+  assert.match(res.headers.get("set-cookie") ?? "", /^__Host-csrf=/);
 });

@@ -36,22 +36,30 @@ import type { Session } from "../lib/auth/session.ts";
 import type { RoutePath } from "../routes.gen.ts";
 import type { Layout } from "./html-document.tsx";
 
+/** 分割代入で取り出しても使える。値を書き足さず、before からの受け渡しには slot.ts の slot() を使う。 */
 export type RouteContext = {
   /**
    * 照合したルートのパターン（例："/user/[id]"）。before.tree.ts で、置いたディレクトリ自身を除くときなどに使う。
    * `/%61dmin` も `/admin` に照合されるため、生の pathname で判定してはいけない。
    */
-  route: RoutePath;
-  params: Record<string, string>;
+  readonly route: RoutePath;
+  readonly params: Record<string, string>;
   /** ログインしていなければ undefined。 */
-  session: Session | undefined;
-  /** フォームに埋め込む CSRF トークン。 */
-  csrfToken: () => Promise<string>;
+  readonly session: Session | undefined;
+  /** URL のクエリ。new URL(req.url) で解析し直さずにこれを使う。 */
+  readonly query: URLSearchParams;
+  /**
+   * フォームの本文。CSRF の検証で解析したものを返すため、本文を何度も解析しない。
+   * フォームでないか解析できなければ、app.ts がページの代わりに 400 を返すため、ページで例外を受けなくてよい。
+   */
+  readonly form: () => Promise<FormData>;
+  /** フォームに埋め込む CSRF トークン。何度呼んでも同じ値を返す。 */
+  readonly csrfToken: () => Promise<string>;
   /**
    * 接続元の IP アドレス。同じアドレスは常に同じ文字列になる（src/lib/ip.ts の formatIp の表記）。分からなければ undefined。
    * リバースプロキシの裏では、環境変数 TRUSTED_PROXIES を設定しないとプロキシのアドレスになる。
    */
-  remoteAddress: string | undefined;
+  readonly remoteAddress: string | undefined;
 };
 export type RouteHandler = (req: Request, ctx: RouteContext) => Response | Promise<Response>;
 /** Response を返すとそれを応答にする。undefined を返すとメソッドのハンドラに進む。 */
@@ -109,6 +117,9 @@ const SPECIAL_FILES = [
 
 // キーはディレクトリのデコード済みの pathname。loadRouter で設定する
 const layoutChains = new Map<string, Layout[]>();
+// ページを出すたびに layoutsOf() を呼ぶため、URL の解析をしないよう moduleUrl ごとに覚えておく。
+// moduleUrl は import.meta.url なので、ファイルの数より増えない
+const layoutsByModule = new Map<string, Layout[]>();
 
 /**
  * ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合、
@@ -150,8 +161,10 @@ export async function loadRouter(
   { mock, root = ROUTES_DIR }: { mock: boolean; root?: URL },
 ): Promise<(pathname: string, method: string) => RouteMatch | undefined> {
   const statics = new Map<string, Route>();
-  const dynamics: DynamicRoute[] = [];
+  // ルートの数に比例して照合が遅くならないよう、区切りの数ごとに分けて、同じ数のものだけを調べる
+  const dynamics = new Map<number, DynamicRoute[]>();
   layoutChains.clear();
+  layoutsByModule.clear();
   for (const dir of await scanRoutes({ mock, root })) {
     const route = await loadRoute(root, dir);
     layoutChains.set(
@@ -159,16 +172,17 @@ export async function loadRouter(
       await loadLayouts(root, dir),
     );
     if (dir.segments.some((s) => "param" in s)) {
-      dynamics.push({ segments: dir.segments, route });
+      const sameLength = dynamics.get(dir.segments.length) ?? [];
+      sameLength.push({ segments: dir.segments, route });
+      dynamics.set(dir.segments.length, sameLength);
     } else {
-      // リクエストの区切りをデコードした配列と同じ形のキーで引く
-      statics.set(
-        JSON.stringify(dir.segments.flatMap((s) => "literal" in s ? [s.literal] : [])),
-        route,
-      );
+      // リクエストの区切りから staticKey() で作るキーと同じ形で引く
+      statics.set(staticKey(dir.segments.map((s) => "literal" in s ? s.literal : "")), route);
     }
   }
-  dynamics.sort((a, b) => compareSpecificity(a.segments, b.segments));
+  for (const sameLength of dynamics.values()) {
+    sameLength.sort((a, b) => compareSpecificity(a.segments, b.segments));
+  }
 
   const found = (route: Route, params: Record<string, string>, method: string): RouteMatch => ({
     route: route.pattern,
@@ -179,9 +193,11 @@ export async function loadRouter(
   return (pathname, method) => {
     const parts = splitPath(pathname);
     if (!parts) return undefined;
-    const route = statics.get(JSON.stringify(parts));
+    const route = statics.get(staticKey(parts));
     if (route) return found(route, {}, method);
-    for (const { segments, route } of dynamics) {
+    const sameLength = dynamics.get(parts.length);
+    if (!sameLength) return undefined;
+    for (const { segments, route } of sameLength) {
       const params = matchSegments(segments, parts);
       if (params) return found(route, params, method);
     }
@@ -194,8 +210,11 @@ export async function loadRouter(
  * ルートのディレクトリでない場合や、loadRouter の前に呼んだ場合は例外を投げる。
  */
 export function layoutsOf(moduleUrl: string): Layout[] {
+  const cached = layoutsByModule.get(moduleUrl);
+  if (cached) return cached;
   const layouts = layoutChains.get(decodeURIComponent(new URL(".", moduleUrl).pathname));
   if (!layouts) throw new Error(`${moduleUrl} はルートのディレクトリにありません`);
+  layoutsByModule.set(moduleUrl, layouts);
   return layouts;
 }
 
@@ -268,22 +287,39 @@ function parseSegments(relative: string): Segment[] {
   });
 }
 
+/**
+ * デコード済みの区切りを、静的なルートの表のキーにする。
+ * 区切りは `%2F` をデコードした `/` を含みうるため、splitPath() が断る制御文字の \0 でつなぐ。
+ */
+function staticKey(parts: string[]): string {
+  return parts.join("\0");
+}
+
+const CONTROL_CHAR = /\p{Cc}/u;
+
 /** 不正なパーセントエンコーディングや、デコード後に制御文字を含む場合は undefined を返す。 */
 function splitPath(pathname: string): string[] | undefined {
   if (pathname === "/") return [];
-  let parts: string[];
-  try {
-    parts = pathname.slice(1).split("/").map(decodeURIComponent);
-  } catch {
-    return undefined;
+  const parts = pathname.slice(1).split("/");
+  // リクエストのたびに通るため、コールバックを作らずにループで書く
+  for (let i = 0; i < parts.length; i++) {
+    let part: string;
+    try {
+      part = decodeURIComponent(parts[i]);
+    } catch {
+      return undefined;
+    }
+    if (CONTROL_CHAR.test(part)) return undefined;
+    parts[i] = part;
   }
-  return parts.some((part) => /\p{Cc}/u.test(part)) ? undefined : parts;
+  return parts;
 }
 
+/** segments と parts の長さは同じであること。 */
 function matchSegments(segments: Segment[], parts: string[]): Record<string, string> | undefined {
-  if (segments.length !== parts.length) return undefined;
   const params: Record<string, string> = {};
-  for (const [i, segment] of segments.entries()) {
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
     if ("param" in segment) {
       if (parts[i] === "") return undefined;
       params[segment.param] = parts[i];

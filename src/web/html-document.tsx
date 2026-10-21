@@ -68,20 +68,23 @@ export async function composePage(
 ): Promise<{ title: string; main: Html }> {
   const layouts = layout === false ? [] : layoutsOf(page);
   let resolved: string | undefined;
-  for (const t of [...layouts.map((l) => l.title), title]) {
-    if (typeof t === "string") resolved = t;
-    else if (t) {
-      if (resolved === undefined) {
-        throw new Error(`${page}: 外側の layout でタイトルが決まっていません`);
-      }
-      resolved = t(resolved);
-    }
-  }
+  for (const l of layouts) resolved = applyTitle(resolved, l.title, page);
+  resolved = applyTitle(resolved, title, page);
   if (resolved === undefined) throw new Error(`${page}: タイトルが決まっていません`);
 
-  let current = slots;
-  for (const { render } of layouts.toReversed()) {
-    current = { ...current, main: await render(current, ctx) };
+  if (layouts.length === 0) return { title: resolved, main: slots.main };
+  // 呼び出し側の slots は書き換えないよう 1 回だけ複製し、main を内側の layout の結果で置き換えていく。
+  // render は Html を返し終えてから次の layout を呼ぶため、前の layout に渡した slots が後で変わっても影響しない
+  const current = { ...slots };
+  for (let i = layouts.length - 1; i >= 0; i--) {
+    current.main = await layouts[i].render(current, ctx);
   }
   return { title: resolved, main: current.main };
+}
+
+function applyTitle(outer: string | undefined, title: Title | undefined, page: string) {
+  if (typeof title === "string") return title;
+  if (!title) return outer;
+  if (outer === undefined) throw new Error(`${page}: 外側の layout でタイトルが決まっていません`);
+  return title(outer);
 }

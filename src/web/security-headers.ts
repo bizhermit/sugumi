@@ -1,3 +1,5 @@
+import { editHeaders } from "./response.ts";
+
 /**
  * 外部のスクリプト・スタイル・iframe を使わない前提で、許可を最小にしている。
  * 緩めたいページは、そのページのレスポンスで同じ名前のヘッダーを設定する。
@@ -72,11 +74,16 @@ const DEFAULT_HEADERS: [string, string][] = [
   ],
 ];
 
-/** res に未設定の既定ヘッダーを足したレスポンスを返す。res のヘッダーが変更不可でもよい。 */
+/**
+ * res に未設定の既定ヘッダーを足したレスポンスを返す。res のヘッダーが変更不可でもよい。
+ * res をその場で書き換えるため、ほかの応答に使い回さないこと（response.ts を参照）。
+ */
 export function withSecurityHeaders(res: Response): Response {
-  const out = new Response(res.body, res);
+  return editHeaders(res, setDefaults, undefined);
+}
+
+function setDefaults(headers: Headers): void {
   for (const [name, value] of DEFAULT_HEADERS) {
-    if (!out.headers.has(name)) out.headers.set(name, value);
+    if (!headers.has(name)) headers.set(name, value);
   }
-  return out;
 }

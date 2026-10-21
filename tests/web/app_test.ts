@@ -81,7 +81,7 @@ Deno.test("app: 期限切れのセッションやログイン前の Cookie な�
 Deno.test("app: ログイン中に CSRF の検証に失敗したら 403 を返す", async () => {
   await resetDb();
   const account = await addAccount();
-  const cookie = cookiePair(sessionCookie(await createSession(account.id)));
+  const cookie = cookiePair(sessionCookie(await createSession(account)));
   const res = await head("/logout", {
     method: "POST",
     headers: { cookie },

@@ -43,6 +43,33 @@ Deno.test("router: メソッドのファイルに振り分け、パラメータ�
   });
 });
 
+Deno.test("router: %2F を区切りとして扱わず、制御文字や不正なエンコードを含むものには照合しない", async () => {
+  await withFixture({
+    "get.ts": handler("GET /"),
+    "foo/bar/get.ts": handler("GET /foo/bar"),
+    "a/[x]/c/get.ts": handler("GET /a/[x]/c"),
+    "a/b/[y]/get.ts": handler("GET /a/b/[y]"),
+  }, async (root) => {
+    const match = await loadRouter({ mock: false, root });
+    assert.equal(match("/foo/bar", "GET")?.route, "/foo/bar");
+    assert.equal(match("/foo%2Fbar", "GET"), undefined);
+    assert.equal(match("/foo/bar/", "GET"), undefined);
+    for (
+      const pathname of ["/foo%00/bar", "/foo/bar%0A", "/foo%7F/bar", "/foo/%C2%85", "/foo/%ZZ"]
+    ) {
+      assert.equal(match(pathname, "GET"), undefined, pathname);
+    }
+    // 表のキーは区切りを \0 でつなぐため、\0 を含む区切りを通すと /foo/bar と同じキーになる
+    assert.equal(match("/foo%00bar", "GET"), undefined);
+    assert.equal(match("/a/%00/c", "GET"), undefined);
+    assert.equal(match("/a/b/%0A", "GET"), undefined);
+    // 区切りの数が同じ動的なルートでは、前の区切りが固定のものを優先する
+    assert.deepEqual(match("/a/b/c", "GET")?.route, "/a/b/[y]");
+    assert.deepEqual(match("/a/z/c", "GET")?.params, { x: "z" });
+    assert.equal(match("/a/z", "GET"), undefined);
+  });
+});
+
 Deno.test("router: ファイルのないメソッドは handler がなく、Allow に使うメソッドを返す", async () => {
   await withFixture({
     "before.tree.ts": before("before.tree"),

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { type Html, jsxAttr, jsxEscape } from "../../src/lib/jsx-runtime.ts";
+import { type Html, jsx, jsxAttr, jsxEscape } from "../../src/lib/jsx-runtime.ts";
 
 const ATTACK = `<script>alert("x")</script>&'`;
 const ESCAPED = "&#60;script&#62;alert(&#34;x&#34;)&#60;/script&#62;&#38;&#39;";
@@ -72,4 +72,30 @@ Deno.test("jsx: 属性を展開しても、属性名に使えない文字や埋�
   assert.throws(() => jsxAttr("data-x", { toString: () => "x" }), /使えない値です/);
   assert.throws(() => jsxEscape({ toString: () => "<b>" }), /JSX に埋め込めない値です/);
   assert.throws(() => jsxEscape(() => "x"), /JSX に埋め込めない値です/);
+});
+
+Deno.test("jsx: 記号が先頭・末尾・連続にあっても、ほかの文字を変えずにエスケープする", () => {
+  for (
+    const [value, escaped] of [
+      ["<", "&#60;"],
+      ["&&a", "&#38;&#38;a"],
+      ["a\"'", "a&#34;&#39;"],
+      ["<>x<>", "&#60;&#62;x&#60;&#62;"],
+      ["😀<😀", "😀&#60;😀"],
+      ["", ""],
+      ["日本語", "日本語"],
+    ]
+  ) {
+    assert.equal(jsxEscape(value), escaped, value);
+    assert.equal(jsxAttr("title", value), `title="${escaped}"`, value);
+  }
+});
+
+Deno.test("jsx: 属性の展開では、自身のプロパティだけを書いた順に出力する", () => {
+  const props = Object.create({ inherited: "x" });
+  props.b = "1";
+  props.a = "2";
+  assert.equal((<p {...props} />).value, `<p b="1" a="2"></p>`);
+  // JSX の展開は自身のプロパティだけを写すため、継承したプロパティは jsx() を直接呼んで確かめる
+  assert.equal(jsx("p", props).value, `<p b="1" a="2"></p>`);
 });

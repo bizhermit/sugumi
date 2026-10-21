@@ -1,6 +1,7 @@
 /**
  * ログイン中のセッション。ログインに成功したときだけ作るため、ログインしていない利用者が DB を増やすことはできない。
  */
+import { type Account, ACCOUNT_COLUMNS, type AccountColumns, toAccount } from "./accounts.ts";
 import { audit } from "../audit.ts";
 import { clearHostCookie, hostCookie, readCookie } from "../cookie.ts";
 import { randomToken } from "../crypto.ts";
@@ -14,10 +15,22 @@ const ABSOLUTE_TIMEOUT_MS = SESSION_ABSOLUTE_TIMEOUT_MINUTES * 60 * 1000;
 const TOUCH_INTERVAL_MS = 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 1000;
 
-/** id は Cookie に入れるトークンそのもの。ログや DB に書かないこと。 */
-export type Session = { readonly id: string; readonly accountId: number };
+/**
+ * id は Cookie に入れるトークンそのもの。ログや DB に書かないこと。
+ * account はこのリクエストで DB から読んだもの。権限などを足しても、変更は次のリクエストから反映される。
+ */
+export type Session = { readonly id: string; readonly account: Account };
 
-type SessionRow = { account_id: number; created_at: Date; last_access_at: Date };
+type SessionRow = AccountColumns & { created_at: Date; last_access_at: Date };
+
+// ログイン中のリクエストのたびに実行するため、名前を付けて DB に解析済みの文を接続ごとに持たせる。
+// セッションとアカウントを別々に引くと、DB との往復が 2 回になる
+const SELECT_SESSION = {
+  name: "select_session",
+  text: `SELECT sessions.created_at, sessions.last_access_at, ${ACCOUNT_COLUMNS}
+         FROM sessions JOIN accounts ON accounts.id = sessions.account_id
+         WHERE sessions.token_hash = $1`,
+};
 
 let nextSweepAt = 0;
 
@@ -32,10 +45,7 @@ export async function getSession(req: Request): Promise<Session | undefined> {
   const token = readCookie(req, COOKIE_NAME);
   if (token === undefined) return undefined;
   const hash = await hashToken(token);
-  const { rows: [row] } = await db.query<SessionRow>(
-    "SELECT account_id, created_at, last_access_at FROM sessions WHERE token_hash = $1",
-    [hash],
-  );
+  const { rows: [row] } = await db.query<SessionRow>({ ...SELECT_SESSION, values: [hash] });
   if (!row) return undefined;
   const now = Date.now();
   if (isExpired(row, now)) {
@@ -48,11 +58,11 @@ export async function getSession(req: Request): Promise<Session | undefined> {
       hash,
     ]);
   }
-  return { id: token, accountId: row.account_id };
+  return { id: token, account: toAccount(row) };
 }
 
 /** 呼び出し側は sessionCookie() で Cookie を返すこと。 */
-export async function createSession(accountId: number): Promise<Session> {
+export async function createSession(account: Account): Promise<Session> {
   const now = Date.now();
   if (now >= nextSweepAt) {
     nextSweepAt = now + SWEEP_INTERVAL_MS;
@@ -65,9 +75,9 @@ export async function createSession(accountId: number): Promise<Session> {
   const token = randomToken();
   await db.query(
     "INSERT INTO sessions (token_hash, account_id, created_at, last_access_at) VALUES ($1, $2, $3, $3)",
-    [await hashToken(token), accountId, new Date(now)],
+    [await hashToken(token), account.id, new Date(now)],
   );
-  return { id: token, accountId };
+  return { id: token, account };
 }
 
 export async function destroySession(session: Session): Promise<void> {
@@ -77,7 +87,7 @@ export async function destroySession(session: Session): Promise<void> {
 /** 呼び出し側は clearSessionCookie() で Cookie を消すこと。 */
 export async function logout(session: Session, remoteAddress: string | undefined): Promise<void> {
   await destroySession(session);
-  audit("logged_out", { accountId: session.accountId, remoteAddress });
+  audit("logged_out", { accountId: session.account.id, remoteAddress });
 }
 
 /** Cookie はあるのに getSession() が undefined なら、期限切れか削除されたセッションと分かる。 */
@@ -102,7 +112,9 @@ function isExpired(row: SessionRow, now: number): boolean {
  * DB にはトークンのハッシュだけを保存する。DB やバックアップが漏れても、そこからログインできないようにするため。
  * トークンは 256 ビットのランダムな値なので、ソルトや遅いハッシュは要らない。
  */
+const encoder = new TextEncoder();
+
 async function hashToken(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(token));
   return new Uint8Array(digest).toBase64({ alphabet: "base64url", omitPadding: true });
 }

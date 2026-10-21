@@ -44,6 +44,8 @@ Deno.test("remote-address: 解析できない値に当たったら、最後に�
   assert.equal(addressOf("10.0.0.1", "198.51.100.1, unknown"), "10.0.0.1");
   assert.equal(addressOf("10.0.0.1", "198.51.100.1, 10.0.1.5, "), "10.0.0.1");
   assert.equal(addressOf("10.0.0.1", "198.51.100.1, garbage, 10.0.1.5"), "10.0.1.5");
+  assert.equal(addressOf("10.0.0.1", "198.51.100.1,,10.0.1.5"), "10.0.1.5");
+  assert.equal(addressOf("10.0.0.1", ",198.51.100.1"), "198.51.100.1");
 });
 
 Deno.test("remote-address: プロキシが付けたポートを取り除き、表記を揃える", () => {

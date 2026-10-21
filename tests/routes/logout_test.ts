@@ -15,7 +15,7 @@ function request(path: string, init?: RequestInit): Promise<Response> {
 async function login(): Promise<string> {
   await resetDb();
   const account = await addAccount();
-  return cookiePair(sessionCookie(await createSession(account.id)));
+  return cookiePair(sessionCookie(await createSession(account)));
 }
 
 async function sessionCount(): Promise<number> {

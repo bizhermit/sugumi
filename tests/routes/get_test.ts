@@ -10,7 +10,7 @@ const handler = await createApp({ mock: false });
 Deno.test("top: ログイン中ならホームへ、そうでなければログイン画面へ送る", async () => {
   await resetDb();
   const account = await addAccount();
-  const cookie = cookiePair(sessionCookie(await createSession(account.id)));
+  const cookie = cookiePair(sessionCookie(await createSession(account)));
   const request = (init?: RequestInit) => handler(new Request("http://localhost/", init));
   assert.equal((await request({ headers: { cookie } })).headers.get("location"), "/home");
   assert.equal((await request()).headers.get("location"), "/login");

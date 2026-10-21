@@ -7,13 +7,8 @@ import type { RouteContext } from "../../web/router.ts";
 import { appPathOf, path, redirect } from "../../web/url.ts";
 import { loginForm } from "./view.tsx";
 
-export default async function (req: Request, ctx: RouteContext): Promise<Response> {
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
-    return errorPage(400);
-  }
+export default async function (_req: Request, ctx: RouteContext): Promise<Response> {
+  const form = await ctx.form();
   const username = form.get("username");
   const password = form.get("password");
   if (typeof username !== "string" || typeof password !== "string") return errorPage(400);
@@ -49,7 +44,7 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
   if (ctx.session) await destroySession(ctx.session);
   audit("login_succeeded", { accountId: result.account.id, remoteAddress });
   const res = redirect(to ?? path("/home"), 303);
-  res.headers.append("set-cookie", sessionCookie(await createSession(result.account.id)));
+  res.headers.append("set-cookie", sessionCookie(await createSession(result.account)));
   res.headers.append("set-cookie", clearPreLoginCookie());
   return res;
 }

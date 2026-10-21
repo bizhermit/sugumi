@@ -99,7 +99,7 @@ Deno.test("login: 期限切れで送られてきたら、その旨を表示す�
 Deno.test("login: ログイン中に開くとログアウトし、to を残してログイン画面を出し直す", async () => {
   await resetDb();
   const account = await addAccount();
-  const cookie = cookiePair(sessionCookie(await createSession(account.id)));
+  const cookie = cookiePair(sessionCookie(await createSession(account)));
   const res = await request("/login?to=%2Fhome", { headers: { cookie } });
   assert.equal(res.status, 302);
   assert.equal(res.headers.get("location"), "/login?to=%2Fhome");
@@ -110,7 +110,7 @@ Deno.test("login: ログイン中に開くとログアウトし、to を残し�
 Deno.test("login: ログインのたびにセッションを作り直す", async () => {
   await resetDb();
   const account = await addAccount();
-  const old = cookiePair(sessionCookie(await createSession(account.id)));
+  const old = cookiePair(sessionCookie(await createSession(account)));
   // ログイン中のフォーム（ホームのログアウト）のトークンで、そのまま /login に送る
   const form = await openForm("/home", old);
   const res = await postLogin({ username: "alice", password: TEST_PASSWORD }, form);

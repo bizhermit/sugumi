@@ -35,6 +35,13 @@ type AccountRow = {
   locked_until: Date | null;
 };
 
+/**
+ * Account にする列。ほかのテーブルと JOIN する問い合わせでも使えるよう、テーブル名を付けている。
+ * Account に項目を足すときは、この列と toAccount() を直す。
+ */
+export const ACCOUNT_COLUMNS = "accounts.id, accounts.username, accounts.display_name";
+export type AccountColumns = Pick<AccountRow, "id" | "username" | "display_name">;
+
 if (LOGIN_MAX_FAILED_ATTEMPTS === 0) {
   console.warn("LOGIN_MAX_FAILED_ATTEMPTS が 0 のため、ログインの試行回数を制限していません");
 }
@@ -59,8 +66,8 @@ export async function authenticate(
     if (checkable) await verifyPassword(password, DUMMY_HASH);
     return { status: "address_blocked", blocks: reserved.blocks, blockedAddress: reserved.key };
   }
-  const { rows: [row] } = await db.query<AccountRow>(
-    "SELECT * FROM accounts WHERE username = $1",
+  const { rows: [row] } = await db.query<AccountColumns & Pick<AccountRow, "password_hash">>(
+    `SELECT ${ACCOUNT_COLUMNS}, password_hash FROM accounts WHERE username = $1`,
     [username],
   );
   if (!row) {
@@ -109,7 +116,10 @@ async function reserveAttempt(id: number, now: number): Promise<{ locks: boolean
 }
 
 export async function findAccount(id: number): Promise<Account | undefined> {
-  const { rows: [row] } = await db.query<AccountRow>("SELECT * FROM accounts WHERE id = $1", [id]);
+  const { rows: [row] } = await db.query<AccountColumns>(
+    `SELECT ${ACCOUNT_COLUMNS} FROM accounts WHERE id = $1`,
+    [id],
+  );
   return row && toAccount(row);
 }
 
@@ -130,8 +140,9 @@ export async function createAccount(
   }
   const hash = await hashPassword(password);
   try {
-    const { rows: [row] } = await db.query<AccountRow>(
-      "INSERT INTO accounts (username, display_name, password_hash) VALUES ($1, $2, $3) RETURNING *",
+    const { rows: [row] } = await db.query<AccountColumns>(
+      `INSERT INTO accounts (username, display_name, password_hash) VALUES ($1, $2, $3)
+       RETURNING ${ACCOUNT_COLUMNS}`,
       [username, displayName, hash],
     );
     return toAccount(row);
@@ -143,6 +154,6 @@ export async function createAccount(
   }
 }
 
-function toAccount(row: AccountRow): Account {
+export function toAccount(row: AccountColumns): Account {
   return { id: row.id, username: row.username, displayName: row.display_name };
 }
