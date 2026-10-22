@@ -174,6 +174,12 @@ bench/            性能の計測。src/ と同じ構成で *_bench.ts を置く
   - 存在しないルートやパラメータの過不足は型エラーになり、値はエンコードされる。
 - リダイレクトは `redirect()` を使う。Location には `path()` の戻り値しか渡せない。
 - `req.url` や Host ヘッダーから絶対 URL を作らない。Host ヘッダーは利用者が書き換えられる。
+- 利用者から受け取った URL（プロフィールのリンクなど）を `href`・`src` などに入れるときは、`safeUrl()` を通す。
+  - JSX は値をエスケープするだけで、`javascript:` などの URL もそのまま出力する。CSP だけに頼らないため。
+  - `undefined` が返ったら、属性ごと出力しないか、リンクにしない。
+  - メールアドレス・電話番号は、URL ではなくアドレスや番号として受け取り、`mailtoUrl()`・`telUrl()` でリンクにする。
+    - `safeUrl()` は `mailto:`・`tel:` を通さない。`mailto:` の URL を受け付けると、cc や本文を足されるため。
+  - フォームの `action` には `path()` か `appPathOf()` の値だけを渡す。`safeUrl()` は外部の URL も通し、CSRF のトークンごと外部へ送信されるため。
 - ルートの型 `src/routes.gen.ts` は `deno task gen` で生成し、コミットする。
   - `deno task dev` の実行中は、ページを追加・削除すると自動で生成し直される。
 

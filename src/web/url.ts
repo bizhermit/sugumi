@@ -110,3 +110,60 @@ export function appPathOf(value: string | null): AppPath | undefined {
   if (url.pathname.startsWith("//")) return undefined;
   return (url.pathname + url.search) as AppPath;
 }
+
+/**
+ * 利用者から受け取った URL を、href・src などに出してよいときだけ返す。
+ * http・https の絶対 URL は解析して正規化した値を、`/` で始まる値は appPathOf() の結果を返す。
+ * それ以外（`javascript:`・`data:`・相対パス・`//` で始まる値・ユーザー名やパスワードを含む URL など）は undefined を返す。
+ */
+export function safeUrl(value: string | null | undefined): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (value.startsWith("/")) return appPathOf(value);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return undefined;
+  }
+  // 拒むスキームを並べると、未知のスキームや表記の揺れ（大文字、前後の空白や制御文字）を取りこぼすため、許すものだけを並べる
+  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+  // `https://example.com@evil.example/` は evil.example を指すが、example.com へのリンクに見えるため
+  if (url.username !== "" || url.password !== "") return undefined;
+  // ブラウザと同じ規則で解析した結果を返し、元の文字列が別の意味に解釈される余地をなくす
+  return url.href;
+}
+
+// HTML の仕様が <input type="email"> の検証に使う形式。RFC 5322 より狭いが、引用符やコメントを含むアドレスを扱わずに済む
+// https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address
+const EMAIL =
+  /^([a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+)@([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*)$/;
+
+/**
+ * 利用者から受け取ったメールアドレスを、リンクに使える `mailto:` の URL にして返す。
+ * 形式が違えば undefined を返す。`mailto:` で始まる値は受け付けない。
+ */
+export function mailtoUrl(address: string | null | undefined): string | undefined {
+  // RFC 5321 の上限。超えるアドレスには送信できない
+  if (address === null || address === undefined || address.length > 254) return undefined;
+  const match = EMAIL.exec(address);
+  if (match === null || match[1].length > 64) return undefined;
+  // ローカル部に使える `?`・`#`・`&`・`%` は、mailto: では cc や本文の指定、区切りとして読まれるためエンコードする
+  return `mailto:${encodeURIComponent(match[1])}@${match[2]}`;
+}
+
+// 区切りは、利用者が書きがちな `-`・空白・括弧だけを認める。先頭の `+` は国番号を表す
+const PHONE = /^\+?[0-9() -]+$/;
+const PHONE_SEPARATORS = /[() -]/g;
+
+/**
+ * 利用者から受け取った電話番号を、リンクに使える `tel:` の URL にして返す。
+ * 区切りを除いた数字だけの URL にする（`03-1234-5678` → `tel:0312345678`）。形式が違えば undefined を返す。
+ */
+export function telUrl(number: string | null | undefined): string | undefined {
+  if (number === null || number === undefined || !PHONE.test(number)) return undefined;
+  const digits = number.replace(PHONE_SEPARATORS, "");
+  // E.164 の上限は国番号を含めて 15 桁。`+` を除いて数える
+  const count = digits.startsWith("+") ? digits.length - 1 : digits.length;
+  if (count === 0 || count > 15) return undefined;
+  return `tel:${digits}`;
+}
