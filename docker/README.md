@@ -140,6 +140,31 @@ docker compose --env-file docker/.env exec db \
   psql -U admin -d app -c "DELETE FROM app.login_throttles WHERE address = '192.0.2.1'"
 ```
 
+### アカウントのロック
+
+同じアカウントでログインに `LOGIN_MAX_FAILED_ATTEMPTS` 回続けて失敗すると、`LOGIN_LOCKOUT_MINUTES`
+の間、そのアカウントはロックされる。ロックすると、監査ログに `account_locked` が出る。
+
+- ユーザー名さえ分かれば、誰でも失敗を重ねて本人を締め出せる。
+  - 接続元ごとの制限では、多数の接続元から分散して試されると止められない。
+- そのため、ログインに成功した端末を `LOGIN_DEVICE_DAYS` 日の間覚えておく（Cookie `__Host-device`）。
+  - 覚えている端末からは、ロック中でも、接続元が制限されていてもログインできる。
+  - その端末からの失敗は、アカウントではなく端末ごとに数える。`LOGIN_MAX_FAILED_ATTEMPTS`
+    回失敗した端末は、ほかの端末と同じ扱いになる。
+  - 監査ログの `login_succeeded`・`login_failed` の `trustedDevice` が `true` なら、覚えている端末からの試行。
+- 新しい端末や、Cookie を消したブラウザからは、ロック中はログインできない。
+  - ユーザー名を推測しにくくすると、締め出されにくくなる（連番やメールアドレスを使わない）。
+- `LOGIN_MAX_FAILED_ATTEMPTS` を 0 にすると、ロックせず、端末も覚えない。
+
+ロックを手で解除するには、監査ログの `accountId` の値を指定して、失敗の回数を消す。
+
+```sh
+docker compose --env-file docker/.env exec db \
+  psql -U admin -d app -c "UPDATE app.accounts SET failed_attempts = 0, locked_until = NULL WHERE id = 1"
+```
+
+リポジトリから DB に接続できる環境では、`deno task account:unlock <accountId>` でも解除できる。
+
 ### 注意
 
 アプリは、`TRUSTED_PROXIES` のアドレスから届いた X-Forwarded-For

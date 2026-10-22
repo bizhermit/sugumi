@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { createSession, sessionCookie } from "../../src/lib/auth/session.ts";
 import { db } from "../../src/lib/db.ts";
+import { LOGIN_DEVICE_DAYS, LOGIN_MAX_FAILED_ATTEMPTS } from "../../src/lib/env.ts";
 import { createApp } from "../../src/web/app.ts";
 import { cookiePair } from "../_support/cookie.ts";
 import { addAccount, resetDb, TEST_PASSWORD } from "../_support/db.ts";
@@ -122,4 +123,28 @@ Deno.test("login: ログインのたびにセッションを作り直す", async
   assert.equal(await sessionCount(), 1);
   const home = await request("/home", { headers: { cookie: old } });
   assert.equal(home.status, 302);
+});
+
+Deno.test({
+  name: "login: 端末の Cookie を発行し、ロック中もその端末からはログインできる",
+  ignore: LOGIN_MAX_FAILED_ATTEMPTS === 0,
+  async fn() {
+    await resetDb();
+    await addAccount();
+    const login = { username: "alice", password: TEST_PASSWORD };
+    const first = await postLogin(login, await openForm("/login"));
+    const issued = first.headers.getSetCookie().find((c) => c.startsWith("__Host-device="));
+    assert.ok(issued !== undefined);
+    assert.ok(issued.includes(`Max-Age=${LOGIN_DEVICE_DAYS * 24 * 60 * 60}`));
+    const device = cookiePair(issued);
+
+    const form = await openForm("/login");
+    for (let i = 0; i < LOGIN_MAX_FAILED_ATTEMPTS; i++) {
+      await (await postLogin({ username: "alice", password: "wrong password" }, form)).body
+        ?.cancel();
+    }
+    assert.equal((await postLogin(login, form)).status, 401);
+    const res = await postLogin(login, { ...form, cookie: `${form.cookie}; ${device}` });
+    assert.equal(res.status, 303);
+  },
 });

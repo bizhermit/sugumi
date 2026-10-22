@@ -18,7 +18,7 @@ export async function resetDb(): Promise<void> {
   if (!name.endsWith("_test")) {
     throw new Error(`DB ${name} は名前が _test で終わらないため、テストで空にしません`);
   }
-  await db.query("TRUNCATE accounts, sessions, login_throttles RESTART IDENTITY");
+  await db.query("TRUNCATE accounts, sessions, login_throttles, login_devices RESTART IDENTITY");
 }
 
 export const TEST_PASSWORD = "correct horse battery staple";
