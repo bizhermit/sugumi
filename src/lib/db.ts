@@ -8,7 +8,12 @@
  */
 // @ts-types="npm:@types/pg@8.23.1"
 import pg from "pg";
-import { DATABASE_URL } from "./env.ts";
+import {
+  DATABASE_URL,
+  DB_CONNECTION_TIMEOUT_SECONDS,
+  DB_POOL_MAX,
+  DB_STATEMENT_TIMEOUT_SECONDS,
+} from "./env.ts";
 
 const MIGRATIONS = [
   `
@@ -47,7 +52,14 @@ const MIGRATIONS = [
 // 複数のインスタンスが同時に起動しても、マイグレーションを 1 つずつ適用するためのロックの番号
 const MIGRATION_LOCK = 7_316_001;
 
-export const db = new pg.Pool({ connectionString: DATABASE_URL });
+// query_timeout（クライアント側の時間制限）は使わない。送信済みの文が切れても接続は応答を待ったまま Pool に戻り、
+// 次にその接続を使う問い合わせが後ろで待たされるため。statement_timeout なら DB が文を取り消し、接続はそのまま使える
+export const db = new pg.Pool({
+  connectionString: DATABASE_URL,
+  max: DB_POOL_MAX,
+  connectionTimeoutMillis: DB_CONNECTION_TIMEOUT_SECONDS * 1000,
+  statement_timeout: DB_STATEMENT_TIMEOUT_SECONDS * 1000,
+});
 // 待機中の接続が切れると Pool が error を出す。リスナーがないとプロセスが終了する
 db.on("error", (e) => console.error(e));
 
@@ -78,6 +90,19 @@ export async function transaction<T>(fn: (client: pg.PoolClient) => Promise<T>):
   }
 }
 
+/**
+ * e が、接続の空きを待ちきれなかったか、問い合わせが statement_timeout で取り消された例外なら true を返す。
+ * pg-pool は待ちの時間切れを専用の型やコードのない Error で知らせるため、メッセージで見分ける。
+ * pg を更新してメッセージが変わったら、tests/lib/db_test.ts・tests/web/app_test.ts が失敗する。
+ */
+export function isDbTimeout(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  // 57014 は query_canceled。statement_timeout のほか、管理者が pg_cancel_backend() で止めたときも含む
+  if ((e as { code?: unknown }).code === "57014") return true;
+  return e.message === "timeout exceeded when trying to connect" ||
+    e.message === "Connection terminated due to connection timeout";
+}
+
 /** name の秘密の値を返す。まだなければ bytes バイトのランダムな値を作って保存する。 */
 export async function secret(name: string, bytes: number): Promise<Uint8Array<ArrayBuffer>> {
   await db.query(
@@ -93,6 +118,8 @@ export async function secret(name: string, bytes: number): Promise<Uint8Array<Ar
 
 async function migrate(): Promise<void> {
   await transaction(async (client) => {
+    // 大きなテーブルの変更や、ほかのインスタンスのマイグレーションの終わりを待つ時間は、リクエストの時間制限では測れない
+    await client.query("SET LOCAL statement_timeout = 0");
     await client.query("SELECT pg_advisory_xact_lock($1)", [MIGRATION_LOCK]);
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (

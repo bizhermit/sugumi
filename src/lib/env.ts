@@ -31,6 +31,28 @@ export const DATABASE_URL = parseDatabaseUrl(
   Deno.env.get("DATABASE_PASSWORD_FILE"),
 );
 
+/**
+ * Pool が同時に開く DB の接続の数。アプリのインスタンスの数を掛けた数が、
+ * PostgreSQL の max_connections（既定 100）から管理用の余裕を引いた数に収まるようにする。
+ */
+export const DB_POOL_MAX = integer("DB_POOL_MAX", 10, 1);
+
+/**
+ * 接続の空きを待つ（空きがなければ新しく接続する）秒数。過ぎたらリクエストに 503 を返す。
+ * 待ちに上限がないと、DB が遅くなったときに待つリクエストが無期限にたまるため。
+ */
+export const DB_CONNECTION_TIMEOUT_SECONDS = integer("DB_CONNECTION_TIMEOUT_SECONDS", 5, 1);
+
+/** 1 つの問い合わせ（SQL の文）にかけてよい秒数。DB が過ぎた文を取り消し、リクエストに 503 を返す。 */
+export const DB_STATEMENT_TIMEOUT_SECONDS = integer("DB_STATEMENT_TIMEOUT_SECONDS", 10, 1);
+
+/**
+ * リクエストの本文を読み終えるまでの秒数。過ぎたら 408 を返す。
+ * 本文はログインや CSRF の確認より前に読むため、上限がないと、誰でも本文を少しずつ送る接続で
+ * 1 接続あたり最大 1 MB を抱えさせ続けられる（slowloris）。
+ */
+export const REQUEST_BODY_TIMEOUT_SECONDS = integer("REQUEST_BODY_TIMEOUT_SECONDS", 30, 1);
+
 /** ログインに続けて失敗してロックしたアカウントを、自動で解除するまでの分数。 */
 export const LOGIN_LOCKOUT_MINUTES = integer("LOGIN_LOCKOUT_MINUTES", 60, 1);
 
