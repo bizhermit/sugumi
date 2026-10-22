@@ -4,7 +4,7 @@
 import { type Account, ACCOUNT_COLUMNS, type AccountColumns, toAccount } from "./accounts.ts";
 import { audit } from "../audit.ts";
 import { clearHostCookie, hostCookie, readCookie } from "../cookie.ts";
-import { randomToken } from "../crypto.ts";
+import { isRandomToken, randomToken } from "../crypto.ts";
 import { db } from "../db.ts";
 import { SESSION_ABSOLUTE_TIMEOUT_MINUTES, SESSION_IDLE_TIMEOUT_MINUTES } from "../env.ts";
 
@@ -44,6 +44,9 @@ if (IDLE_TIMEOUT_MS === 0 && ABSOLUTE_TIMEOUT_MS === 0) {
 export async function getSession(req: Request): Promise<Session | undefined> {
   const token = readCookie(req, COOKIE_NAME);
   if (token === undefined) return undefined;
+  // 公開ページでも通るため、でたらめな Cookie で未ログインの利用者が DB の問い合わせを作れないようにする。
+  // 形式が違う Cookie も hasSessionCookie() では「ある」ので、期限切れと同じ扱いになる
+  if (!isRandomToken(token)) return undefined;
   const hash = await hashToken(token);
   const { rows: [row] } = await db.query<SessionRow>({ ...SELECT_SESSION, values: [hash] });
   if (!row) return undefined;

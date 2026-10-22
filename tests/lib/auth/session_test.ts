@@ -84,6 +84,31 @@ Deno.test({
   },
 });
 
+Deno.test("session: randomToken の形式でない Cookie では DB を引かない", async () => {
+  const session = await newSession();
+  const values = ["x", session.id.slice(1), `${session.id}A`, `${session.id.slice(1)}+`];
+  let queries = 0;
+  const query = db.query;
+  // deno-lint-ignore no-explicit-any
+  db.query = ((...args: any[]) => {
+    queries++;
+    // deno-lint-ignore no-explicit-any
+    return (query as any).apply(db, args);
+  }) as typeof db.query;
+  try {
+    for (const value of values) {
+      const req = new Request("http://localhost/", { headers: { cookie: `__Host-sid=${value}` } });
+      assert.equal(await getSession(req), undefined, value);
+    }
+    assert.equal(queries, 0);
+    // 形式が合っていれば DB を引く（数え方が正しいことの確かめ）
+    assert.deepEqual(await getSession(requestWith(session)), session);
+    assert.ok(queries > 0);
+  } finally {
+    db.query = query;
+  }
+});
+
 Deno.test("session: アカウントを消すとセッションも消える", async () => {
   const session = await newSession();
   await db.query("DELETE FROM accounts");
