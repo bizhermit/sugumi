@@ -4,7 +4,7 @@
 import { type Account, ACCOUNT_COLUMNS, type AccountColumns, toAccount } from "./accounts.ts";
 import { audit } from "../audit.ts";
 import { clearHostCookie, hostCookie, readCookie } from "../cookie.ts";
-import { isRandomToken, randomToken } from "../crypto.ts";
+import { hashToken, isRandomToken, randomToken } from "../crypto.ts";
 import { db } from "../db.ts";
 import { SESSION_ABSOLUTE_TIMEOUT_MINUTES, SESSION_IDLE_TIMEOUT_MINUTES } from "../env.ts";
 
@@ -109,15 +109,4 @@ export function clearSessionCookie(): string {
 function isExpired(row: SessionRow, now: number): boolean {
   return (IDLE_TIMEOUT_MS > 0 && now - row.last_access_at.getTime() >= IDLE_TIMEOUT_MS) ||
     (ABSOLUTE_TIMEOUT_MS > 0 && now - row.created_at.getTime() >= ABSOLUTE_TIMEOUT_MS);
-}
-
-/**
- * DB にはトークンのハッシュだけを保存する。DB やバックアップが漏れても、そこからログインできないようにするため。
- * トークンは 256 ビットのランダムな値なので、ソルトや遅いハッシュは要らない。
- */
-const encoder = new TextEncoder();
-
-async function hashToken(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(token));
-  return new Uint8Array(digest).toBase64({ alphabet: "base64url", omitPadding: true });
 }

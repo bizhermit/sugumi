@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
-import { authenticate, createAccount, findAccount } from "../../../src/lib/auth/accounts.ts";
+import {
+  authenticate,
+  createAccount,
+  findAccount,
+  unlockAccount,
+} from "../../../src/lib/auth/accounts.ts";
+import { sweep as sweepLoginDevices } from "../../../src/lib/auth/login-devices.ts";
 import { reserveAttempt } from "../../../src/lib/auth/login-throttle.ts";
 import { PASSWORD_MAX_LENGTH } from "../../../src/lib/auth/password.ts";
+import { isRandomToken } from "../../../src/lib/crypto.ts";
 import { db } from "../../../src/lib/db.ts";
 import {
+  LOGIN_DEVICE_DAYS,
   LOGIN_IP_MAX_FAILED_ATTEMPTS,
   LOGIN_LOCKOUT_MINUTES,
   LOGIN_MAX_FAILED_ATTEMPTS,
@@ -20,24 +28,29 @@ async function accountRow(): Promise<{ failed_attempts: number; locked_until: Da
 Deno.test("accounts: 正しいパスワードならログインでき、失敗の回数を 0 に戻す", async () => {
   await resetDb();
   const account = await addAccount();
-  await authenticate("alice", "wrong password", undefined);
-  assert.deepEqual(await authenticate("alice", TEST_PASSWORD, undefined), {
-    status: "ok",
-    account,
-  });
+  await authenticate("alice", "wrong password", undefined, undefined);
+  const result = await authenticate("alice", TEST_PASSWORD, undefined, undefined);
+  assert.ok(result.status === "ok");
+  assert.deepEqual(result.account, account);
+  assert.equal(result.trustedDevice, false);
   assert.deepEqual(await accountRow(), { failed_attempts: 0, locked_until: null });
 });
 
 Deno.test("accounts: パスワードの誤りと、存在しないユーザーを区別して返す", async () => {
   await resetDb();
   await addAccount();
-  const wrong = await authenticate("alice", "wrong password", undefined);
+  const wrong = await authenticate("alice", "wrong password", undefined, undefined);
   assert.equal(wrong.status, "wrong_password");
-  assert.deepEqual(await authenticate("bob", TEST_PASSWORD, undefined), {
+  assert.deepEqual(await authenticate("bob", TEST_PASSWORD, undefined, undefined), {
     status: "unknown_user",
   });
   // 上限を超える長さは、計算せずに失敗にする（失敗として数える）
-  const long = await authenticate("alice", "x".repeat(PASSWORD_MAX_LENGTH + 1), undefined);
+  const long = await authenticate(
+    "alice",
+    "x".repeat(PASSWORD_MAX_LENGTH + 1),
+    undefined,
+    undefined,
+  );
   assert.equal(long.status, "wrong_password");
   assert.equal((await accountRow()).failed_attempts, MAX === 0 ? 0 : 2);
 });
@@ -50,12 +63,15 @@ Deno.test({
     await resetDb();
     await addAccount();
     for (let i = 1; i < MAX; i++) {
-      const result = await authenticate("alice", "wrong password", undefined);
+      const result = await authenticate("alice", "wrong password", undefined, undefined);
       assert.equal(result.status === "wrong_password" && result.locked, false);
     }
-    const last = await authenticate("alice", "wrong password", undefined);
+    const last = await authenticate("alice", "wrong password", undefined, undefined);
     assert.equal(last.status === "wrong_password" && last.locked, true);
-    assert.equal((await authenticate("alice", TEST_PASSWORD, undefined)).status, "locked");
+    assert.equal(
+      (await authenticate("alice", TEST_PASSWORD, undefined, undefined)).status,
+      "locked",
+    );
   },
 });
 
@@ -65,7 +81,9 @@ Deno.test({
   async fn() {
     await resetDb();
     await addAccount();
-    for (let i = 0; i < MAX; i++) await authenticate("alice", "wrong password", undefined);
+    for (let i = 0; i < MAX; i++) {
+      await authenticate("alice", "wrong password", undefined, undefined);
+    }
     const { locked_until } = await accountRow();
     assert.ok(locked_until !== null);
     const lockout = LOGIN_LOCKOUT_MINUTES * 60 * 1000;
@@ -73,11 +91,11 @@ Deno.test({
 
     await db.query("UPDATE accounts SET locked_until = $1", [new Date(Date.now() - 1)]);
     assert.equal(
-      (await authenticate("alice", "wrong password", undefined)).status,
+      (await authenticate("alice", "wrong password", undefined, undefined)).status,
       "wrong_password",
     );
     assert.equal((await accountRow()).failed_attempts, 1);
-    assert.equal((await authenticate("alice", TEST_PASSWORD, undefined)).status, "ok");
+    assert.equal((await authenticate("alice", TEST_PASSWORD, undefined, undefined)).status, "ok");
   },
 });
 
@@ -88,7 +106,10 @@ Deno.test({
     await resetDb();
     await addAccount();
     const results = await Promise.all(
-      Array.from({ length: MAX + 3 }, () => authenticate("alice", "wrong password", undefined)),
+      Array.from(
+        { length: MAX + 3 },
+        () => authenticate("alice", "wrong password", undefined, undefined),
+      ),
     );
     assert.equal(results.filter((r) => r.status === "wrong_password").length, MAX);
     assert.equal(results.filter((r) => r.status === "locked").length, 3);
@@ -103,14 +124,14 @@ Deno.test({
     await addAccount();
     const now = Date.now();
     for (let i = 0; i < LOGIN_IP_MAX_FAILED_ATTEMPTS; i++) await reserveAttempt("192.0.2.1", now);
-    assert.deepEqual(await authenticate("alice", TEST_PASSWORD, "192.0.2.1"), {
+    assert.deepEqual(await authenticate("alice", TEST_PASSWORD, "192.0.2.1", undefined), {
       status: "address_blocked",
       blocks: true,
       blockedAddress: "192.0.2.1",
     });
     // 制限中はアカウントの失敗として数えない
     assert.equal((await accountRow()).failed_attempts, 0);
-    assert.equal((await authenticate("alice", TEST_PASSWORD, "192.0.2.2")).status, "ok");
+    assert.equal((await authenticate("alice", TEST_PASSWORD, "192.0.2.2", undefined)).status, "ok");
   },
 });
 
@@ -120,8 +141,8 @@ Deno.test({
   async fn() {
     await resetDb();
     await addAccount();
-    await authenticate("alice", "wrong password", "192.0.2.1");
-    await authenticate("alice", TEST_PASSWORD, "192.0.2.1");
+    await authenticate("alice", "wrong password", "192.0.2.1", undefined);
+    await authenticate("alice", TEST_PASSWORD, "192.0.2.1", undefined);
     const { rows } = await db.query("SELECT failed_attempts FROM login_throttles");
     assert.deepEqual(rows, [{ failed_attempts: 1 }]);
   },
@@ -149,4 +170,178 @@ Deno.test("accounts: createAccount は入力を確かめ、使われているユ
 
   await addAccount("alice");
   await assert.rejects(addAccount("alice"), /ユーザー名 alice は使われています/);
+});
+
+/** 失敗を重ねて alice をロックする。 */
+async function lockAlice(): Promise<void> {
+  for (let i = 0; i < MAX; i++) {
+    await authenticate("alice", "wrong password", undefined, undefined);
+  }
+  assert.equal((await authenticate("alice", TEST_PASSWORD, undefined, undefined)).status, "locked");
+}
+
+/** alice でログインに成功し、その端末のトークンを返す。 */
+async function aliceDevice(): Promise<string> {
+  const result = await authenticate("alice", TEST_PASSWORD, undefined, undefined);
+  assert.ok(result.status === "ok" && result.deviceToken !== undefined);
+  return result.deviceToken;
+}
+
+async function deviceRows(): Promise<{ account_id: number; failed_attempts: number }[]> {
+  const { rows } = await db.query(
+    "SELECT account_id, failed_attempts FROM login_devices ORDER BY account_id",
+  );
+  return rows;
+}
+
+Deno.test({
+  name: "accounts: ログインに成功すると、LOGIN_DEVICE_DAYS の間有効な端末のトークンを作る",
+  ignore: MAX === 0,
+  async fn() {
+    await resetDb();
+    const account = await addAccount();
+    const token = await aliceDevice();
+    assert.ok(isRandomToken(token));
+    const { rows: [row] } = await db.query<{ account_id: number; expires_at: Date }>(
+      "SELECT account_id, expires_at FROM login_devices",
+    );
+    assert.equal(row.account_id, account.id);
+    const days = LOGIN_DEVICE_DAYS * 24 * 60 * 60 * 1000;
+    assert.ok(Math.abs(row.expires_at.getTime() - Date.now() - days) < 60_000);
+  },
+});
+
+Deno.test({
+  name: "accounts: ロック中でも、ログインしたことのある端末からは正しいパスワードで通す",
+  ignore: MAX === 0,
+  async fn() {
+    await resetDb();
+    await addAccount();
+    const token = await aliceDevice();
+    await lockAlice();
+    const result = await authenticate("alice", TEST_PASSWORD, undefined, token);
+    assert.ok(result.status === "ok");
+    assert.equal(result.trustedDevice, true);
+    // 成功のたびにトークンを作り直し、前のものは使えなくする
+    assert.notEqual(result.deviceToken, token);
+    assert.equal((await authenticate("alice", TEST_PASSWORD, undefined, token)).status, "locked");
+    assert.equal(
+      (await authenticate("alice", TEST_PASSWORD, undefined, result.deviceToken)).status,
+      "ok",
+    );
+    // 端末からの成功では、ほかの端末に対するロックは解かない
+    assert.equal(
+      (await authenticate("alice", TEST_PASSWORD, undefined, undefined)).status,
+      "locked",
+    );
+  },
+});
+
+Deno.test({
+  name: "accounts: 端末からの失敗はアカウントに数えず、上限に達した端末は信頼しない",
+  ignore: MAX === 0,
+  async fn() {
+    await resetDb();
+    await addAccount();
+    const token = await aliceDevice();
+    for (let i = 0; i < MAX; i++) {
+      const result = await authenticate("alice", "wrong password", undefined, token);
+      assert.ok(result.status === "wrong_password");
+      assert.equal(result.trustedDevice, true);
+      assert.equal(result.locked, false);
+    }
+    assert.equal((await accountRow()).failed_attempts, 0);
+    // 上限に達した端末からの試行は、ほかの端末と同じくアカウントに数える
+    const next = await authenticate("alice", "wrong password", undefined, token);
+    assert.ok(next.status === "wrong_password");
+    assert.equal(next.trustedDevice, false);
+    assert.equal((await accountRow()).failed_attempts, 1);
+  },
+});
+
+Deno.test({
+  name: "accounts: 端末からの失敗も、並行して試して上限を超えてパスワードを確かめない",
+  ignore: MAX === 0,
+  async fn() {
+    await resetDb();
+    await addAccount();
+    const token = await aliceDevice();
+    const results = await Promise.all(
+      Array.from(
+        { length: MAX + 3 },
+        () => authenticate("alice", "wrong password", undefined, token),
+      ),
+    );
+    const trusted = results.filter((r) => r.status === "wrong_password" && r.trustedDevice);
+    assert.equal(trusted.length, MAX);
+  },
+});
+
+Deno.test({
+  name: "accounts: ほかのアカウントの端末、期限切れ、形式の違うトークンは信頼しない",
+  ignore: MAX === 0,
+  async fn() {
+    await resetDb();
+    await addAccount();
+    await addAccount("bob");
+    const bob = await authenticate("bob", TEST_PASSWORD, undefined, undefined);
+    assert.ok(bob.status === "ok" && bob.deviceToken !== undefined);
+    const expired = await aliceDevice();
+    await db.query("UPDATE login_devices SET expires_at = $1 WHERE account_id = 1", [
+      new Date(Date.now() - 1),
+    ]);
+    await lockAlice();
+    for (const token of [bob.deviceToken, expired, "not a token"]) {
+      assert.equal((await authenticate("alice", TEST_PASSWORD, undefined, token)).status, "locked");
+    }
+  },
+});
+
+Deno.test({
+  name: "accounts: ログインしたことのある端末からは、接続元が制限されていても通す",
+  ignore: LOGIN_IP_MAX_FAILED_ATTEMPTS === 0 || MAX === 0,
+  async fn() {
+    await resetDb();
+    await addAccount();
+    const token = await aliceDevice();
+    const now = Date.now();
+    for (let i = 0; i <= LOGIN_IP_MAX_FAILED_ATTEMPTS; i++) await reserveAttempt("192.0.2.1", now);
+    assert.equal(
+      (await authenticate("alice", TEST_PASSWORD, "192.0.2.1", undefined)).status,
+      "address_blocked",
+    );
+    assert.equal((await authenticate("alice", TEST_PASSWORD, "192.0.2.1", token)).status, "ok");
+  },
+});
+
+Deno.test({
+  name: "accounts: 端末のトークンの行は、期限切れと上限に達したものを消す",
+  ignore: MAX === 0,
+  async fn() {
+    await resetDb();
+    await addAccount();
+    await addAccount("bob");
+    const used = await aliceDevice();
+    for (let i = 0; i < MAX; i++) await authenticate("alice", "wrong password", undefined, used);
+    await authenticate("bob", TEST_PASSWORD, undefined, undefined);
+    await db.query("UPDATE login_devices SET expires_at = $1 WHERE account_id = 2", [
+      new Date(Date.now() - 1),
+    ]);
+    await sweepLoginDevices(Date.now());
+    assert.deepEqual(await deviceRows(), []);
+  },
+});
+
+Deno.test({
+  name: "accounts: unlockAccount はロックと失敗の回数を消し、なければ false を返す",
+  ignore: MAX === 0,
+  async fn() {
+    await resetDb();
+    const account = await addAccount();
+    await lockAlice();
+    assert.deepEqual(await unlockAccount(account.id), account);
+    assert.deepEqual(await accountRow(), { failed_attempts: 0, locked_until: null });
+    assert.equal((await authenticate("alice", TEST_PASSWORD, undefined, undefined)).status, "ok");
+    assert.equal(await unlockAccount(account.id + 1), undefined);
+  },
 });

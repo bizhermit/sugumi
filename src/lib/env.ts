@@ -56,8 +56,17 @@ export const REQUEST_BODY_TIMEOUT_SECONDS = integer("REQUEST_BODY_TIMEOUT_SECOND
 /** ログインに続けて失敗してロックしたアカウントを、自動で解除するまでの分数。 */
 export const LOGIN_LOCKOUT_MINUTES = integer("LOGIN_LOCKOUT_MINUTES", 60, 1);
 
-/** ログインに続けてこの回数だけ失敗するとロックする。0 ならロックしない。 */
+/**
+ * ログインに続けてこの回数だけ失敗するとロックする。0 ならロックしない。
+ * ログインしたことのある端末からは、端末ごとにこの回数まで試せる（LOGIN_DEVICE_DAYS を参照）。
+ */
 export const LOGIN_MAX_FAILED_ATTEMPTS = integer("LOGIN_MAX_FAILED_ATTEMPTS", 5, 0);
+
+/**
+ * ログインに成功した端末を覚えておく日数。成功するたびに延びる。
+ * 覚えている端末からは、アカウントのロックと接続元ごとの制限を受けずにログインできる。
+ */
+export const LOGIN_DEVICE_DAYS = integer("LOGIN_DEVICE_DAYS", 90, 1);
 
 /**
  * 同じ接続元から LOGIN_IP_WINDOW_MINUTES の間にこの回数だけログインに失敗すると、それ以降はその接続元からのログインを受け付けない。

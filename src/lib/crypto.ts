@@ -16,6 +16,15 @@ export function isRandomToken(value: string): boolean {
 
 const encoder = new TextEncoder();
 
+/**
+ * Cookie に入れるトークンを、DB に保存する形にする。DB やバックアップが漏れても、そこからログインできないようにするため。
+ * randomToken() の値は 256 ビットのランダムな値なので、ソルトや遅いハッシュは要らない。
+ */
+export async function hashToken(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(token));
+  return new Uint8Array(digest).toBase64({ alphabet: "base64url", omitPadding: true });
+}
+
 /** 秘密の値の比較に使う。一致した文字数によって処理時間が変わらないようにしている。 */
 export function timingSafeEqual(a: string, b: string): boolean {
   const x = encoder.encode(a);
