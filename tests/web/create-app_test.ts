@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createApp } from "../../src/web/app.ts";
 import { withTempDir } from "../_support/fixture.ts";
-import { handler, withFixture } from "../_support/routes.ts";
+import { calls, handler, withFixture } from "../_support/routes.ts";
 
 const THROW = `export default () => { throw new Error("テストで投げた例外"); };`;
 
@@ -178,4 +178,30 @@ Deno.test("createApp: ctx.form() で解析できない本文には、ページ�
       await res.body?.cancel();
     }
   });
+});
+
+Deno.test("createApp: 本文が締め切りまでに届かなければ、ページを呼ばずに 408 を返し、本文を読むのをやめる", async () => {
+  await withFixture(
+    { "get.ts": handler("GET /"), "post.ts": handler("POST /") },
+    async (routes) => {
+      // 既定の REQUEST_BODY_TIMEOUT_SECONDS を待たずに確かめるため、締め切りを短くして渡す
+      const app = await createApp({ mock: false, routes, bodyTimeoutMs: 50 });
+      let canceled = false;
+      // 最初の塊だけ送り、残りを送らないまま接続を開けておくクライアント
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("_csrf="));
+        },
+        cancel() {
+          canceled = true;
+        },
+      });
+      const res = await app(new Request("http://localhost/", { method: "POST", body }));
+      assert.equal(res.status, 408);
+      assert.equal(res.headers.get("x-frame-options"), "DENY");
+      assert.ok(canceled);
+      assert.deepEqual(calls, []);
+      await res.body?.cancel();
+    },
+  );
 });

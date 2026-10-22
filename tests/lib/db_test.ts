@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { db, secret, transaction } from "../../src/lib/db.ts";
+import { db, isDbTimeout, secret, transaction } from "../../src/lib/db.ts";
+import {
+  DB_CONNECTION_TIMEOUT_SECONDS,
+  DB_POOL_MAX,
+  DB_STATEMENT_TIMEOUT_SECONDS,
+} from "../../src/lib/env.ts";
 import { resetDb } from "../_support/db.ts";
 
 async function usernames(): Promise<string[]> {
@@ -56,4 +61,27 @@ Deno.test("db: secret は最初に作った値を返し続ける", async () => {
   } finally {
     await db.query("DELETE FROM secrets WHERE name = $1", [name]);
   }
+});
+
+Deno.test("db: Pool の大きさと時間制限は env.ts の値にする", async () => {
+  assert.equal(db.options.max, DB_POOL_MAX);
+  assert.equal(db.options.connectionTimeoutMillis, DB_CONNECTION_TIMEOUT_SECONDS * 1000);
+  // current_setting() は 60 秒を 1min のように単位を変えて返すため、ミリ秒の値で比べる
+  const { rows } = await db.query<{ setting: string }>(
+    "SELECT setting FROM pg_settings WHERE name = 'statement_timeout'",
+  );
+  assert.equal(Number(rows[0].setting), DB_STATEMENT_TIMEOUT_SECONDS * 1000);
+});
+
+Deno.test("db: isDbTimeout は、問い合わせの時間制限で止まった例外を見分ける", async () => {
+  // DB_STATEMENT_TIMEOUT_SECONDS を待たずに確かめるため、このトランザクションだけ短くする
+  await assert.rejects(
+    transaction(async (client) => {
+      await client.query("SET LOCAL statement_timeout = 10");
+      await client.query("SELECT pg_sleep(1)");
+    }),
+    (e) => isDbTimeout(e),
+  );
+  assert.equal(isDbTimeout(new Error("x")), false);
+  assert.equal(isDbTimeout("timeout"), false);
 });

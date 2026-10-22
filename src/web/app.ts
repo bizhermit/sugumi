@@ -11,6 +11,8 @@ import {
   hasSessionCookie,
   type Session,
 } from "../lib/auth/session.ts";
+import { isDbTimeout } from "../lib/db.ts";
+import { REQUEST_BODY_TIMEOUT_SECONDS } from "../lib/env.ts";
 import { path, redirect } from "./url.ts";
 import { remoteAddressOf } from "./remote-address.ts";
 import type { RoutePath } from "../routes.gen.ts";
@@ -21,6 +23,10 @@ const VALID_HOST = /^(?:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*|\[[0-9A-Fa-f:.]+\])(?:
 
 // ファイルのアップロードなど大きな本文を受けるルートを作るときは、ルートごとに上限を変えられるようにすること
 const MAX_BODY_BYTES = 1024 * 1024;
+
+// 締め切りを過ぎて読むのをやめた本文の reader。
+// リクエストごとに関数を作らないよう、setTimeout にはモジュールの expireBody() と reader を渡し、結果はここに残す
+const expiredBodies = new WeakSet<ReadableStreamDefaultReader<Uint8Array>>();
 
 // ctx.session が常に undefined になるため、src/routes/before.tree.ts の PUBLIC_ROUTES にも入れること
 const SESSIONLESS_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/healthz"]);
@@ -35,10 +41,16 @@ type Router = Awaited<ReturnType<typeof loadRouter>>;
 /**
  * ルートと静的ファイルを読み込み、Deno.serve に渡すハンドラを返す。
  * routes・staticDir は既定で src/routes/・static/ で、テストで別のディレクトリを渡す。
+ * bodyTimeoutMs は既定で REQUEST_BODY_TIMEOUT_SECONDS で、テストで短い値を渡す。
  * 静的ファイルがルートか /assets/ と同じ URL になる場合は例外を投げる。
  */
 export async function createApp(
-  { mock, routes, staticDir }: { mock: boolean; routes?: URL; staticDir?: URL },
+  { mock, routes, staticDir, bodyTimeoutMs = REQUEST_BODY_TIMEOUT_SECONDS * 1000 }: {
+    mock: boolean;
+    routes?: URL;
+    staticDir?: URL;
+    bodyTimeoutMs?: number;
+  },
 ): Promise<Handler> {
   const match = await loadRouter({ mock, root: routes });
   const statics = await loadStatic(staticDir);
@@ -57,11 +69,12 @@ export async function createApp(
     const tcpAddress = addr && "hostname" in addr ? addr.hostname : undefined;
     let res: Response;
     try {
-      res = await handle(match, statics, req, tcpAddress);
+      res = await handle(match, statics, req, tcpAddress, bodyTimeoutMs);
     } catch (e) {
       // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける
       console.error(e);
-      res = errorPage(500);
+      // DB の混雑は待てば直るため、プロキシやクライアントがやり直せるよう 500 と分ける
+      res = errorPage(isDbTimeout(e) ? 503 : 500);
     }
     return withSecurityHeaders(res);
   };
@@ -72,6 +85,7 @@ async function handle(
   statics: StaticFiles,
   req: Request,
   tcpAddress: string | undefined,
+  bodyTimeoutMs: number,
 ): Promise<Response> {
   const host = req.headers.get("host");
   if (host !== null && !VALID_HOST.test(host)) return errorPage(400);
@@ -91,8 +105,8 @@ async function handle(
   if (!route) return errorPage(404);
   const { handler: pageHandler } = route;
   if (!pageHandler) return methodNotAllowed(route.allow);
-  const buffered = await bufferBody(req, MAX_BODY_BYTES);
-  if (!buffered) return errorPage(413);
+  const buffered = await bufferBody(req, MAX_BODY_BYTES, bodyTimeoutMs);
+  if (typeof buffered === "number") return errorPage(buffered);
 
   // ヘルスチェックは DB が止まっていても応答させるため、Cookie が付いていてもセッションを引かない
   const session = SESSIONLESS_ROUTES.has(route.route) ? undefined : await getSession(buffered);
@@ -129,18 +143,36 @@ async function handle(
 }
 
 /**
- * 本文を上限まで読み込み、何度でも読める Request にして返す。上限を超えたら undefined を返す。
+ * 本文を上限まで読み込み、何度でも読める Request にして返す。
+ * 上限を超えたら 413、timeoutMs ミリ秒で読み終わらなければ 408 を返す。
  * Content-Length は省略や偽装ができるため、実際に読んだ量でも判定する。
  */
-async function bufferBody(req: Request, limit: number): Promise<Request | undefined> {
+async function bufferBody(
+  req: Request,
+  limit: number,
+  timeoutMs: number,
+): Promise<Request | 408 | 413> {
   if (req.body === null) return req;
-  if (Number(req.headers.get("content-length")) > limit) return undefined;
+  if (Number(req.headers.get("content-length")) > limit) return 413;
+  const reader = req.body.getReader();
+  // 締め切りは塊ごとではなく本文全体に付ける。塊ごとだと、1 バイトずつ送り続ける接続を止められない
+  const timer = setTimeout(expireBody, timeoutMs, reader);
   const chunks: Uint8Array[] = [];
   let size = 0;
-  for await (const chunk of req.body) {
-    size += chunk.byteLength;
-    if (size > limit) return undefined;
-    chunks.push(chunk);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (expiredBodies.has(reader)) return 408;
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        return 413;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    clearTimeout(timer);
   }
   // 小さな本文はほとんど 1 つの塊で届くため、そのときは複製しない。
   // Content-Length で先に確保すると、大きく宣言して少しだけ送る接続ごとにメモリを確保させられるため、届いた分だけ使う
@@ -153,6 +185,13 @@ async function bufferBody(req: Request, limit: number): Promise<Request | undefi
     offset += chunk.byteLength;
   }
   return new Request(req, { body });
+}
+
+/** 読み込み中の read() を done で終わらせ、bufferBody() に 408 を返させる。 */
+function expireBody(reader: ReadableStreamDefaultReader<Uint8Array>): void {
+  expiredBodies.add(reader);
+  // 取り消しの失敗は応答に関わらないが、捨てずにログに残す
+  reader.cancel().catch(console.error);
 }
 
 /**

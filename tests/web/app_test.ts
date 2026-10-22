@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { createSession, sessionCookie } from "../../src/lib/auth/session.ts";
 import { randomToken } from "../../src/lib/crypto.ts";
-import { PRE_LOGIN_CSRF_TIMEOUT_MINUTES } from "../../src/lib/env.ts";
+import { db } from "../../src/lib/db.ts";
+import { DB_POOL_MAX, PRE_LOGIN_CSRF_TIMEOUT_MINUTES } from "../../src/lib/env.ts";
 import { createApp } from "../../src/web/app.ts";
 import { asset } from "../../src/web/assets.ts";
 import { cookiePair } from "../_support/cookie.ts";
@@ -48,6 +49,27 @@ Deno.test("app: 本文が上限を超えたら、ページを呼ばずに 413 �
   // 上限ちょうどは受け付け、CSRF の検証に進む
   const atLimit = await head("/login", { method: "POST", body: body.subarray(1) });
   assert.equal(atLimit.status, 303);
+});
+
+Deno.test("app: DB の接続の空きを待ちきれなければ 503 を返す", async () => {
+  await resetDb();
+  const account = await addAccount();
+  const cookie = cookiePair(sessionCookie(await createSession(account)));
+  // 接続をすべて使い切り、セッションを引く問い合わせを DB_CONNECTION_TIMEOUT_SECONDS だけ待たせる
+  const clients = [];
+  for (let i = 0; i < DB_POOL_MAX; i++) clients.push(await db.connect());
+  const error = console.error;
+  console.error = () => {};
+  try {
+    const res = await head("/home", { headers: { cookie } });
+    assert.equal(res.status, 503);
+    assert.equal(res.headers.get("x-frame-options"), "DENY");
+  } finally {
+    console.error = error;
+    for (const client of clients) client.release();
+  }
+  // 接続が空けば、また応答できる
+  assert.equal((await head("/home", { headers: { cookie } })).status, 200);
 });
 
 Deno.test("app: CSRF の検証に失敗したら、ログイン前ならログイン画面へ送る", async () => {

@@ -23,6 +23,7 @@
    - Cookie に Secure を付けているため、HTTP のままではログインできない。
    - 「[接続元の IP アドレス](#接続元の-ip-アドレス)」の設定をする。
      しないと、接続元ごとのログインの制限が全員にまとめてかかる。
+   - 「[時間制限](#時間制限)」の設定をする。
 
 - パスワードは、コンテナには環境変数ではなく `/run/secrets/` のファイルとして渡る。
 - DB の初期化は、データのボリュームが空のときにだけ行われる。
@@ -41,6 +42,7 @@
 | `APP_NETWORK_SUBNET`         | ○    | アプリのコンテナを置くネットワークの範囲（例：`172.30.255.0/24`）                       |
 | `APP_NETWORK_GATEWAY`        | ○    | そのネットワークのゲートウェイ。ふつうは範囲の最初のアドレス（例：`172.30.255.1`）      |
 | `TRUSTED_PROXIES`            |      | 信頼するプロキシの IP アドレス。「[接続元の IP アドレス](#接続元の-ip-アドレス)」を参照 |
+| `DB_POOL_MAX` ほか           |      | DB の接続数と時間制限。「[時間制限](#時間制限)」を参照                                  |
 | `LOGIN_LOCKOUT_MINUTES` ほか |      | アプリの設定。書かなければ既定値を使う。意味と既定値は `src/lib/env.ts` を参照          |
 
 ### APP_NETWORK_SUBNET・APP_NETWORK_GATEWAY
@@ -51,6 +53,41 @@
 - 同じサーバーのリバースプロキシから `127.0.0.1:3000`
   へ転送すると、アプリにはゲートウェイのアドレスから接続したように見える。
   - ネットワークを作り直すたびにこのアドレスが変わらないよう、固定している。
+
+## 時間制限
+
+アプリは、本文の読み込みと DB の待ちを、次の値で打ち切る。書かなければ括弧の中の既定値を使う。
+
+| 名前                            | 内容                                                                          |
+| ------------------------------- | ----------------------------------------------------------------------------- |
+| `REQUEST_BODY_TIMEOUT_SECONDS`  | 本文を読み終えるまでの秒数（30）。過ぎたら 408 を返す                         |
+| `DB_POOL_MAX`                   | 1 つのアプリのインスタンスが開く DB の接続の数（10）                          |
+| `DB_CONNECTION_TIMEOUT_SECONDS` | DB の接続の空きを待つ秒数（5）。過ぎたら 503 を返す                           |
+| `DB_STATEMENT_TIMEOUT_SECONDS`  | 1 つの SQL の文にかけてよい秒数（10）。過ぎたら DB が文を取り消し、503 を返す |
+
+- `DB_POOL_MAX` にアプリのインスタンスの数を掛けた数は、PostgreSQL の `max_connections`
+  （既定 100）より少なくする。
+  - 管理者で `psql` から接続する分の余裕を残す。
+- 起動時のマイグレーションには、`DB_STATEMENT_TIMEOUT_SECONDS` をかけない。
+- 本文の締め切りは、本文の全体にかける。遅い回線で 1 MB 近くを送る利用者がいるなら長くする。
+
+リバースプロキシでも、遅い接続を打ち切る。アプリの締め切りは、アプリまで届いた接続にしか効かないため。
+nginx の例：
+
+```nginx
+client_header_timeout 10s;
+client_body_timeout 10s;   # 本文の読み込みの間隔。全体ではない
+client_max_body_size 1m;   # アプリの本文の上限（src/web/app.ts の MAX_BODY_BYTES）と揃える
+send_timeout 10s;
+limit_conn_zone $binary_remote_addr zone=perip:10m;  # http に書く
+limit_conn perip 20;       # 接続元ごとの同時接続数
+```
+
+- nginx は既定（`proxy_request_buffering on`）で本文を受け取り終えてからアプリに送る。
+  - 本文を少しずつ送る接続は、アプリではなく nginx が抱える。上の設定で打ち切る。
+- `proxy_read_timeout`（既定 60 秒）は、`DB_CONNECTION_TIMEOUT_SECONDS` と
+  `DB_STATEMENT_TIMEOUT_SECONDS` の合計より十分に長くする。
+  - 短いと、アプリが 503 を返す前に nginx が 504 を返す。
 
 ## 接続元の IP アドレス
 
