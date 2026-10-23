@@ -5,7 +5,17 @@
   "permissions": {
     "test": {
       "net": true,
-      "read": ["../dist/e2e", "/usr/local/share/ms-playwright"],
+      "read": {
+        "allow": [
+          "../dist/e2e",
+          "/usr/local/share/ms-playwright",
+          "/etc/os-release",
+          "/run/WSL",
+          "/run/.containerenv",
+          "/.dockerenv"
+        ],
+        "ignore": ["/proc/version", "/proc/self/cgroup", "/proc/sys/fs/binfmt_misc/WSLInterop"]
+      },
       "write": ["../dist/e2e"],
       "run": [
         "/usr/local/share/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell"
