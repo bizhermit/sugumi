@@ -16,6 +16,9 @@ services:
         UID: ${UID:-1000}
         GID: ${GID:-1000}
     user: root
+    # e2e/ のテストが起動する Chrome の子プロセスは、親が終わると PID 1 の子になる。
+    # command の sleep は終わった子プロセスを回収しないため、init を PID 1 に置いて回収させる
+    init: true
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

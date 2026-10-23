@@ -2,6 +2,9 @@ import { createApp } from "./web/app.ts";
 import { APP_MODE, PORT } from "./lib/env.ts";
 import { db } from "./lib/db.ts";
 
+// deno.json の unstable の no-legacy-abort で、req.signal を接続が切れたときだけ中断にする。
+// 既定では応答を返し終えたときにも中断になり、ページが切断と見分けられない。
+// 既定のままだと、本文を読み込んだ Request を作る（app.ts）たびに、Deno が警告を出す
 const server = Deno.serve({ port: PORT }, await createApp({ mock: APP_MODE === "MOCK" }));
 
 // 本文を送り終えないまま開けておかれた接続があると、shutdown() はクライアントが閉じるまで終わらない。

@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 15
     env:
       TEST_DATABASE_URL: postgres://app:app@127.0.0.1:5432/app_test
+      # e2e/deno.json の permissions で、このパスのブラウザだけを読み込み・起動できるようにしている
+      PLAYWRIGHT_BROWSERS_PATH: /usr/local/share/ms-playwright
     steps:
       # 更新時は `gh api repos/<owner>/<repo>/commits/<タグ> --jq .sha` でコミットを取得して置き換える
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -21,7 +23,7 @@ jobs:
           persist-credentials: false
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          # docker/app/Dockerfile のイメージと揃える
+          # docker/app/Dockerfile のイメージ・.devcontainer/Dockerfile の DENO_VERSION と揃える
           deno-version: 2.9.7
 
       # 権限を本番と揃えるため、本番と同じイメージ（docker/db/）を使う。
@@ -37,6 +39,13 @@ jobs:
       - run: deno fmt --check
       - run: deno lint
       - run: deno check
+      - name: e2e/ を確かめる
+        # ルートの deno.json は e2e/ を除外しているため、e2e/ の deno.json で別に確かめる
+        working-directory: e2e
+        run: |
+          deno fmt --check
+          deno lint
+          deno check
       - name: routes.gen.ts が src/routes/ と食い違っていないか確かめる
         run: |
           deno task gen
@@ -47,3 +56,12 @@ jobs:
         # 初期化の途中は Unix ソケットだけで待ち受けるため、TCP で確かめる
         run: timeout 60 sh -c 'until docker exec db pg_isready -h 127.0.0.1 -U admin -d app_test; do sleep 1; done'
       - run: deno task test
+
+      - name: ブラウザを入れる
+        # Playwright は自身のバージョンに合うブラウザしか起動しないため、e2e/deno.json の imports と同じものから入れる。
+        # e2e/ で実行し、ルートの deno.lock に Playwright を書き込ませない
+        working-directory: e2e
+        run: |
+          sudo install -d -o "$(id -u)" -g "$(id -g)" "$PLAYWRIGHT_BROWSERS_PATH"
+          deno run -A --frozen "$(jq -r '.imports.playwright' deno.json)" install --with-deps --only-shell chromium
+      - run: deno task test:e2e

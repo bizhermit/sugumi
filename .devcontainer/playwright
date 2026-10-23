@@ -1,0 +1,4 @@
+#!/bin/sh
+# Dockerfile で入れたブラウザと同じバージョンの Playwright の CLI を実行する。
+# プロジェクトの deno.json と deno.lock を使わない。/workspace で実行したときに、ルートの deno.lock に Playwright が入らないようにするため
+exec deno run -A --no-config --no-lock "npm:playwright@${PLAYWRIGHT_VERSION}" "$@"

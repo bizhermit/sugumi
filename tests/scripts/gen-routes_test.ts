@@ -3,7 +3,7 @@ import { generateRoutes } from "../../scripts/gen-routes.ts";
 import { withTempDir } from "../_support/fixture.ts";
 import { handler } from "../_support/routes.ts";
 
-Deno.test("gen-routes: ルートのパターンを並べた RoutePath を書き出す", async () => {
+Deno.test("gen-routes: ルートのパターンを並べた RoutePath と、GET で開けるルートの一覧を書き出す", async () => {
   await withTempDir({
     "routes/get.ts": handler("/"),
     "routes/user/[id]/get.ts": handler("/user/[id]"),
@@ -19,6 +19,12 @@ export type RoutePath =
   | "/"
   | "/about"
   | "/user/[id]";
+
+/** GET で開けるルート。e2e/ のテストが、すべての画面を開いて確かめるのに使う。 */
+export const GET_ROUTES: readonly RoutePath[] = [
+  "/",
+  "/user/[id]",
+];
 `,
     );
   });
@@ -28,7 +34,10 @@ Deno.test("gen-routes: ルートがなければ never にする", async () => {
   await withTempDir({ "routes/view.tsx": "" }, async (dir) => {
     const out = new URL("routes.gen.ts", dir);
     await generateRoutes(new URL("routes/", dir), out);
-    assert.match(await Deno.readTextFile(out), /export type RoutePath = never;\n$/);
+    assert.match(
+      await Deno.readTextFile(out),
+      /export type RoutePath = never;\n\n.*\nexport const GET_ROUTES: readonly RoutePath\[\] = \[\];\n$/,
+    );
   });
 });
 

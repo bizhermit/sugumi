@@ -25,6 +25,8 @@ docker/           コンテナのイメージ（app/・db/）と、本番の設�
 tests/            テスト。src/ と同じ構成で *_test.ts を置く
   _support/       複数のテストで使う部品
 bench/            性能の計測。src/ と同じ構成で *_bench.ts を置く
+e2e/              ブラウザで画面を動かすテスト。専用の deno.json・deno.lock を持つ。src/ と同じ構成で *_test.ts を置く
+  _support/       複数のテストで使う部品
 .github/workflows/  CI
 ```
 
@@ -98,19 +100,47 @@ bench/            性能の計測。src/ と同じ構成で *_bench.ts を置く
   - `deno task test tests/routes/before.tree_test.ts --filter "テストの名前の一部"`
   - DevContainer では `docker exec -it sugumi_devcontainer-db-test-1 psql -U app -d app_test` で接続する。
 - タイムアウトなどの値は、テストに書かず `src/lib/env.ts` の値を使う。開発環境で変えていても通るようにするため。
-- PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`・`routes.gen.ts` の差分・`deno task build`・`deno task test` を確かめる。
+- `_assets/` の JS と、画面が CSP の違反なく動くことは、`e2e/` のテストでブラウザを動かして確かめる。`deno task test:e2e` で実行する。
+  - テストは、`e2e/` の同じパスに置く（`src/routes/login/_assets/index.ts` → `e2e/routes/login/_assets/index_test.ts`）。
+  - ファイルは `e2e/` からのパスで指定する（`deno task test:e2e routes_test.ts --filter "テストの名前の一部"`）。
+  - `deno task test:e2e` は、テスト用の DB を空にしてアカウントを作り、本番と同じ方法でアプリを起動してから、`e2e/` のテストを実行する（`scripts/test-e2e.ts`）。
+  - `e2e/` のテストは、アプリを外から操作するだけにする。
+    - DB を触らない。アプリの部品を import しない（`src/web/url.ts` の `path()` と `src/routes.gen.ts` は使ってよい）。
+    - 使うデータは `scripts/test-e2e.ts` で用意し、環境変数で渡す。
+  - テストどうしが影響し合わないようにする。並列や CI のジョブの分割で実行できるようにするため。
+    - ページは `e2e/_support/browser.ts` の `withPage()` で開く。テストごとに Cookie などの保存先を分ける。
+    - ログインは、テストごとに `login()` でする。GET でも状態を変えるルートがある（`/login` はログアウトする）。
+    - アカウントの状態（パスワード、ロックなど）を変えるテストは、そのテスト用のアカウントを `scripts/test-e2e.ts` で作る。
+  - `withPage()` は、コンソールのエラーか、ページで捕まえていない例外があれば失敗にする。
+    - CSP・Trusted Types で止められた処理は、ブラウザがコンソールのエラーか例外として出す。
+  - `e2e/routes_test.ts` が、GET で開けるすべてのルートを、ログインせずに・ログインして開く。
+    - パラメータのあるルートを足したら、`SAMPLE_URLS` に開く URL を書く。書いていないと失敗する。
+  - `evaluate()` などに渡す関数はブラウザで動くため、ファイルの先頭に `/// <reference lib="dom" />` を書く。
+  - ルートの `deno fmt`・`deno lint`・`deno check` は `e2e/` を除外する。`e2e/` の中で実行する。
+- PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`（ルートと `e2e/`）・`routes.gen.ts` の差分・`deno task build`・`deno task test`・`deno task test:e2e` を確かめる。
 
 ## ライブラリ
 
 - フレームワーク・ライブラリは使わない。
   - 例外：サーバーから外部サービスに接続するためのクライアントライブラリ。
     - DB のドライバ、外部 API の SDK など。
+  - 例外：テストで、Deno と標準の API ではできないことをするためのライブラリ。
+    - ブラウザを操作する Playwright など。
+    - アサーション・モック・テストランナーは含めない（`node:assert/strict` と `deno test` を使う）。
+    - ルートの `deno.json` には入れず、`e2e/` のように別の `deno.json` を持つディレクトリに入れる。
+      - ルートの `deno.lock` にある npm のパッケージは、import していなくても本番のイメージに入るため。
+      - `e2e/` のものがルートの `deno.lock` にないことを、`tests/scripts/test-e2e_test.ts` で確かめている。
   - ブラウザで読み込む外部のスクリプト（解析ツールのタグなど）は、例外に含めない。
     - CSP を緩める必要があるため、個別に判断する。
 - 追加するときは、`deno.json` の `imports` に正確なバージョンで書き、`deno.lock` もコミットする。
   - ライブラリが読む環境変数やファイルにも、`deno.json` の `permissions` での許可が要る。
     - 使わない環境変数は、`env.ignore` に入れて未設定として扱わせる（`pg` の `USER` など）。
     - 許可も `ignore` もしないと、端末から起動したときに確認が出る。端末がない本番では拒否される。
+- Playwright のバージョンを変えるときは、次の 3 つを揃える。ずれると、ブラウザを起動できない。
+  - `e2e/deno.json` の `imports`
+  - `e2e/deno.json` の `permissions` の `run`（パスにブラウザのリビジョンが入る）
+  - `.devcontainer/Dockerfile` の `PLAYWRIGHT_VERSION`（変えたら DevContainer をリビルドする）
+  - CI は `e2e/deno.json` の `imports` のバージョンでブラウザを入れるため、揃えなくてよい。
 
 ## DB
 

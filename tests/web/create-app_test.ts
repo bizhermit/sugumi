@@ -205,3 +205,30 @@ Deno.test("createApp: 本文が締め切りまでに届かなければ、ペー�
     },
   );
 });
+
+Deno.test("createApp: 応答を返し終えても、ページの req.signal を中断にしない", async () => {
+  // deno.json の unstable の no-legacy-abort を外すと、Deno.serve は応答を返し終えたときにも中断にする
+  const SIGNAL = "(globalThis as unknown as { signal: AbortSignal }).signal";
+  await withFixture(
+    {
+      "get.ts":
+        `export default (req: Request) => { ${SIGNAL} = req.signal; return new Response("ok"); };`,
+    },
+    async (routes) => {
+      const server = Deno.serve(
+        { hostname: "127.0.0.1", port: 0, onListen() {} },
+        await createApp({ mock: false, routes }),
+      );
+      try {
+        const res = await fetch(`http://127.0.0.1:${server.addr.port}/`);
+        assert.equal(await res.text(), "ok");
+        // 応答を送り終えるのを待つ
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const { signal } = globalThis as unknown as { signal: AbortSignal };
+        assert.equal(signal.aborted, false);
+      } finally {
+        await server.shutdown();
+      }
+    },
+  );
+});

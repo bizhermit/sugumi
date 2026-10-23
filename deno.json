@@ -1,4 +1,6 @@
 {
+  "exclude": ["e2e/"],
+  "unstable": ["no-legacy-abort"],
   "compilerOptions": {
     "jsx": "precompile",
     "jsxImportSource": "#jsx"
@@ -48,8 +50,37 @@
     },
     "test": {
       "net": true,
-      "read": ["src", "dist/public", "dist/test", "static"],
+      "read": ["src", "dist/public", "dist/test", "static", "deno.lock", "e2e/deno.json"],
       "write": ["dist/test"],
+      "env": {
+        "allow": [
+          "APP_MODE",
+          "DATABASE_URL",
+          "DATABASE_PASSWORD_FILE",
+          "PG*",
+          "PORT",
+          "DB_POOL_MAX",
+          "DB_CONNECTION_TIMEOUT_SECONDS",
+          "DB_STATEMENT_TIMEOUT_SECONDS",
+          "REQUEST_BODY_TIMEOUT_SECONDS",
+          "LOGIN_LOCKOUT_MINUTES",
+          "LOGIN_MAX_FAILED_ATTEMPTS",
+          "LOGIN_DEVICE_DAYS",
+          "LOGIN_IP_MAX_FAILED_ATTEMPTS",
+          "LOGIN_IP_WINDOW_MINUTES",
+          "LOGIN_IP_LOCKOUT_MINUTES",
+          "SESSION_IDLE_TIMEOUT_MINUTES",
+          "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
+          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES",
+          "TRUSTED_PROXIES"
+        ],
+        "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
+      }
+    },
+    "test-e2e": {
+      "net": true,
+      "run": ["deno"],
+      "write": ["dist/e2e"],
       "env": {
         "allow": [
           "APP_MODE",
@@ -118,6 +149,7 @@
     "account:add": "deno run -P=account scripts/add-account.ts",
     "account:unlock": "deno run -P=account scripts/unlock-account.ts",
     "test": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_DATABASE_URL deno test -P=test",
+    "test:e2e": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && deno task build && DATABASE_URL=$TEST_DATABASE_URL deno run -P=test-e2e scripts/test-e2e.ts",
     "bench": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_DATABASE_URL deno bench -P=test"
   },
   "lint": {
