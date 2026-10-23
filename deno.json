@@ -1,5 +1,6 @@
 {
   "exclude": ["e2e/"],
+  "lock": { "frozen": true },
   "unstable": ["no-legacy-abort"],
   "compilerOptions": {
     "jsx": "precompile",
@@ -50,7 +51,7 @@
     },
     "test": {
       "net": true,
-      "read": ["src", "dist/public", "dist/test", "static", "deno.lock", "e2e/deno.json"],
+      "read": ["src", "dist/public", "dist/test", "static", "deno.lock", "e2e/deno.lock"],
       "write": ["dist/test"],
       "env": {
         "allow": [
