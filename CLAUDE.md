@@ -104,6 +104,8 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
   - テストは、`e2e/` の同じパスに置く（`src/routes/login/_assets/index.ts` → `e2e/routes/login/_assets/index_test.ts`）。
   - ファイルは `e2e/` からのパスで指定する（`deno task test:e2e routes_test.ts --filter "テストの名前の一部"`）。
   - `deno task test:e2e` は、テスト用の DB を空にしてアカウントを作り、本番と同じ方法でアプリを起動してから、`e2e/` のテストを実行する（`scripts/test-e2e.ts`）。
+    - 環境変数 `E2E_BASE_URL` があれば、アプリを起動せず、そこで動いているアプリに対して実行する。そのアプリは `TEST_DATABASE_URL` と同じ DB に接続しておく。
+    - CI は、本番のイメージ（`docker/app/Dockerfile`）を起動して渡す。デプロイするものと同じイメージで確かめるため。
   - `e2e/` のテストは、アプリを外から操作するだけにする。
     - DB を触らない。アプリの部品を import しない（`src/web/url.ts` の `path()` と `src/routes.gen.ts` は使ってよい）。
     - 使うデータは `scripts/test-e2e.ts` で用意し、環境変数で渡す。
@@ -117,7 +119,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
     - パラメータのあるルートを足したら、`SAMPLE_URLS` に開く URL を書く。書いていないと失敗する。
   - `evaluate()` などに渡す関数はブラウザで動くため、ファイルの先頭に `/// <reference lib="dom" />` を書く。
   - ルートの `deno fmt`・`deno lint`・`deno check` は `e2e/` を除外する。`e2e/` の中で実行する。
-- PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`（ルートと `e2e/`）・`routes.gen.ts` の差分・`deno task build`・`deno task test`・`deno task test:e2e` を確かめる。
+- PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`（ルートと `e2e/`）・`routes.gen.ts` の差分・`deno task build`・本番のイメージのビルド・`deno task test`・本番のイメージに対する `deno task test:e2e` を確かめる。
 
 ## ライブラリ
 

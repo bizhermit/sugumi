@@ -4,6 +4,9 @@
  *
  *   deno task test:e2e [deno test の引数]
  *
+ * 環境変数 E2E_BASE_URL があれば、アプリを起動せず、そこで動いているアプリに対して実行する。
+ * そのアプリは TEST_DATABASE_URL と同じ DB に接続しておく。CI は本番のイメージを起動して渡す。
+ *
  * e2e/ のテストはアプリを外から操作するだけで、DB を触らない。
  * 使うデータはここで用意し、接続先とアカウントを環境変数で渡す（e2e/_support/browser.ts）。
  */
@@ -16,10 +19,10 @@ const TMP_PARENT = new URL("dist/e2e/", ROOT);
 const READY_TIMEOUT_MS = 30_000;
 
 if (import.meta.main) {
-  Deno.exit(await runE2e(Deno.args));
+  Deno.exit(await runE2e(Deno.args, Deno.env.get("E2E_BASE_URL")));
 }
 
-async function runE2e(args: string[]): Promise<number> {
+async function runE2e(args: string[], externalUrl: string | undefined): Promise<number> {
   await resetDb();
   const account = await addAccount();
   await db.end();
@@ -27,9 +30,23 @@ async function runE2e(args: string[]): Promise<number> {
   // Playwright がブラウザのプロファイルなどを作る場所。実行ごとに分け、終わったら消す
   await Deno.mkdir(TMP_PARENT, { recursive: true });
   const tmp = await Deno.makeTempDir({ dir: decodeURIComponent(TMP_PARENT.pathname) });
+  const runTests = async (baseUrl: string) => {
+    await waitUntilReady(new URL("/healthz", baseUrl), READY_TIMEOUT_MS);
+    const tests = new Deno.Command("deno", {
+      args: ["task", "test", ...args],
+      cwd: new URL("e2e/", ROOT),
+      env: {
+        E2E_BASE_URL: baseUrl,
+        E2E_USERNAME: account.username,
+        E2E_PASSWORD: TEST_PASSWORD,
+        TMPDIR: tmp,
+      },
+    }).spawn();
+    return (await tests.status).code;
+  };
   try {
+    if (externalUrl) return await runTests(externalUrl);
     const port = freePort();
-    const baseUrl = `http://127.0.0.1:${port}`;
     // 本番と同じ起動のしかたにする（権限も deno.json の permissions.default になる）
     const app = new Deno.Command("deno", {
       args: ["run", "-P", "src/main.ts"],
@@ -39,18 +56,7 @@ async function runE2e(args: string[]): Promise<number> {
       stdout: "null",
     }).spawn();
     try {
-      await waitUntilReady(new URL("/healthz", baseUrl), READY_TIMEOUT_MS);
-      const tests = new Deno.Command("deno", {
-        args: ["task", "test", ...args],
-        cwd: new URL("e2e/", ROOT),
-        env: {
-          E2E_BASE_URL: baseUrl,
-          E2E_USERNAME: account.username,
-          E2E_PASSWORD: TEST_PASSWORD,
-          TMPDIR: tmp,
-        },
-      }).spawn();
-      return (await tests.status).code;
+      return await runTests(`http://127.0.0.1:${port}`);
     } finally {
       app.kill("SIGTERM");
       await app.status;

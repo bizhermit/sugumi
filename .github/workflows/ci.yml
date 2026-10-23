@@ -51,6 +51,8 @@ jobs:
           deno task gen
           git diff --exit-code src/routes.gen.ts
       - run: deno task build
+      - name: 本番のイメージをビルドする
+        run: docker build -t sugumi-app -f docker/app/Dockerfile .
 
       - name: DB の初期化を待つ
         # 初期化の途中は Unix ソケットだけで待ち受けるため、TCP で確かめる
@@ -67,4 +69,24 @@ jobs:
         run: |
           sudo install -d -o "$(id -u)" -g "$(id -g)" "$PLAYWRIGHT_BROWSERS_PATH"
           deno run -A --frozen "$(jq -r '.imports.playwright' deno.json)" install --only-shell chromium
-      - run: deno task test:e2e
+      - name: 本番のイメージを起動する
+        # e2e/ のテストを、デプロイするものと同じイメージに対して実行する（手元の deno task test:e2e は deno run で起動する）。
+        # DB のパスワードは、本番の compose.yaml の secrets と同じく /run/secrets/ のファイルで渡す。
+        # ホストのネットワークで動かし、テスト用の DB にもブラウザからも 127.0.0.1 で接続する。
+        # __Host- の Cookie は、ブラウザが安全なオリジンとして扱う 127.0.0.1 でなければ HTTP で保存されない
+        run: |
+          install -d -m 755 "$RUNNER_TEMP/secrets"
+          printf '%s' app > "$RUNNER_TEMP/secrets/db_app_password"
+          chmod 644 "$RUNNER_TEMP/secrets/db_app_password"
+          docker run -d --name app --network host \
+            -e DATABASE_URL=postgres://app@127.0.0.1:5432/app_test \
+            -e DATABASE_PASSWORD_FILE=/run/secrets/db_app_password \
+            -v "$RUNNER_TEMP/secrets:/run/secrets:ro" \
+            sugumi-app
+      - name: 本番のイメージに対して e2e/ のテストを実行する
+        run: deno task test:e2e
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3000
+      - name: アプリのログを出す
+        if: failure()
+        run: docker logs app

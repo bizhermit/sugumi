@@ -101,7 +101,8 @@
           "SESSION_IDLE_TIMEOUT_MINUTES",
           "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
           "PRE_LOGIN_CSRF_TIMEOUT_MINUTES",
-          "TRUSTED_PROXIES"
+          "TRUSTED_PROXIES",
+          "E2E_BASE_URL"
         ],
         "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
       }
