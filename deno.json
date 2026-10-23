@@ -1,4 +1,7 @@
 {
+  "exclude": ["e2e/"],
+  "lock": { "frozen": true },
+  "unstable": ["no-legacy-abort"],
   "compilerOptions": {
     "jsx": "precompile",
     "jsxImportSource": "#jsx"
@@ -18,6 +21,7 @@
           "DATABASE_PASSWORD_FILE",
           "PG*",
           "PORT",
+          "LISTEN_HOST",
           "DB_POOL_MAX",
           "DB_CONNECTION_TIMEOUT_SECONDS",
           "DB_STATEMENT_TIMEOUT_SECONDS",
@@ -48,7 +52,7 @@
     },
     "test": {
       "net": true,
-      "read": ["src", "dist/public", "dist/test", "static"],
+      "read": ["src", "dist/public", "dist/test", "static", "deno.lock", "e2e/deno.lock"],
       "write": ["dist/test"],
       "env": {
         "allow": [
@@ -57,6 +61,7 @@
           "DATABASE_PASSWORD_FILE",
           "PG*",
           "PORT",
+          "LISTEN_HOST",
           "DB_POOL_MAX",
           "DB_CONNECTION_TIMEOUT_SECONDS",
           "DB_STATEMENT_TIMEOUT_SECONDS",
@@ -75,6 +80,48 @@
         "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
       }
     },
+    "test-e2e": {
+      "net": true,
+      "run": ["deno"],
+      "write": ["dist/e2e"],
+      "env": {
+        "allow": [
+          "APP_MODE",
+          "DATABASE_URL",
+          "DATABASE_PASSWORD_FILE",
+          "PG*",
+          "PORT",
+          "LISTEN_HOST",
+          "DB_POOL_MAX",
+          "DB_CONNECTION_TIMEOUT_SECONDS",
+          "DB_STATEMENT_TIMEOUT_SECONDS",
+          "REQUEST_BODY_TIMEOUT_SECONDS",
+          "LOGIN_LOCKOUT_MINUTES",
+          "LOGIN_MAX_FAILED_ATTEMPTS",
+          "LOGIN_DEVICE_DAYS",
+          "LOGIN_IP_MAX_FAILED_ATTEMPTS",
+          "LOGIN_IP_WINDOW_MINUTES",
+          "LOGIN_IP_LOCKOUT_MINUTES",
+          "SESSION_IDLE_TIMEOUT_MINUTES",
+          "SESSION_ABSOLUTE_TIMEOUT_MINUTES",
+          "PRE_LOGIN_CSRF_TIMEOUT_MINUTES",
+          "TRUSTED_PROXIES",
+          "PATH",
+          "HOME",
+          "DENO_DIR",
+          "XDG_CACHE_HOME",
+          "PLAYWRIGHT_BROWSERS_PATH",
+          "TERM",
+          "NO_COLOR",
+          "LANG",
+          "LC_ALL",
+          "TZ",
+          "CI",
+          "E2E_BASE_URL"
+        ],
+        "ignore": ["USER", "NODE_PG_FORCE_NATIVE"]
+      }
+    },
     "account": {
       "read": ["src", "/run/secrets"],
       "net": true,
@@ -85,6 +132,7 @@
           "DATABASE_PASSWORD_FILE",
           "PG*",
           "PORT",
+          "LISTEN_HOST",
           "DB_POOL_MAX",
           "DB_CONNECTION_TIMEOUT_SECONDS",
           "DB_STATEMENT_TIMEOUT_SECONDS",
@@ -118,6 +166,7 @@
     "account:add": "deno run -P=account scripts/add-account.ts",
     "account:unlock": "deno run -P=account scripts/unlock-account.ts",
     "test": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_DATABASE_URL deno test -P=test",
+    "test:e2e": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && deno task build && DATABASE_URL=$TEST_DATABASE_URL deno run -P=test-e2e scripts/test-e2e.ts",
     "bench": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_DATABASE_URL deno bench -P=test"
   },
   "lint": {

@@ -5,3 +5,12 @@ export type RoutePath =
   | "/home"
   | "/login"
   | "/logout";
+
+/** GET で開けるルート。e2e/ のテストが、すべての画面を開いて確かめるのに使う。 */
+export const GET_ROUTES: readonly RoutePath[] = [
+  "/",
+  "/healthz",
+  "/home",
+  "/login",
+  "/logout",
+];

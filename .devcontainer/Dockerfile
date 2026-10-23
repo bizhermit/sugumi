@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
         locales \
         tzdata \
-        # Playwright の venv でも使用
+        # postCreate.sh が使用
         python3 \
         python3-openpyxl \
         python3-pil \
@@ -43,7 +43,8 @@ RUN GH_VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.c
 
 # Deno
 # 公式 install.sh (curl | sh) は改ざん検知ができないため使わず、チェックサムを検証して配置する
-ARG DENO_VERSION=latest
+# docker/app/Dockerfile のイメージ・.github/workflows/ci.yml の deno-version と揃える
+ARG DENO_VERSION=2.9.7
 RUN if [ "${DENO_VERSION}" = "latest" ]; then \
         DENO_VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/denoland/deno/releases/latest | grep -oP 'v\K[\d.]+'); \
     fi \
@@ -62,19 +63,24 @@ RUN if [ "${DENO_VERSION}" = "latest" ]; then \
     && rm -f "deno-${DENO_TARGET}.zip" deno_checksum.txt
 
 # Playwright
-# - Node.js を入れないため Python 版を使う
-# - システム Python には pip install できない (externally managed) ため venv に導入する
+# - e2e/deno.json の imports のバージョンを、e2e/deno.lock でハッシュを確かめて入れる（--frozen）。
+#   e2e/deno.json を変えたら Rebuild する。入れたブラウザと別のリビジョンを探して起動できなくなるため
+# - --with-deps は apt で OS のパッケージを入れるため、root で実行できるビルド時に入れる
 # - ブラウザは dev ユーザーからも参照できるよう共有パスに置く
 # - fonts-noto-cjk はスクリーンショットの日本語表示用
+# - root の Deno のキャッシュは dev ユーザーが使わないため消す
+# - playwright コマンド（screenshot など）は、同じものを Deno で実行するラッパーにする
 ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/ms-playwright
+COPY e2e/deno.json e2e/deno.lock /tmp/playwright/
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3-venv fonts-noto-cjk \
-    && python3 -m venv /opt/playwright \
-    && /opt/playwright/bin/pip install --no-cache-dir playwright \
-    && ln -s /opt/playwright/bin/playwright /usr/local/bin/playwright \
-    && playwright install --with-deps chromium \
+    && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && cd /tmp/playwright \
+    && spec=$(deno eval --no-config "console.log(JSON.parse(Deno.readTextFileSync('deno.json')).imports.playwright)") \
+    && DENO_DIR=/tmp/deno-playwright deno run -A --frozen "${spec}" install --with-deps chromium \
     && chmod -R a+rX "${PLAYWRIGHT_BROWSERS_PATH}" \
-    && rm -rf /var/lib/apt/lists/*
+    && cd / \
+    && rm -rf /tmp/playwright /tmp/deno-playwright /var/lib/apt/lists/*
+COPY --chmod=0755 .devcontainer/playwright /usr/local/bin/playwright
 
 # 開発用ユーザー
 # - ubuntu ユーザーは最初から sudo グループ等に所属しているため削除し、最小権限で作り直す
