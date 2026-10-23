@@ -59,9 +59,12 @@ jobs:
 
       - name: ブラウザを入れる
         # Playwright は自身のバージョンに合うブラウザしか起動しないため、e2e/deno.json の imports と同じものから入れる。
-        # e2e/ で実行し、ルートの deno.lock に Playwright を書き込ませない
+        # e2e/ で実行し、ルートの deno.lock に Playwright を書き込ませない。
+        # --with-deps は付けない。ランナーには Chrome が入っていて、起動に要るライブラリはそろっている。
+        # --with-deps が足すのはスクリーンショット用のフォントで、apt のミラーが遅いとジョブの時間を使い切るため
         working-directory: e2e
+        timeout-minutes: 5
         run: |
           sudo install -d -o "$(id -u)" -g "$(id -g)" "$PLAYWRIGHT_BROWSERS_PATH"
-          deno run -A --frozen "$(jq -r '.imports.playwright' deno.json)" install --with-deps --only-shell chromium
+          deno run -A --frozen "$(jq -r '.imports.playwright' deno.json)" install --only-shell chromium
       - run: deno task test:e2e
