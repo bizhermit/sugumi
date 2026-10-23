@@ -10,8 +10,10 @@ services:
       # deno task test が使う DB。テストはテーブルを空にするため、開発用の DB とは分ける
       TEST_DATABASE_URL: ${TEST_DATABASE_URL:-postgres://app:app@db-test:5432/app_test}
     build:
-      context: .
-      dockerfile: Dockerfile
+      # e2e/deno.json・deno.lock を読むため、コンテキストはリポジトリの直下にする。
+      # 含めるものは Dockerfile.dockerignore で絞る
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
       args:
         UID: ${UID:-1000}
         GID: ${GID:-1000}

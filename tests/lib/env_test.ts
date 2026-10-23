@@ -3,6 +3,7 @@ import {
   parseAppMode,
   parseDatabaseUrl,
   parseInteger,
+  parseListenHost,
   parseTrustedProxies,
 } from "../../src/lib/env.ts";
 import { formatIp } from "../../src/lib/ip.ts";
@@ -78,4 +79,14 @@ Deno.test("env: DATABASE_URL は必須で、パスワードはファイルから
       /両方でパスワードを指定しています/,
     );
   });
+});
+
+Deno.test("env: 待ち受けるアドレスは、未設定なら 0.0.0.0 にし、IP アドレスでなければ例外にする", () => {
+  assert.equal(parseListenHost(undefined), "0.0.0.0");
+  assert.equal(parseListenHost(""), "0.0.0.0");
+  assert.equal(parseListenHost("127.0.0.1"), "127.0.0.1");
+  assert.equal(parseListenHost("::1"), "::1");
+  for (const raw of ["localhost", "example.com", "127.0.0.1:3000", " 127.0.0.1"]) {
+    assert.throws(() => parseListenHost(raw), /LISTEN_HOST/, raw);
+  }
 });

@@ -1,4 +1,7 @@
 #!/bin/sh
-# Dockerfile で入れたブラウザと同じバージョンの Playwright の CLI を実行する。
-# プロジェクトの deno.json と deno.lock を使わない。/workspace で実行したときに、ルートの deno.lock に Playwright が入らないようにするため
-exec deno run -A --no-config --no-lock "npm:playwright@${PLAYWRIGHT_VERSION}" "$@"
+# e2e/deno.json の imports の Playwright の CLI を、e2e/deno.lock でハッシュを確かめて実行する。
+# --config で e2e/ の設定を使い、ルートの deno.json・deno.lock を使わない。
+# /workspace で実行したときに、ルートの deno.lock に Playwright が入らないようにするため
+config=/workspace/e2e/deno.json
+spec=$(deno eval --no-config "console.log(JSON.parse(Deno.readTextFileSync('${config}')).imports.playwright)") || exit 1
+exec deno run -A --config "${config}" --frozen "${spec}" "$@"

@@ -143,11 +143,10 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
   - ライブラリが読む環境変数やファイルにも、`deno.json` の `permissions` での許可が要る。
     - 使わない環境変数は、`env.ignore` に入れて未設定として扱わせる（`pg` の `USER` など）。
     - 許可も `ignore` もしないと、端末から起動したときに確認が出る。端末がない本番では拒否される。
-- Playwright のバージョンを変えるときは、次の 3 つを揃える。ずれると、ブラウザを起動できない。
+- Playwright のバージョンを変えるときは、次の 2 つを揃え、DevContainer をリビルドする。ずれると、ブラウザを起動できない。
   - `e2e/deno.json` の `imports`
   - `e2e/deno.json` の `permissions` の `run`（パスにブラウザのリビジョンが入る）
-  - `.devcontainer/Dockerfile` の `PLAYWRIGHT_VERSION`（変えたら DevContainer をリビルドする）
-  - CI は `e2e/deno.json` の `imports` のバージョンでブラウザを入れるため、揃えなくてよい。
+  - DevContainer と CI は、`e2e/deno.json` の `imports` のバージョンを、`e2e/deno.lock` でハッシュを確かめて入れる。
 
 ## DB
 

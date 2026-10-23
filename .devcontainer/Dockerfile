@@ -63,20 +63,24 @@ RUN if [ "${DENO_VERSION}" = "latest" ]; then \
     && rm -f "deno-${DENO_TARGET}.zip" deno_checksum.txt
 
 # Playwright
-# - バージョンは e2e/deno.json の imports の playwright と揃える。ずれると、入れたブラウザと別のリビジョンを探して起動できない
+# - e2e/deno.json の imports のバージョンを、e2e/deno.lock でハッシュを確かめて入れる（--frozen）。
+#   e2e/deno.json を変えたら Rebuild する。入れたブラウザと別のリビジョンを探して起動できなくなるため
 # - --with-deps は apt で OS のパッケージを入れるため、root で実行できるビルド時に入れる
 # - ブラウザは dev ユーザーからも参照できるよう共有パスに置く
 # - fonts-noto-cjk はスクリーンショットの日本語表示用
 # - root の Deno のキャッシュは dev ユーザーが使わないため消す
-# - playwright コマンド（screenshot など）は、同じバージョンを Deno で実行するラッパーにする
-ENV PLAYWRIGHT_VERSION=1.64.1 \
-    PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/ms-playwright
+# - playwright コマンド（screenshot など）は、同じものを Deno で実行するラッパーにする
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/ms-playwright
+COPY e2e/deno.json e2e/deno.lock /tmp/playwright/
 RUN apt-get update \
     && apt-get install -y --no-install-recommends fonts-noto-cjk \
-    && DENO_DIR=/tmp/deno-playwright deno run -A "npm:playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium \
+    && cd /tmp/playwright \
+    && spec=$(deno eval --no-config "console.log(JSON.parse(Deno.readTextFileSync('deno.json')).imports.playwright)") \
+    && DENO_DIR=/tmp/deno-playwright deno run -A --frozen "${spec}" install --with-deps chromium \
     && chmod -R a+rX "${PLAYWRIGHT_BROWSERS_PATH}" \
-    && rm -rf /tmp/deno-playwright /var/lib/apt/lists/*
-COPY --chmod=0755 playwright /usr/local/bin/playwright
+    && cd / \
+    && rm -rf /tmp/playwright /tmp/deno-playwright /var/lib/apt/lists/*
+COPY --chmod=0755 .devcontainer/playwright /usr/local/bin/playwright
 
 # 開発用ユーザー
 # - ubuntu ユーザーは最初から sudo グループ等に所属しているため削除し、最小権限で作り直す

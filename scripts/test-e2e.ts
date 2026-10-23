@@ -19,6 +19,21 @@ const ROOT = new URL("../", import.meta.url);
 const TMP_PARENT = new URL("dist/e2e/", ROOT);
 const READY_TIMEOUT_MS = 30_000;
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "localhost", "[::1]"]);
+// e2e/ のテストとブラウザには、DB の接続先などを渡さず、Deno と Playwright が動くのに要るものだけを渡す。
+// 足したら、deno.json の permissions の test-e2e の env.allow にも足すこと
+const PASSED_ENV = [
+  "PATH",
+  "HOME",
+  "DENO_DIR",
+  "XDG_CACHE_HOME",
+  "PLAYWRIGHT_BROWSERS_PATH",
+  "TERM",
+  "NO_COLOR",
+  "LANG",
+  "LC_ALL",
+  "TZ",
+  "CI",
+];
 
 if (import.meta.main) {
   // DB を空にする前に確かめる
@@ -40,7 +55,9 @@ async function runE2e(args: string[], externalUrl: string | undefined): Promise<
     const tests = new Deno.Command("deno", {
       args: ["task", "test", ...args],
       cwd: new URL("e2e/", ROOT),
+      clearEnv: true,
       env: {
+        ...passedEnv(),
         E2E_BASE_URL: baseUrl,
         E2E_USERNAME: account.username,
         E2E_PASSWORD: TEST_PASSWORD,
@@ -61,7 +78,8 @@ async function runE2e(args: string[], externalUrl: string | undefined): Promise<
     const app = new Deno.Command("deno", {
       args: ["run", "-P", "src/main.ts"],
       cwd: ROOT,
-      env: { APP_MODE: "PROD", PORT: String(port) },
+      // テストの間だけ、LAN からテスト用の DB のアプリに届かないようにする
+      env: { APP_MODE: "PROD", PORT: String(port), LISTEN_HOST: "127.0.0.1" },
       // 監査のログでテストの結果が読みにくくならないよう、標準出力だけ捨てる
       stdout: "null",
     }).spawn();
@@ -103,6 +121,15 @@ export function parseBaseUrl(raw: string): string {
     );
   }
   return url.origin;
+}
+
+function passedEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const name of PASSED_ENV) {
+    const value = Deno.env.get(name);
+    if (value !== undefined) env[name] = value;
+  }
+  return env;
 }
 
 /** すでに終わったプロセスに kill() すると例外になり、元の例外を上書きするため、終わっていれば何もしない。 */
