@@ -1,4 +1,6 @@
-# CloudWatch Logs へ送る。AWS の権限は、EC2 のインスタンスに付けた IAM ロールから得る（docker/README.md）
+# CloudWatch Logs へ送る。AWS の権限は、EC2 のインスタンスに付けた IAM ロールから得る（docker/README.md）。
+# ロググループと保存日数は、管理者が先に作る。ロールに保存日数を変える権限を与えると、
+# サーバーを乗っ取られたときに保存日数を縮めて、送ったログを消させられるため
 includes:
   - pipeline.yaml
 
@@ -10,8 +12,7 @@ pipeline:
       log_group_name: ${CLOUDWATCH_LOG_GROUP}
       # サーバーごとに分ける。同じストリームに複数のサーバーから書くと、順番が崩れる
       log_stream_name: ${SERVER_NAME}
-      auto_create_group: true
-      log_retention_days: ${CLOUDWATCH_RETENTION_DAYS}
+      auto_create_group: false
       # 送れない間は捨てずにため、届くまで送り直す
       retry_limit: no_limits
       storage.total_limit_size: ${LOG_BUFFER_MAX_SIZE}

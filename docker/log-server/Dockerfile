@@ -17,7 +17,7 @@ FROM fluent/fluent-bit:5.1.3@sha256:c5542543523c9678398dd78d927c05e8425ec15b038f
 
 COPY --from=dirs --chown=65532:65532 --chmod=700 /out/buffer/ /fluent-bit/buffer/
 COPY --from=dirs --chown=65532:65532 --chmod=700 /out/logs/ /logs/
-COPY fluent-bit.yaml /fluent-bit/etc/sugumi/
+COPY fluent-bit.yaml receive-time.lua /fluent-bit/etc/sugumi/
 # 秘密鍵は nonroot だけが読めるようにする
 COPY --from=dirs --chown=65532:65532 /out/certs/ /fluent-bit/etc/sugumi/certs/
 

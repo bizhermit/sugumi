@@ -13,8 +13,9 @@ FROM fluent/fluent-bit:5.1.3@sha256:c5542543523c9678398dd78d927c05e8425ec15b038f
 
 COPY --from=dirs --chown=65532:65532 --chmod=700 /out/buffer/ /fluent-bit/buffer/
 COPY *.yaml /fluent-bit/etc/sugumi/
-# internal で、ログ用のサーバーの証明書を確かめる CA の証明書（log-server-ca.crt）。cloudwatch では空でよい
-COPY certs/ /fluent-bit/etc/sugumi/certs/
+# internal で、ログ用のサーバーの証明書を確かめる CA の証明書（log-server-ca.crt）。cloudwatch では空でよい。
+# 手順（docker/README.md）の umask 077 で作ると所有者しか読めないため、nonroot の所有にする
+COPY --chown=65532:65532 certs/ /fluent-bit/etc/sugumi/certs/
 
 # root で動かさない（65532 は distroless の nonroot ユーザー）
 USER 65532:65532

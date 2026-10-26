@@ -12,9 +12,10 @@ parsers:
 
 pipeline:
   inputs:
-    # Docker の fluentd ログドライバーから受け取る。compose.yaml でホストの 127.0.0.1 にだけ公開する
+    # Docker の fluentd ログドライバーから受け取る。ホストのネットワークで動かすため（compose.yaml）、
+    # 127.0.0.1 だけで待ち受け、外やアプリのコンテナからは送れないようにする
     - name: forward
-      listen: 0.0.0.0
+      listen: 127.0.0.1
       port: 24224
       storage.type: filesystem
 

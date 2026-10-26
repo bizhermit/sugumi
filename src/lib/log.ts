@@ -6,6 +6,11 @@
  * パスワード・トークン・セッション ID は渡さないこと。
  */
 
+// Docker は 16 KB を超える行を分けて渡し、1 行 1 つの JSON が崩れるため、例外の内容は JSON にしてこのバイト数までに切る
+const MAX_ERROR_BYTES = 8 * 1024;
+
+const encoder = new TextEncoder();
+
 /** record を 1 行の JSON にして出す。toStderr なら標準エラーに出す。 */
 export function writeLog(record: object, toStderr = false): void {
   const line = JSON.stringify(record);
@@ -20,11 +25,23 @@ export function logError(e: unknown, requestId?: string): void {
     time: new Date().toISOString(),
     requestId,
     // スタックトレースの改行で行が分かれないよう、ほかのログと同じく 1 行の JSON にする
-    error: e instanceof Error ? e.stack ?? String(e) : String(e),
+    error: truncateError(errorText(e)),
   }, true);
 }
 
 /** 設定の不備など、エラーではないが運用者に知らせたいことを出す。 */
 export function logWarning(message: string): void {
   writeLog({ type: "warning", time: new Date().toISOString(), message }, true);
+}
+
+function errorText(e: unknown): string {
+  return e instanceof Error ? e.stack ?? String(e) : String(e);
+}
+
+// 例外のときにしか通らないため、読みやすさを優先して、収まるまで縮める
+function truncateError(text: string): string {
+  while (encoder.encode(JSON.stringify(text)).byteLength > MAX_ERROR_BYTES) {
+    text = text.slice(0, Math.floor(text.length * 0.9));
+  }
+  return text;
 }

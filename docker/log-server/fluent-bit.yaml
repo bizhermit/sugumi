@@ -20,6 +20,11 @@ pipeline:
       storage.type: filesystem
 
   filters:
+    # 送り手に、書き込むファイルの日付を選ばせない（receive-time.lua）
+    - name: lua
+      match: "*"
+      script: /fluent-bit/etc/sugumi/receive-time.lua
+      call: set_receive_time
     # 監査ログは保存日数を分けるため、別のファイルに書く
     - name: rewrite_tag
       match: sugumi.app
@@ -41,7 +46,8 @@ pipeline:
       format: plain
       rotate: on
       rotate_max_size: ${LOG_FILE_MAX_SIZE}
-      # 1 日のうちに上限まで分かれても消さない。消すのは log-cleaner が日数と合計の上限で行う
+      # 上限は 1 以上で、無制限にできない。数で消すのは、1 日に 100M × 1 万を超えたときだけになるよう大きくする。
+      # 量を送られると押し出されるのは、log-cleaner の合計の上限と同じく、アクセスログなどでは受け入れる
       rotate_max_files: 10000
       retry_limit: no_limits
     - name: file
@@ -55,7 +61,7 @@ pipeline:
       fallback_path: /logs
       fallback_file: audit-fallback.jsonl
       format: plain
-      rotate: on
-      rotate_max_size: ${LOG_FILE_MAX_SIZE}
-      rotate_max_files: 10000
+      # 分けない。分けると、rotate_max_files を超えた古いものを Fluent Bit が消すため、
+      # 共有の鍵を持つ送り手が量を送るだけで、その日の監査ログを押し出せる。増えた分はディスクの監視で気づく
+      rotate: off
       retry_limit: no_limits
