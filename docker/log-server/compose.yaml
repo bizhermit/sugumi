@@ -21,23 +21,17 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
 
-  # 保存日数を過ぎたファイルを消す。1 時間ごとに確かめる
+  # 保存日数を過ぎたファイルと、合計の上限を超えた分を消す（log-cleaner.sh）
   log-cleaner:
-    image: busybox:1.38.0@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+    build:
+      context: .
+      dockerfile: log-cleaner.Dockerfile
     restart: unless-stopped
-    user: "65532:65532"
     environment:
       APP_DAYS: ${LOG_APP_RETENTION_DAYS:-90}
       AUDIT_DAYS: ${LOG_AUDIT_RETENTION_DAYS:-90}
-    command:
-      - sh
-      - -c
-      - >-
-          while :; do
-          find /logs -name 'app-*' -mtime +"$$APP_DAYS" -delete;
-          find /logs -name 'audit-*' -mtime +"$$AUDIT_DAYS" -delete;
-          sleep 3600;
-          done
+      APP_MAX_TOTAL_SIZE_MB: ${LOG_APP_MAX_TOTAL_SIZE_MB:-51200}
+      AUDIT_MAX_TOTAL_SIZE_MB: ${LOG_AUDIT_MAX_TOTAL_SIZE_MB:-5120}
     volumes:
       - logs:/logs
     read_only: true

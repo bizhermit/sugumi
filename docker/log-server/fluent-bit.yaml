@@ -41,7 +41,7 @@ pipeline:
       format: plain
       rotate: on
       rotate_max_size: ${LOG_FILE_MAX_SIZE}
-      # 1 日のうちに上限まで分かれても消さない。消すのは log-cleaner が日数で行う
+      # 1 日のうちに上限まで分かれても消さない。消すのは log-cleaner が日数と合計の上限で行う
       rotate_max_files: 10000
       retry_limit: no_limits
     - name: file

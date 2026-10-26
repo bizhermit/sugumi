@@ -250,7 +250,7 @@ fields @timestamp, server, type, event, method, path, status
 
 ### 社内のログ用のサーバー
 
-アプリのサーバーとは別のサーバーに置く。`docker/log-server/` に、受け口（`receiver`）と、古いファイルを消す `log-cleaner` がある。
+アプリのサーバーとは別のサーバーに置く。`docker/log-server/` に、受け口（`receiver`）と、古いファイルを消す `log-cleaner`（「[古いファイルの削除](#古いファイルの削除)」）がある。
 
 アプリのサーバーの `log-forwarder` は、TLS で暗号化し、共有の鍵で認証してログを送るだけで、ログ用のサーバーのファイルを読んだり消したりできない。
 
@@ -286,14 +286,16 @@ fields @timestamp, server, type, event, method, path, status
    docker compose --env-file .env up -d --build
    ```
 
-| 名前                       | 必須 | 内容                                                  |
-| -------------------------- | ---- | ----------------------------------------------------- |
-| `LOG_SERVER_NAME`          | ○    | ログ用のサーバーの名前。共有の鍵での認証に使う        |
-| `LOG_SERVER_SHARED_KEY`    | ○    | アプリのサーバーと揃える共有の鍵                      |
-| `LOG_SERVER_PORT`          |      | 受け口のポート（`24224`）                             |
-| `LOG_FILE_MAX_SIZE`        |      | ファイル 1 つの大きさの上限。超えると分ける（`100M`） |
-| `LOG_APP_RETENTION_DAYS`   |      | `app-*` のファイルを残す日数（`90`）                  |
-| `LOG_AUDIT_RETENTION_DAYS` |      | `audit-*` のファイルを残す日数（`90`）                |
+| 名前                          | 必須 | 内容                                                  |
+| ----------------------------- | ---- | ----------------------------------------------------- |
+| `LOG_SERVER_NAME`             | ○    | ログ用のサーバーの名前。共有の鍵での認証に使う        |
+| `LOG_SERVER_SHARED_KEY`       | ○    | アプリのサーバーと揃える共有の鍵                      |
+| `LOG_SERVER_PORT`             |      | 受け口のポート（`24224`）                             |
+| `LOG_FILE_MAX_SIZE`           |      | ファイル 1 つの大きさの上限。超えると分ける（`100M`） |
+| `LOG_APP_RETENTION_DAYS`      |      | `app-*` のファイルを残す日数（`90`）                  |
+| `LOG_AUDIT_RETENTION_DAYS`    |      | `audit-*` のファイルを残す日数（`90`）                |
+| `LOG_APP_MAX_TOTAL_SIZE_MB`   |      | `app-*` のファイルの合計の上限（MB）（`51200`）       |
+| `LOG_AUDIT_MAX_TOTAL_SIZE_MB` |      | `audit-*` のファイルの合計の上限（MB）（`5120`）      |
 
 #### アプリのサーバーを設定する
 
@@ -307,16 +309,32 @@ fields @timestamp, server, type, event, method, path, status
 
 - `app-<日付>.jsonl`：`access`・`error`・`warning` など
 - `audit-<日付>.jsonl`：`audit`
-- 1 日のうちに `LOG_FILE_MAX_SIZE` を超えると、分けたファイルが増える。
+- 書いているファイルが `LOG_FILE_MAX_SIZE` を超えると、gzip で圧縮して `<元の名前>.<分けた時刻>_<ランダムな文字>.gz` に移し、元の名前で書き直す。
+  - 例：`app-2026-10-26.jsonl.20261026_113154_ba22e1c0.gz`。名前順に並べると古い順になる。
+  - 名前の付け方は Fluent Bit が決めていて、変えられない。
+
+`zgrep` は、圧縮したファイルとしていないファイルの両方を読める。
 
 ```sh
 LOGS=$(docker volume inspect log-server_logs --format '{{ .Mountpoint }}')
 sudo ls -l "$LOGS"
-sudo grep -h '"requestId":"<requestId>"' "$LOGS"/*.jsonl
-sudo grep -h '"sessionLogId":"<sessionLogId>"' "$LOGS"/audit-*.jsonl
+sudo zgrep -h '"requestId":"<requestId>"' "$LOGS"/app-2026-10-26.jsonl*
+sudo zgrep -h '"sessionLogId":"<sessionLogId>"' "$LOGS"/audit-*
 ```
 
-ディスクの空きを見張る。保存日数の間に流れてくる量が多いと、ディスクが埋まる。
+#### 古いファイルの削除
+
+`log-cleaner` が 1 分ごとに、種類（`app-*`・`audit-*`）ごとに消す。
+
+- 保存日数（`LOG_APP_RETENTION_DAYS`・`LOG_AUDIT_RETENTION_DAYS`）を過ぎたファイル。
+- 合計の上限（`LOG_APP_MAX_TOTAL_SIZE_MB`・`LOG_AUDIT_MAX_TOTAL_SIZE_MB`）を超えた分を、最終更新が古いファイルから。
+  - 受け口が書いている今日のファイルは消さない。
+  - 上限を種類ごとに分けているため、アクセスログを大量に出させても監査ログは消えない。
+  - 上限で消すと、保存日数より前にログが消える。そのときは `log-cleaner` のログに `warning` が出る（`docker compose --env-file .env logs log-cleaner`）。
+  - 1 分ごとに確かめるため、その間に流れ込んだ分だけ一時的に上限を超える。
+
+2 つの上限の合計は、ディスクの空きより十分小さくする。受け口が書けない間にためる分（ボリューム `log-server_buffer`）の余裕も残す。
+上限に届く前にディスクが埋まると、新しいログを書けなくなる。
 
 ### 突き合わせ
 
