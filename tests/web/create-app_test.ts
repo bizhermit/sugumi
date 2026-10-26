@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { createApp } from "../../src/web/app.ts";
 import { withTempDir } from "../_support/fixture.ts";
+import { captureLogs } from "../_support/logs.ts";
 import { calls, handler, withFixture } from "../_support/routes.ts";
 
 const THROW = `export default () => { throw new Error("テストで投げた例外"); };`;
@@ -71,6 +72,82 @@ Deno.test("createApp: TCP の接続元を ctx.remoteAddress に渡す", async ()
       ({ remoteAddr: { transport: "tcp", hostname, port: 1 } }) as Deno.ServeHandlerInfo;
     assert.equal(await (await app(req(), info("::ffff:192.0.2.1"))).text(), "192.0.2.1");
     assert.equal(await (await app(req())).text(), "undefined");
+  });
+});
+
+Deno.test("createApp: 1 リクエストにつき 1 行のアクセスログを出し、クエリ文字列は出さない", async () => {
+  await withFixture({
+    "get.ts": handler("GET /"),
+    "user/[id]/get.ts": `export default (_req: Request, ctx: { requestId: string }) =>
+      new Response(ctx.requestId);`,
+  }, async (routes) => {
+    const app = await createApp({ mock: false, routes });
+    const info = {
+      remoteAddr: { transport: "tcp", hostname: "192.0.2.1", port: 1 },
+    } as Deno.ServeHandlerInfo;
+    const bodies: string[] = [];
+    const logs = await captureLogs(async () => {
+      for (const path of ["/user/1?to=%2Fsecret", "/user/2", "/missing?q=secret"]) {
+        bodies.push(await (await app(new Request(`http://localhost${path}`), info)).text());
+      }
+      await (await app(new Request("http://localhost/", { method: "POST" }))).body?.cancel();
+    });
+    assert.equal(logs.length, 4);
+    const [first, second, missing, notAllowed] = logs;
+    assert.deepEqual(Object.keys(first), [
+      "type",
+      "time",
+      "requestId",
+      "method",
+      "path",
+      "route",
+      "status",
+      "durationMs",
+      "remoteAddress",
+    ]);
+    assert.equal(first.type, "access");
+    assert.equal(typeof first.time, "string");
+    assert.equal(typeof first.durationMs, "number");
+    assert.equal(first.method, "GET");
+    assert.equal(first.path, "/user/1");
+    assert.equal(first.route, "/user/[id]");
+    assert.equal(first.status, 200);
+    assert.equal(first.remoteAddress, "192.0.2.1");
+    // ページが受け取る ID と同じで、リクエストごとに変わる
+    assert.equal(first.requestId, bodies[0]);
+    assert.equal(second.requestId, bodies[1]);
+    assert.notEqual(first.requestId, second.requestId);
+    assert.deepEqual(
+      [missing.path, missing.route, missing.status],
+      ["/missing", undefined, 404],
+    );
+    assert.deepEqual([notAllowed.method, notAllowed.status], ["POST", 405]);
+    assert.doesNotMatch(JSON.stringify(logs), /secret/);
+  });
+});
+
+Deno.test("createApp: アクセスログのパスは長すぎれば切り詰める", async () => {
+  await withFixture({ "get.ts": handler("GET /") }, async (routes) => {
+    const app = await createApp({ mock: false, routes });
+    const [log] = await captureLogs(async () => {
+      await (await app(new Request(`http://localhost/${"a".repeat(5000)}`))).body?.cancel();
+    });
+    assert.equal(log.path, `/${"a".repeat(1023)}`);
+  });
+});
+
+Deno.test("createApp: ページの例外は、アクセスログと同じリクエスト ID を付けて 1 行のエラーログにする", async () => {
+  await withFixture({ "get.ts": handler("GET /"), "page/get.ts": THROW }, async (routes) => {
+    const app = await createApp({ mock: false, routes });
+    const logs = await captureLogs(async () => {
+      await (await app(new Request("http://localhost/page"))).body?.cancel();
+    });
+    assert.equal(logs.length, 2);
+    const [error, access] = logs;
+    assert.equal(error.type, "error");
+    assert.match(String(error.error), /テストで投げた例外/);
+    assert.equal(access.status, 500);
+    assert.equal(error.requestId, access.requestId);
   });
 });
 

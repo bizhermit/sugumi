@@ -9,7 +9,7 @@ export default async function (_req: Request, ctx: RouteContext): Promise<Respon
   if (ctx.session) {
     // 別のアカウントでログインし直せるよう、開いただけでログアウトする。
     // 外部サイトのリンクやブラウザの先読みでもログアウトされるが、許容している
-    await logout(ctx.session, ctx.remoteAddress);
+    await logout(ctx.session, ctx);
     // CSRF トークンはセッションに結び付いているため、フォームはログイン前のトークンで出し直す
     const res = redirect(path("/login", { query: { to } }));
     res.headers.append("set-cookie", clearSessionCookie());

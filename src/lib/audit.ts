@@ -9,6 +9,28 @@ export type AuditEvent =
   | "address_blocked"
   | "logged_out";
 
-export function audit(event: AuditEvent, data: Record<string, unknown>): void {
-  console.log(JSON.stringify({ type: "audit", time: new Date().toISOString(), event, ...data }));
+/**
+ * 監査ログを出すリクエスト。ページの ctx（RouteContext）をそのまま渡せる。
+ * requestId は、アクセスログ・エラーログと突き合わせるために出す。
+ */
+export type AuditSource = {
+  readonly requestId: string;
+  readonly remoteAddress: string | undefined;
+};
+
+export function audit(
+  event: AuditEvent,
+  { requestId, remoteAddress }: AuditSource,
+  data: Record<string, unknown> = {},
+): void {
+  console.log(
+    JSON.stringify({
+      type: "audit",
+      time: new Date().toISOString(),
+      requestId,
+      event,
+      remoteAddress,
+      ...data,
+    }),
+  );
 }

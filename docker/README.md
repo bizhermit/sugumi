@@ -178,3 +178,21 @@ docker compose --env-file docker/.env exec db \
 - `compose.yaml` の ports を `127.0.0.1`
   以外にも公開したとき：外からの接続もゲートウェイから届く場合があり、偽れる。 公開するなら
   `TRUSTED_PROXIES` を外す。
+
+## ログ
+
+アプリは、1 行に 1 つの JSON でログを出す。`type` で種類を見分ける。
+
+- `access`：1 リクエストにつき 1 行。静的ファイルも含む。標準出力に出す。
+  - `durationMs` は応答を返し始めるまでの時間で、本文を送り終えるまでは含まない。
+  - `accountId` はログイン中のときだけ出す。
+- `audit`：ログイン・ログアウトなどの監査ログ。標準出力に出す。
+- `error`：500・503 にした例外。`error` にスタックトレースが入る。標準エラーに出す。
+
+どれにも `requestId` が入る。エラーや監査ログのリクエストは、同じ `requestId` のアクセスログで探す。
+
+```sh
+docker compose --env-file docker/.env logs --no-log-prefix app | grep '"requestId":"<requestId>"'
+```
+
+クエリ文字列・Cookie・本文は出さない。ログイン後の戻り先やトークンが入るため。

@@ -2,7 +2,7 @@
  * ログイン中のセッション。ログインに成功したときだけ作るため、ログインしていない利用者が DB を増やすことはできない。
  */
 import { type Account, ACCOUNT_COLUMNS, type AccountColumns, toAccount } from "./accounts.ts";
-import { audit } from "../audit.ts";
+import { audit, type AuditSource } from "../audit.ts";
 import { clearHostCookie, hostCookie, readCookie } from "../cookie.ts";
 import { hashToken, isRandomToken, randomToken } from "../crypto.ts";
 import { db } from "../db.ts";
@@ -88,9 +88,9 @@ export async function destroySession(session: Session): Promise<void> {
 }
 
 /** 呼び出し側は clearSessionCookie() で Cookie を消すこと。 */
-export async function logout(session: Session, remoteAddress: string | undefined): Promise<void> {
+export async function logout(session: Session, source: AuditSource): Promise<void> {
   await destroySession(session);
-  audit("logged_out", { accountId: session.account.id, remoteAddress });
+  audit("logged_out", source, { accountId: session.account.id });
 }
 
 /** Cookie はあるのに getSession() が undefined なら、期限切れか削除されたセッションと分かる。 */

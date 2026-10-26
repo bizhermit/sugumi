@@ -35,6 +35,30 @@ const SESSIONLESS_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/healthz
 // 前のリクエストで足した Cookie などが次の利用者に渡るため、2 回目は書き足す前に例外にする
 const claimed = new WeakSet<Response>();
 
+// 照合できない長い URL を送り続けて、ログを埋められないようにする
+const MAX_LOGGED_PATH_LENGTH = 1024;
+
+/**
+ * 1 リクエストにつき 1 行出すアクセスログ。キーを揃えておき、handle() が分かった値を書き足す。
+ * クエリ文字列・Cookie・本文は出さない。ログイン後の戻り先やトークンが入るため。
+ * time はほかのログと同じく書き出した時刻で、durationMs は Response を返すまでの時間（本文を送り終えるまでではない）。
+ */
+type AccessLog = {
+  type: "access";
+  time: string;
+  requestId: string;
+  method: string;
+  /** pathname。URL として解析できなければ undefined。 */
+  path: string | undefined;
+  /** 照合したルートのパターン。照合しなければ undefined。 */
+  route: RoutePath | undefined;
+  status: number;
+  durationMs: number;
+  remoteAddress: string | undefined;
+  /** ログインしていれば、そのアカウントの ID。 */
+  accountId: number | undefined;
+};
+
 export type Handler = (req: Request, info?: Deno.ServeHandlerInfo) => Promise<Response>;
 type Router = Awaited<ReturnType<typeof loadRouter>>;
 
@@ -65,18 +89,44 @@ export async function createApp(
   }
 
   return async (req, info) => {
+    const start = performance.now();
     const addr = info?.remoteAddr;
     const tcpAddress = addr && "hostname" in addr ? addr.hostname : undefined;
+    // 静的ファイルのリクエストも出す。/assets/ はブラウザにずっとキャッシュされ、static/ は 304 で済むため量は少なく、
+    // 存在しないファイルを探して回る接続元も追えるようにするため
+    const log: AccessLog = {
+      type: "access",
+      time: "",
+      requestId: crypto.randomUUID(),
+      method: req.method,
+      path: undefined,
+      route: undefined,
+      status: 0,
+      durationMs: 0,
+      remoteAddress: remoteAddressOf(req, tcpAddress),
+      accountId: undefined,
+    };
     let res: Response;
     try {
-      res = await handle(match, statics, req, tcpAddress, bodyTimeoutMs);
+      res = await handle(match, statics, req, log, bodyTimeoutMs);
     } catch (e) {
-      // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける
-      console.error(e);
+      // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける。
+      // スタックトレースの改行で行が分かれないよう、ほかのログと同じく 1 行の JSON にする
+      console.error(JSON.stringify({
+        type: "error",
+        time: new Date().toISOString(),
+        requestId: log.requestId,
+        error: e instanceof Error ? e.stack ?? String(e) : String(e),
+      }));
       // DB の混雑は待てば直るため、プロキシやクライアントがやり直せるよう 500 と分ける
       res = errorPage(isDbTimeout(e) ? 503 : 500);
     }
-    return withSecurityHeaders(res);
+    res = withSecurityHeaders(res);
+    log.time = new Date().toISOString();
+    log.status = res.status;
+    log.durationMs = Math.round((performance.now() - start) * 10) / 10;
+    console.log(JSON.stringify(log));
+    return res;
   };
 }
 
@@ -84,7 +134,7 @@ async function handle(
   match: Router,
   statics: StaticFiles,
   req: Request,
-  tcpAddress: string | undefined,
+  log: AccessLog,
   bodyTimeoutMs: number,
 ): Promise<Response> {
   const host = req.headers.get("host");
@@ -96,6 +146,10 @@ async function handle(
     return errorPage(400);
   }
   if (url.hash !== "") return errorPage(400);
+  // パスはそのまま出すため、トークンなど秘密の値をパスに入れるルートを作らないこと
+  log.path = url.pathname.length > MAX_LOGGED_PATH_LENGTH
+    ? url.pathname.slice(0, MAX_LOGGED_PATH_LENGTH)
+    : url.pathname;
   // 静的ファイルはログインの有無で内容が変わらないため、セッションや CSRF を確かめない
   if (url.pathname.startsWith(ASSETS_PREFIX)) return serveAsset(req, url);
   const staticFile = statics.serve(req, url);
@@ -103,6 +157,7 @@ async function handle(
 
   const route = match(url.pathname, req.method);
   if (!route) return errorPage(404);
+  log.route = route.route;
   const { handler: pageHandler } = route;
   if (!pageHandler) return methodNotAllowed(route.allow);
   const buffered = await bufferBody(req, MAX_BODY_BYTES, bodyTimeoutMs);
@@ -110,6 +165,7 @@ async function handle(
 
   // ヘルスチェックは DB が止まっていても応答させるため、Cookie が付いていてもセッションを引かない
   const session = SESSIONLESS_ROUTES.has(route.route) ? undefined : await getSession(buffered);
+  log.accountId = session?.account.id;
   const csrf = csrfFor(buffered, session);
   if (!(await csrf.verify(buffered))) {
     if (session) return errorPage(403);
@@ -127,7 +183,16 @@ async function handle(
   try {
     res = await pageHandler(
       buffered,
-      new Context(route.route, route.params, session, buffered, url, csrf, tcpAddress),
+      new Context(
+        route.route,
+        route.params,
+        session,
+        log.remoteAddress,
+        log.requestId,
+        buffered,
+        url,
+        csrf,
+      ),
     );
   } catch (e) {
     if (e instanceof InvalidFormError) return errorPage(400);
@@ -195,16 +260,13 @@ function expireBody(reader: ReadableStreamDefaultReader<Uint8Array>): void {
 }
 
 /**
- * ページに渡す ctx。リクエストごとに作るため、ページが使わない値（IP アドレスの解析など）は読まれたときに作る。
+ * ページに渡す ctx。リクエストごとに作るため、ページが使わない値は読まれたときに作る。
  * 関数の値は、分割代入で取り出してから呼んでも動くよう、this を使わないものを読まれたときに作る。
  */
 class Context implements RouteContext {
   readonly #req: Request;
   readonly #url: URL;
   readonly #csrf: Csrf;
-  readonly #tcpAddress: string | undefined;
-  #remoteAddress: string | undefined;
-  #remoteAddressResolved = false;
   #csrfToken: (() => Promise<string>) | undefined;
   #form: (() => Promise<FormData>) | undefined;
 
@@ -212,27 +274,19 @@ class Context implements RouteContext {
     readonly route: RouteContext["route"],
     readonly params: Record<string, string>,
     readonly session: Session | undefined,
+    readonly remoteAddress: string | undefined,
+    readonly requestId: string,
     req: Request,
     url: URL,
     csrf: Csrf,
-    tcpAddress: string | undefined,
   ) {
     this.#req = req;
     this.#url = url;
     this.#csrf = csrf;
-    this.#tcpAddress = tcpAddress;
   }
 
   get query(): URLSearchParams {
     return this.#url.searchParams;
-  }
-
-  get remoteAddress(): string | undefined {
-    if (!this.#remoteAddressResolved) {
-      this.#remoteAddress = remoteAddressOf(this.#req, this.#tcpAddress);
-      this.#remoteAddressResolved = true;
-    }
-    return this.#remoteAddress;
   }
 
   get csrfToken(): () => Promise<string> {
