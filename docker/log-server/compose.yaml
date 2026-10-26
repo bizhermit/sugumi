@@ -1,0 +1,50 @@
+# 社内のログ用のサーバー。アプリのサーバー（リポジトリ直下の compose.yaml）とは別のサーバーで起動する。
+# 値と証明書を用意してから（docker/README.md を参照）、このディレクトリで起動する。
+#
+#   docker compose --env-file .env up -d --build
+
+services:
+  receiver:
+    build: .
+    restart: unless-stopped
+    environment:
+      LOG_SERVER_NAME: ${LOG_SERVER_NAME:?.env に LOG_SERVER_NAME を書いてください}
+      LOG_SERVER_SHARED_KEY: ${LOG_SERVER_SHARED_KEY:?.env に LOG_SERVER_SHARED_KEY を書いてください}
+      LOG_FILE_MAX_SIZE: ${LOG_FILE_MAX_SIZE:-100M}
+    ports:
+      # アプリのサーバーからだけ届くよう、ファイアウォールで絞る（docker/README.md）
+      - ${LOG_SERVER_PORT:-24224}:24224
+    volumes:
+      - logs:/logs
+      - buffer:/fluent-bit/buffer
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  # 保存日数を過ぎたファイルを消す。1 時間ごとに確かめる
+  log-cleaner:
+    image: busybox:1.38.0@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+    restart: unless-stopped
+    user: "65532:65532"
+    environment:
+      APP_DAYS: ${LOG_APP_RETENTION_DAYS:-90}
+      AUDIT_DAYS: ${LOG_AUDIT_RETENTION_DAYS:-90}
+    command:
+      - sh
+      - -c
+      - >-
+          while :; do
+          find /logs -name 'app-*' -mtime +"$$APP_DAYS" -delete;
+          find /logs -name 'audit-*' -mtime +"$$AUDIT_DAYS" -delete;
+          sleep 3600;
+          done
+    volumes:
+      - logs:/logs
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    network_mode: none
+
+volumes:
+  logs:
+  buffer:

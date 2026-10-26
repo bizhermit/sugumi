@@ -1,0 +1,22 @@
+# 社内のログ用のサーバー（docker/log-server/）へ送る
+includes:
+  - pipeline.yaml
+
+pipeline:
+  outputs:
+    - name: forward
+      match: "*"
+      host: ${LOG_SERVER_HOST}
+      port: ${LOG_SERVER_PORT}
+      # 途中で盗み見られたり、別のサーバーに受け取られたりしないよう、証明書とホスト名を確かめる
+      tls: on
+      tls.verify: on
+      tls.verify_hostname: on
+      tls.ca_file: /fluent-bit/etc/sugumi/certs/log-server-ca.crt
+      # 鍵を知らない送り手からのログを、ログ用のサーバーが受け付けないようにする
+      shared_key: ${LOG_SERVER_SHARED_KEY}
+      self_hostname: ${SERVER_NAME}
+      # 受け取ったと返されるまでは送れたことにしない。届く前に接続が切れても、ためた分を送り直す
+      require_ack_response: true
+      retry_limit: no_limits
+      storage.total_limit_size: ${LOG_BUFFER_MAX_SIZE}

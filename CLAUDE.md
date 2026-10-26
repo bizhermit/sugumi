@@ -21,7 +21,8 @@ src/
     _shared/      サーバーとクライアントの両方で使う部品（必要になったら作る）
 static/           URL が外部の取り決めで決まるファイル（favicon.ico・robots.txt など）。同じパスで配信する
 scripts/          deno task から実行するスクリプト
-docker/           コンテナのイメージ（app/・db/）と、本番の設定（.env。コミットしない）・手順（README.md）
+docker/           コンテナのイメージ（app/・db/・log-forwarder/）と、本番の設定（.env。コミットしない）・手順（README.md）
+  log-server/     社内のログ用のサーバー（アプリのサーバーとは別のサーバーで起動する）
 tests/            テスト。src/ と同じ構成で *_test.ts を置く
   _support/       複数のテストで使う部品
 bench/            性能の計測。src/ と同じ構成で *_bench.ts を置く

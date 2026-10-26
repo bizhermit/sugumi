@@ -41,3 +41,9 @@ __pycache__/
 
 # Data
 /data/
+
+# ログ用のサーバーの証明書・鍵と設定（docker/README.md の手順で作る）
+/docker/log-forwarder/certs/*
+!/docker/log-forwarder/certs/.gitkeep
+/docker/log-server/certs/*
+!/docker/log-server/certs/.gitkeep

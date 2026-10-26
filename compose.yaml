@@ -38,9 +38,47 @@ services:
     networks:
       - default
       - db
+    # ログ（1 行の JSON）を、同じサーバーの log-forwarder に渡す。送り先は log-forwarder が LOG_DESTINATION で決める
+    logging:
+      driver: fluentd
+      options:
+        # Docker が接続する。log-forwarder の ports と揃える
+        fluentd-address: 127.0.0.1:24224
+        tag: sugumi.app
+        # log-forwarder の起動を待たずにアプリを起動する。届くまでは Docker がメモリにためて送り直す
+        fluentd-async: "true"
     depends_on:
       db:
         condition: service_healthy
+      log-forwarder:
+        condition: service_started
+
+  # アプリのログを受け取り、送り先（CloudWatch か社内のログ用のサーバー）へ送る。届くまではディスクにためる
+  log-forwarder:
+    build: ./docker/log-forwarder
+    restart: unless-stopped
+    command:
+      - /fluent-bit/bin/fluent-bit
+      - -c
+      - /fluent-bit/etc/sugumi/${LOG_DESTINATION:?docker/.env に LOG_DESTINATION（cloudwatch か internal）を書いてください}.yaml
+    environment:
+      SERVER_NAME: ${SERVER_NAME:?docker/.env に SERVER_NAME を書いてください}
+      LOG_BUFFER_MAX_SIZE: ${LOG_BUFFER_MAX_SIZE:-5G}
+      AWS_REGION: ${AWS_REGION:-}
+      CLOUDWATCH_LOG_GROUP: ${CLOUDWATCH_LOG_GROUP:-}
+      CLOUDWATCH_RETENTION_DAYS: ${CLOUDWATCH_RETENTION_DAYS:-90}
+      LOG_SERVER_HOST: ${LOG_SERVER_HOST:-}
+      LOG_SERVER_PORT: ${LOG_SERVER_PORT:-24224}
+      # Fluent Bit は設定の値をファイルから読めないため、secrets ではなく環境変数で渡す
+      LOG_SERVER_SHARED_KEY: ${LOG_SERVER_SHARED_KEY:-}
+    ports:
+      # Docker の fluentd ログドライバーはホストから接続するため、ホストの 127.0.0.1 にだけ公開する
+      - 127.0.0.1:24224:24224
+    volumes:
+      - log-buffer:/fluent-bit/buffer
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
 
   db:
     build: ./docker/db
@@ -80,6 +118,7 @@ networks:
 
 volumes:
   db-data:
+  log-buffer:
 
 # 環境変数に置くと docker inspect などで見えるため、docker/.env の値からファイルを作り、/run/secrets/ に置く。
 # --env-file を付け忘れると、値がないため起動しない

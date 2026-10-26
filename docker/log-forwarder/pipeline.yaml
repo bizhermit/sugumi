@@ -1,0 +1,31 @@
+# cloudwatch.yaml・internal.yaml が includes で読み込む、送り先によらない部分
+service:
+  # 送り先に届くまで、ログをディスクにためる。プロセスが落ちても、ためた分は次に起動したときに送る
+  storage.path: /fluent-bit/buffer
+  storage.sync: full
+  # 書き込みが詰まったときに、どこで止まっているか分かるよう、Fluent Bit 自身のログも出す
+  log_level: info
+
+parsers:
+  - name: app_json
+    format: json
+
+pipeline:
+  inputs:
+    # Docker の fluentd ログドライバーから受け取る。compose.yaml でホストの 127.0.0.1 にだけ公開する
+    - name: forward
+      listen: 0.0.0.0
+      port: 24224
+      storage.type: filesystem
+
+  filters:
+    # アプリが出す 1 行の JSON（log）を展開する。JSON でない行（Deno の起動時の表示など）は log のまま残す
+    - name: parser
+      match: "*"
+      key_name: log
+      parser: app_json
+      reserve_data: on
+    # サーバーが複数台になっても、どのサーバーのログか分かるようにする
+    - name: record_modifier
+      match: "*"
+      record: server ${SERVER_NAME}
