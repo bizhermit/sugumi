@@ -126,13 +126,17 @@ Deno.test("createApp: 1 リクエストにつき 1 行のアクセスログを�
   });
 });
 
-Deno.test("createApp: アクセスログのパスは長すぎれば切り詰める", async () => {
+Deno.test("createApp: アクセスログのパスは長すぎれば切り詰め、知らないメソッドは OTHER にまとめる", async () => {
   await withFixture({ "get.ts": handler("GET /") }, async (routes) => {
     const app = await createApp({ mock: false, routes });
-    const [log] = await captureLogs(async () => {
+    const logs = await captureLogs(async () => {
       await (await app(new Request(`http://localhost/${"a".repeat(5000)}`))).body?.cancel();
+      for (const method of ["A".repeat(50_000), "PROPFIND", "PATCH"]) {
+        await (await app(new Request("http://localhost/", { method }))).body?.cancel();
+      }
     });
-    assert.equal(log.path, `/${"a".repeat(1023)}`);
+    assert.equal(logs[0].path, `/${"a".repeat(1023)}`);
+    assert.deepEqual(logs.slice(1).map((log) => log.method), ["OTHER", "OTHER", "PATCH"]);
   });
 });
 

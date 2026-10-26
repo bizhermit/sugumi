@@ -6,6 +6,7 @@ import { audit, type AuditSource } from "../audit.ts";
 import { clearHostCookie, hostCookie, readCookie } from "../cookie.ts";
 import { hashToken, isRandomToken, randomToken } from "../crypto.ts";
 import { db } from "../db.ts";
+import { logWarning } from "../log.ts";
 import { SESSION_ABSOLUTE_TIMEOUT_MINUTES, SESSION_IDLE_TIMEOUT_MINUTES } from "../env.ts";
 
 const COOKIE_NAME = "__Host-sid";
@@ -17,17 +18,18 @@ const SWEEP_INTERVAL_MS = 60 * 1000;
 
 /**
  * id は Cookie に入れるトークンそのもの。ログや DB に書かないこと。
+ * logId は、ログでセッション（1 回のログイン）を指す ID。トークンとは無関係に振るため、ログに出してよい。
  * account はこのリクエストで DB から読んだもの。権限などを足しても、変更は次のリクエストから反映される。
  */
-export type Session = { readonly id: string; readonly account: Account };
+export type Session = { readonly id: string; readonly logId: string; readonly account: Account };
 
-type SessionRow = AccountColumns & { created_at: Date; last_access_at: Date };
+type SessionRow = AccountColumns & { log_id: string; created_at: Date; last_access_at: Date };
 
 // ログイン中のリクエストのたびに実行するため、名前を付けて DB に解析済みの文を接続ごとに持たせる。
 // セッションとアカウントを別々に引くと、DB との往復が 2 回になる
 const SELECT_SESSION = {
   name: "select_session",
-  text: `SELECT sessions.created_at, sessions.last_access_at, ${ACCOUNT_COLUMNS}
+  text: `SELECT sessions.log_id, sessions.created_at, sessions.last_access_at, ${ACCOUNT_COLUMNS}
          FROM sessions JOIN accounts ON accounts.id = sessions.account_id
          WHERE sessions.token_hash = $1`,
 };
@@ -35,7 +37,7 @@ const SELECT_SESSION = {
 let nextSweepAt = 0;
 
 if (IDLE_TIMEOUT_MS === 0 && ABSOLUTE_TIMEOUT_MS === 0) {
-  console.warn(
+  logWarning(
     "セッションのタイムアウトがどちらも 0 のため、ログアウトするまでセッションが切れません",
   );
 }
@@ -61,7 +63,7 @@ export async function getSession(req: Request): Promise<Session | undefined> {
       hash,
     ]);
   }
-  return { id: token, account: toAccount(row) };
+  return { id: token, logId: row.log_id, account: toAccount(row) };
 }
 
 /** 呼び出し側は sessionCookie() で Cookie を返すこと。 */
@@ -76,11 +78,12 @@ export async function createSession(account: Account): Promise<Session> {
     ]);
   }
   const token = randomToken();
+  const logId = crypto.randomUUID();
   await db.query(
-    "INSERT INTO sessions (token_hash, account_id, created_at, last_access_at) VALUES ($1, $2, $3, $3)",
-    [await hashToken(token), account.id, new Date(now)],
+    "INSERT INTO sessions (token_hash, log_id, account_id, created_at, last_access_at) VALUES ($1, $2, $3, $4, $4)",
+    [await hashToken(token), logId, account.id, new Date(now)],
   );
-  return { id: token, account };
+  return { id: token, logId, account };
 }
 
 export async function destroySession(session: Session): Promise<void> {
@@ -90,7 +93,7 @@ export async function destroySession(session: Session): Promise<void> {
 /** 呼び出し側は clearSessionCookie() で Cookie を消すこと。 */
 export async function logout(session: Session, source: AuditSource): Promise<void> {
   await destroySession(session);
-  audit("logged_out", source, { accountId: session.account.id });
+  audit("logged_out", source, { accountId: session.account.id, sessionLogId: session.logId });
 }
 
 /** Cookie はあるのに getSession() が undefined なら、期限切れか削除されたセッションと分かる。 */

@@ -12,6 +12,7 @@ import {
   type Session,
 } from "../lib/auth/session.ts";
 import { isDbTimeout } from "../lib/db.ts";
+import { logError, writeLog } from "../lib/log.ts";
 import { REQUEST_BODY_TIMEOUT_SECONDS } from "../lib/env.ts";
 import { path, redirect } from "./url.ts";
 import { remoteAddressOf } from "./remote-address.ts";
@@ -38,6 +39,21 @@ const claimed = new WeakSet<Response>();
 // 照合できない長い URL を送り続けて、ログを埋められないようにする
 const MAX_LOGGED_PATH_LENGTH = 1024;
 
+// Deno はメソッドを長さの制限なく（約 60 KB まで）受け付けるため、これ以外は OTHER にまとめてログに出す。
+// そのまま出すと、1 リクエストで長い行を書かせてログを埋めさせたり、Docker に行を分けさせて
+// 1 行 1 つの JSON を崩させたりできる
+const LOGGED_METHODS: ReadonlySet<string> = new Set([
+  "GET",
+  "HEAD",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "OPTIONS",
+  "CONNECT",
+  "TRACE",
+]);
+
 /**
  * 1 リクエストにつき 1 行出すアクセスログ。キーを揃えておき、handle() が分かった値を書き足す。
  * クエリ文字列・Cookie・本文は出さない。ログイン後の戻り先やトークンが入るため。
@@ -47,6 +63,7 @@ type AccessLog = {
   type: "access";
   time: string;
   requestId: string;
+  /** LOGGED_METHODS にないメソッドは OTHER。 */
   method: string;
   /** pathname。URL として解析できなければ undefined。 */
   path: string | undefined;
@@ -57,6 +74,8 @@ type AccessLog = {
   remoteAddress: string | undefined;
   /** ログインしていれば、そのアカウントの ID。 */
   accountId: number | undefined;
+  /** ログインしていれば、そのセッションの logId。監査ログの login_succeeded と突き合わせ、どのログインかを調べる。 */
+  sessionLogId: string | undefined;
 };
 
 export type Handler = (req: Request, info?: Deno.ServeHandlerInfo) => Promise<Response>;
@@ -98,26 +117,21 @@ export async function createApp(
       type: "access",
       time: "",
       requestId: crypto.randomUUID(),
-      method: req.method,
+      method: LOGGED_METHODS.has(req.method) ? req.method : "OTHER",
       path: undefined,
       route: undefined,
       status: 0,
       durationMs: 0,
       remoteAddress: remoteAddressOf(req, tcpAddress),
       accountId: undefined,
+      sessionLogId: undefined,
     };
     let res: Response;
     try {
       res = await handle(match, statics, req, log, bodyTimeoutMs);
     } catch (e) {
-      // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける。
-      // スタックトレースの改行で行が分かれないよう、ほかのログと同じく 1 行の JSON にする
-      console.error(JSON.stringify({
-        type: "error",
-        time: new Date().toISOString(),
-        requestId: log.requestId,
-        error: e instanceof Error ? e.stack ?? String(e) : String(e),
-      }));
+      // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける
+      logError(e, log.requestId);
       // DB の混雑は待てば直るため、プロキシやクライアントがやり直せるよう 500 と分ける
       res = errorPage(isDbTimeout(e) ? 503 : 500);
     }
@@ -125,7 +139,7 @@ export async function createApp(
     log.time = new Date().toISOString();
     log.status = res.status;
     log.durationMs = Math.round((performance.now() - start) * 10) / 10;
-    console.log(JSON.stringify(log));
+    writeLog(log);
     return res;
   };
 }
@@ -165,7 +179,10 @@ async function handle(
 
   // ヘルスチェックは DB が止まっていても応答させるため、Cookie が付いていてもセッションを引かない
   const session = SESSIONLESS_ROUTES.has(route.route) ? undefined : await getSession(buffered);
-  log.accountId = session?.account.id;
+  if (session) {
+    log.accountId = session.account.id;
+    log.sessionLogId = session.logId;
+  }
   const csrf = csrfFor(buffered, session);
   if (!(await csrf.verify(buffered))) {
     if (session) return errorPage(403);
@@ -256,7 +273,7 @@ async function bufferBody(
 function expireBody(reader: ReadableStreamDefaultReader<Uint8Array>): void {
   expiredBodies.add(reader);
   // 取り消しの失敗は応答に関わらないが、捨てずにログに残す
-  reader.cancel().catch(console.error);
+  reader.cancel().catch(logError);
 }
 
 /**

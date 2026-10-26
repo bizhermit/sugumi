@@ -1,7 +1,9 @@
 /**
- * 監査ログ。ログの仕組みを用意したら、この関数の中身だけを差し替える。
+ * 監査ログ。出し方は src/lib/log.ts を参照。
  * パスワード・トークン・セッション ID は渡さないこと。
  */
+import { writeLog } from "./log.ts";
+
 export type AuditEvent =
   | "login_succeeded"
   | "login_failed"
@@ -18,19 +20,24 @@ export type AuditSource = {
   readonly remoteAddress: string | undefined;
 };
 
+/** audit() が付ける項目は、data で上書きできないようにする。 */
+export type AuditData =
+  & Record<string, unknown>
+  & {
+    [K in "type" | "time" | "requestId" | "event" | "remoteAddress"]?: never;
+  };
+
 export function audit(
   event: AuditEvent,
   { requestId, remoteAddress }: AuditSource,
-  data: Record<string, unknown> = {},
+  data: AuditData = {},
 ): void {
-  console.log(
-    JSON.stringify({
-      type: "audit",
-      time: new Date().toISOString(),
-      requestId,
-      event,
-      remoteAddress,
-      ...data,
-    }),
-  );
+  writeLog({
+    type: "audit",
+    time: new Date().toISOString(),
+    requestId,
+    event,
+    remoteAddress,
+    ...data,
+  });
 }

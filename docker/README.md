@@ -185,14 +185,22 @@ docker compose --env-file docker/.env exec db \
 
 - `access`：1 リクエストにつき 1 行。静的ファイルも含む。標準出力に出す。
   - `durationMs` は応答を返し始めるまでの時間で、本文を送り終えるまでは含まない。
-  - `accountId` はログイン中のときだけ出す。
+  - `accountId`・`sessionLogId` はログイン中のときだけ出す。
 - `audit`：ログイン・ログアウトなどの監査ログ。標準出力に出す。
-- `error`：500・503 にした例外。`error` にスタックトレースが入る。標準エラーに出す。
+- `error`：500・503 にした例外など。`error` にスタックトレースが入る。標準エラーに出す。
+- `warning`：設定の不備など。標準エラーに出す。
 
-どれにも `requestId` が入る。エラーや監査ログのリクエストは、同じ `requestId` のアクセスログで探す。
+クエリ文字列・Cookie・本文は出さない。ログイン後の戻り先やトークンが入るため。
+
+リクエストの処理中に出たログには `requestId` が入る。エラーや監査ログのリクエストは、同じ `requestId` のアクセスログで探す。
 
 ```sh
 docker compose --env-file docker/.env logs --no-log-prefix app | grep '"requestId":"<requestId>"'
 ```
 
-クエリ文字列・Cookie・本文は出さない。ログイン後の戻り先やトークンが入るため。
+`sessionLogId` は、1 回のログインごとに振る ID。アクセスログの `sessionLogId` と同じ値の `login_succeeded`
+を探すと、そのリクエストがいつ・どの接続元からのログインによるものかが分かる。
+
+```sh
+docker compose --env-file docker/.env logs --no-log-prefix app | grep '"sessionLogId":"<sessionLogId>"' | grep '"type":"audit"'
+```

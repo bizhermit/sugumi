@@ -1,6 +1,7 @@
 import { createApp } from "./web/app.ts";
 import { APP_MODE, LISTEN_HOST, PORT } from "./lib/env.ts";
 import { db } from "./lib/db.ts";
+import { logWarning } from "./lib/log.ts";
 
 // deno.json の unstable の no-legacy-abort で、req.signal を接続が切れたときだけ中断にする。
 // 既定では応答を返し終えたときにも中断になり、ページが切断と見分けられない。
@@ -21,7 +22,7 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
     if (shuttingDown) Deno.exit(1);
     shuttingDown = true;
     const timer = setTimeout(() => {
-      console.error(`終了処理が ${SHUTDOWN_TIMEOUT_MS} ms で終わらないため、強制終了します`);
+      logWarning(`終了処理が ${SHUTDOWN_TIMEOUT_MS} ms で終わらないため、強制終了します`);
       Deno.exit(1);
     }, SHUTDOWN_TIMEOUT_MS);
     // 先に DB を閉じると、処理中のリクエストの問い合わせが失敗する

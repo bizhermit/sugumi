@@ -48,6 +48,13 @@ Deno.test("session: Cookie のセッションを返す", async () => {
   assert.notEqual(rows[0].token_hash, session.id);
 });
 
+Deno.test("session: ログでセッションを指す logId は、セッションごとに振り、トークンと関係しない", async () => {
+  const session = await newSession();
+  const other = await createSession(session.account);
+  assert.notEqual(session.logId, other.logId);
+  assert.ok(!session.logId.includes(session.id) && !session.id.includes(session.logId));
+});
+
 Deno.test({
   name: "session: 操作がないまま SESSION_IDLE_TIMEOUT_MINUTES が経つと切れる",
   ignore: SESSION_IDLE_TIMEOUT_MINUTES === 0,

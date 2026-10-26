@@ -42,12 +42,14 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
   }
   // ログイン前と同じトークンを使い続けるとセッション固定攻撃を受けるため、ログインのたびに作り直す
   if (ctx.session) await destroySession(ctx.session);
+  const session = await createSession(result.account);
   audit("login_succeeded", ctx, {
     accountId: result.account.id,
+    sessionLogId: session.logId,
     trustedDevice: result.trustedDevice,
   });
   const res = redirect(to ?? path("/home"), 303);
-  res.headers.append("set-cookie", sessionCookie(await createSession(result.account)));
+  res.headers.append("set-cookie", sessionCookie(session));
   if (result.deviceToken !== undefined) {
     res.headers.append("set-cookie", loginDeviceCookie(result.deviceToken));
   }

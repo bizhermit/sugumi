@@ -195,6 +195,11 @@ Deno.test("app: ログにパスワード・トークン・セッション ID・�
   assert.deepEqual(audits.map((log) => log.event), ["login_succeeded", "logged_out"]);
   assert.equal(audits[0].requestId, accesses[1].requestId);
   assert.equal(audits[1].requestId, accesses[3].requestId);
+  // ログインの後のリクエストを、どのログインによるものか突き合わせられる
+  assert.equal(typeof audits[0].sessionLogId, "string");
+  assert.equal(accesses[2].sessionLogId, audits[0].sessionLogId);
+  assert.equal(accesses[3].sessionLogId, audits[0].sessionLogId);
+  assert.equal(audits[1].sessionLogId, audits[0].sessionLogId);
 });
 
 Deno.test("app: ページは CSS を JS より先に、共通のものをページのものより先に読み込む", async () => {

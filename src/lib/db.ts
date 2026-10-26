@@ -14,6 +14,7 @@ import {
   DB_POOL_MAX,
   DB_STATEMENT_TIMEOUT_SECONDS,
 } from "./env.ts";
+import { logError } from "./log.ts";
 
 const MIGRATIONS = [
   `
@@ -56,6 +57,11 @@ const MIGRATIONS = [
   );
   CREATE INDEX login_devices_account_id ON login_devices (account_id);
   `,
+  // 既存の行にも値を入れるため既定値を付けて足し、以降はアプリが振る
+  `
+  ALTER TABLE sessions ADD COLUMN log_id uuid NOT NULL DEFAULT gen_random_uuid();
+  ALTER TABLE sessions ALTER COLUMN log_id DROP DEFAULT;
+  `,
 ];
 
 // 複数のインスタンスが同時に起動しても、マイグレーションを 1 つずつ適用するためのロックの番号
@@ -70,7 +76,8 @@ export const db = new pg.Pool({
   statement_timeout: DB_STATEMENT_TIMEOUT_SECONDS * 1000,
 });
 // 待機中の接続が切れると Pool が error を出す。リスナーがないとプロセスが終了する
-db.on("error", (e) => console.error(e));
+// 第 2 引数に接続を渡してくるため、logError() をそのまま渡さない
+db.on("error", (e) => logError(e));
 
 await migrate();
 
