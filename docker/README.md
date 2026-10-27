@@ -46,7 +46,6 @@
 | `SESSION_*`・`LOGIN_*`・`PRE_LOGIN_CSRF_TIMEOUT_MINUTES`                                                       |      | セッションの期限、ログインの制限、ログイン前の CSRF のトークンの期限。書かなければデフォルト値を使う。意味とデフォルト値は `src/lib/env.ts` を参照 |
 | `DB_ADMIN_PASSWORD`                                                                                            | ○    | DB の管理者のパスワード                                                                                                                            |
 | `DB_APP_PASSWORD`                                                                                              | ○    | アプリが DB に接続するときの DB ユーザー `app` のパスワード                                                                                        |
-| `BACKUP_DIR`                                                                                                   | ○    | DB のバックアップを置く、ホストのディレクトリ（絶対パス）。「[バックアップと復元](#バックアップと復元)」を参照                                     |
 | `LOG_DESTINATION` ほか                                                                                         | ○    | ログの送り先。「[ログ](#ログ)」を参照                                                                                                              |
 | `APP_NETWORK_SUBNET`                                                                                           | ○    | アプリのコンテナを置くネットワークの範囲（例：`172.30.255.0/24`）                                                                                  |
 | `APP_NETWORK_GATEWAY`                                                                                          | ○    | そのネットワークのゲートウェイ。ふつうは範囲の最初のアドレス（例：`172.30.255.1`）                                                                 |
@@ -143,8 +142,10 @@ limit_conn perip 20;       # 接続元ごとの同時接続数
 
 ```sh
 docker compose --env-file docker/.env exec db \
-  psql -U admin -d app -c "DELETE FROM app.login_throttles WHERE address = '192.0.2.1'"
+  psql -U app -d app -c "DELETE FROM app.login_throttles WHERE address = '192.0.2.1'"
 ```
+
+- 管理者（`admin`）ではなく `app` で接続する。アプリを乗っ取られていたときに、仕込まれたトリガーなどが管理者の権限で動かないようにするため。
 
 ### アカウントのロック
 
@@ -166,8 +167,10 @@ docker compose --env-file docker/.env exec db \
 
 ```sh
 docker compose --env-file docker/.env exec db \
-  psql -U admin -d app -c "UPDATE app.accounts SET failed_attempts = 0, locked_until = NULL WHERE id = 1"
+  psql -U app -d app -c "UPDATE app.accounts SET failed_attempts = 0, locked_until = NULL WHERE id = 1"
 ```
+
+- 管理者（`admin`）ではなく `app` で接続する。アプリを乗っ取られていたときに、仕込まれたトリガーなどが管理者の権限で動かないようにするため。
 
 リポジトリから DB に接続できる環境では、`deno task account:unlock <accountId>` でも解除できる。
 
@@ -418,8 +421,8 @@ limit_req zone=per_ip burst=100 nodelay;
 
 ## バックアップと復元
 
-DB のスキーマ `app`（アプリのテーブル）のバックアップを、DB のコンテナの `db-backup` で取り、そこから復元する。
-バックアップは、`docker/.env` の `BACKUP_DIR` のディレクトリに置く。
+DB のコンテナの `db-backup` で、スキーマ `app` のテーブルのバックアップを取り、`db-restore` で復元する。
+どちらもファイルは扱わず、標準出力に書き出し、標準入力から読む。ファイルは、ホストで運用者の権限で扱う。
 
 - アプリを動かしたままバックアップを取れる。取り始めた時点の、そろった状態が書き出される。
 - バックアップには、パスワードのハッシュ・セッション・アプリの鍵（`secrets` テーブル）が入る。
@@ -428,68 +431,59 @@ DB のスキーマ `app`（アプリのテーブル）のバックアップを�
 
 ### 置き場所を用意する
 
-`BACKUP_DIR` のディレクトリを、起動する前に作っておく。
-ないと Docker が root のディレクトリとして作り、バックアップを別の場所へ写すのに root の権限が要る。
+ほかのユーザーが読み書きできないディレクトリを作る。以降の例では `/var/backups/sugumi` とする。
 
 ```sh
-mkdir -p -m 700 /var/backups/sugumi
+sudo install -d -m 700 -o "$USER" /var/backups/sugumi
 ```
 
-- 書き込めるのは持ち主だけにする。すでにあるディレクトリは、`mkdir -m` では権限が変わらないので、`chmod 700` する。
-  - 書き込める人は、細工したバックアップを置いて、復元させられるため。
-  - 中身は DB のユーザー `app` の権限で実行するので、影響はアプリのデータの範囲にとどまる。
-- バックアップのファイルは、このディレクトリの持ち主のものになり、持ち主だけが読める。
-  `db-backup` は、このディレクトリのファイルを持ち主の権限で読み書きする。
 - リポジトリの中には置かない。`git clean` などで消えるため。
 
 ### バックアップを取る
 
 ```sh
-docker compose --env-file docker/.env exec db db-backup create
+docker compose --env-file docker/.env exec -T db db-backup > "/var/backups/sugumi/sugumi-$(date -u +%Y%m%dT%H%M%SZ).dump"
 ```
 
-- 取ったファイルの名前（`sugumi-20261027T030000Z.dump` のような、UTC の日時）が出力される。
+- ファイル名には、取った日時（UTC）が入る。名前順が、取った順になる。
+- `-T` を付ける。付けないと、端末を通るときに中身が書き換わり、復元できないファイルになる。
+- エラーが出たときは、できたファイルを消す。途中までしか書かれていない。
 - サーバーが壊れたときに備え、別のサーバーやストレージにも写す。
 
 ### バックアップの一覧を出す
 
-ファイル名と大きさを、古い順に出力する。
-
 ```sh
-docker compose --env-file docker/.env exec db db-backup list
+ls -l /var/backups/sugumi
 ```
 
 ### バックアップを消す
 
-ファイル名を 1 つ以上渡す。1 つでもないファイルや誤った名前があると、どれも消さない。
-
 ```sh
-docker compose --env-file docker/.env exec db db-backup delete sugumi-20261027T030000Z.dump
+rm /var/backups/sugumi/sugumi-20261027T030000Z.dump
 ```
 
 ### バックアップから復元する
 
-1. 使うバックアップを、一覧から選ぶ。
-   ほかの場所に写したものを使うときは、`BACKUP_DIR` に置く。
-   新しいサーバーに復元するときは、先に「[手順](#手順)」で起動しておく。
-
-2. アプリを止める。DB のテーブルを置き換えた後に、起動し直す必要があるため。
+1. アプリを止める。DB のテーブルを置き換えた後に、起動し直す必要があるため。
+   新しいサーバーに復元するときは、先に「[手順](#手順)」で起動してから止める。
 
    ```sh
    docker compose --env-file docker/.env stop app
    ```
 
-3. 復元する。今の DB のスキーマ `app` を消し、バックアップの内容で作り直す。
-   - 先に、今の状態のバックアップを自動で取り、その名前を出力する。
-     途中で失敗したときは、そのバックアップから自動で戻す。
-   - アプリのテーブルがないバックアップ（アプリを起動する前に取ったものなど）は、データをすべて消してしまうので、復元しない。
-   - 復元が始まった後は、Ctrl-C などで中断しても止まらない。途中で止めると、テーブルのない状態で残るため。
+2. 復元する。スキーマ `app` のテーブルをすべて消し、バックアップの内容で作り直す。
 
    ```sh
-   docker compose --env-file docker/.env exec db db-backup restore sugumi-20261027T030000Z.dump
+   docker compose --env-file docker/.env exec -T db db-restore < /var/backups/sugumi/sugumi-20261027T030000Z.dump
    ```
 
-4. アプリを起動する。
+   - 1 つのトランザクションで実行する。失敗したときや中断したときは、元のデータのまま残る。
+   - アプリを止め忘れていると、テーブルのロックを 10 秒待って失敗する。
+   - アプリのテーブルがないバックアップ（アプリを起動する前に取ったものなど）は、復元しない。
+   - アプリと同じ DB のユーザー `app` で実行する。管理者で実行すると、アプリを乗っ取られていたときに、
+     バックアップに仕込まれた関数が管理者の権限で動くため。手で `pg_restore` などを管理者で実行しない。
+
+3. アプリを起動する。
 
    ```sh
    docker compose --env-file docker/.env start app
@@ -498,9 +492,24 @@ docker compose --env-file docker/.env exec db db-backup delete sugumi-20261027T0
 - バックアップを取ったときと同じか、新しいバージョンのアプリで起動する。
   新しいバージョンでは、足りないマイグレーションが起動時に適用される。
 - バックアップを取った後のログアウト・パスワードの変更・アカウントの削除やロックも、取り消される。
-  - 乗っ取りなどの後に復元したときは、盗まれたセッションや古いパスワードが、また使えるようになる。
-  - その場合は、アプリを起動する前にセッションと覚えている端末を消す。必要なら、パスワードを変更してもらう。
 
-    ```sh
-    docker compose --env-file docker/.env exec db psql -U app -d app -c "DELETE FROM sessions" -c "DELETE FROM login_devices"
-    ```
+### 乗っ取られた後に復元する
+
+アプリを乗っ取られていた場合は、乗っ取られる前に取ったバックアップを使い、手順の 1 と 2 の間で次のことをする。
+
+- 乗っ取られた `app` は、DB のユーザー `app` の設定やパスワードを変えたり、関数などを残したりできる。
+  管理者でそれを元に戻し、スキーマを空にして作り直す。管理者で実行するのは、ユーザーのコードが動かない、次のコマンドだけにする。
+
+  ```sh
+  docker compose --env-file docker/.env exec db psql -U admin -d app -v ON_ERROR_STOP=1 \
+    -c "ALTER ROLE app RESET ALL" -c "ALTER ROLE app SET search_path = app" \
+    -c "DROP SCHEMA app CASCADE" -c "CREATE SCHEMA app AUTHORIZATION app"
+  ```
+
+- `app` のパスワードを変える（「[手順](#手順)」の、あとからパスワードを変えるとき）。
+- 復元の後、アプリを起動する前に、セッションと覚えている端末を消す。盗まれたセッションが、復元でまた使えるようになるため。
+  必要なら、利用者にパスワードを変えてもらう。
+
+  ```sh
+  docker compose --env-file docker/.env exec db psql -U app -d app -c "DELETE FROM sessions" -c "DELETE FROM login_devices"
+  ```

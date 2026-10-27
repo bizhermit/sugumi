@@ -1,0 +1,30 @@
+#!/bin/sh
+# db-backup で取ったバックアップを標準入力から読み、スキーマ app のテーブルをその内容で置き換える。
+# アプリを止めてから実行し、終わったら起動し直す。アプリは起動時のマイグレーションの後のテーブルを前提に動くため。
+#
+# すべてを、アプリと同じ DB のユーザー app で、1 つのトランザクションで実行する。
+# - 管理者で実行すると、app が仕込んだ関数（CHECK 制約など）が、データを入れるときに管理者の権限で動く。
+#   アプリを乗っ取られた後の復元で、DB の管理者やコンテナまで乗っ取られてしまう。
+# - どこで失敗しても、中断しても、元のデータのまま残る。
+set -eu
+set -o pipefail
+
+# COMMIT は、バックアップをすべて読めたときだけ送る。途中で失敗したら送らずに終わり、psql の切断でロールバックされる。
+# バックアップより後のマイグレーションで足したテーブルが残らないよう、先にすべてのテーブルを消す。
+# アプリが動いたままだと、テーブルのロックを待ち続けるので、時間を区切って失敗させる。
+# 最後に schema_migrations を読み、アプリのテーブルがないバックアップ（アプリを起動する前に取ったものなど）なら失敗させる。
+if ! {
+  cat <<'SQL'
+BEGIN;
+SET LOCAL lock_timeout = '10s';
+SELECT format('DROP TABLE app.%I CASCADE', tablename) FROM pg_tables WHERE schemaname = 'app' \gexec
+SQL
+  pg_restore --no-owner --no-privileges --file=- || exit 1
+  cat <<'SQL'
+SELECT FROM app.schema_migrations LIMIT 1;
+COMMIT;
+SQL
+} | PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 --no-psqlrc --quiet --username app --dbname "$POSTGRES_DB" >/dev/null; then
+  echo "復元しませんでした。データは元のままです" >&2
+  exit 1
+fi
