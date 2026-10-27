@@ -8,14 +8,6 @@
  */
 import { type Cidr, parseCidr, parseIp } from "./ip.ts";
 
-export const PORT = Number(Deno.env.get("PORT") ?? 3000);
-
-/**
- * 待ち受けるアドレス。既定は 0.0.0.0 で、コンテナの外（compose.yaml の ports）から届くようにする。
- * deno task test:e2e は、テストの間だけ LAN から届かないよう 127.0.0.1 にする（scripts/test-e2e.ts）。
- */
-export const LISTEN_HOST = parseListenHost(Deno.env.get("LISTEN_HOST"));
-
 export type AppMode = "PROD" | "DEV" | "MOCK";
 const APP_MODES: readonly AppMode[] = ["PROD", "DEV", "MOCK"];
 
@@ -25,32 +17,25 @@ const APP_MODES: readonly AppMode[] = ["PROD", "DEV", "MOCK"];
  */
 export const APP_MODE: AppMode = parseAppMode(Deno.env.get("APP_MODE"));
 
+export const PORT = Number(Deno.env.get("PORT") ?? 3000);
+
 /**
- * PostgreSQL の接続先（例：postgres://user:password@host:5432/dbname）。パスワードを含むため、ログに出さないこと。
- * パスワードは DATABASE_URL に含めるか、DATABASE_PASSWORD_FILE にファイルのパスを指定する（compose の secrets 用）。
- * ファイルは /run/secrets/ の下に置く。deno.json の permissions で、読み込みをそこだけ許可している。
- * どちらもないと pg が ~/.pgpass を読もうとし、permissions で拒否される。
- * pg は PGSSLMODE など PG で始まる環境変数も読むため、deno.json の permissions で PG* を許可している。
+ * 待ち受けるアドレス。既定は 0.0.0.0 で、コンテナの外（compose.yaml の ports）から届くようにする。
+ * deno task test:e2e は、テストの間だけ LAN から届かないよう 127.0.0.1 にする（scripts/test-e2e.ts）。
  */
-export const DATABASE_URL = parseDatabaseUrl(
-  Deno.env.get("DATABASE_URL"),
-  Deno.env.get("DATABASE_PASSWORD_FILE"),
+export const LISTEN_HOST = parseListenHost(Deno.env.get("LISTEN_HOST"));
+
+/**
+ * 信頼するリバースプロキシ・ロードバランサーの IP アドレス。カンマ区切り（例：192.0.2.10）。
+ * ロードバランサーのようにアドレスが変わるものは、CIDR（例：10.0.1.0/24）で書ける。
+ * TCP の接続元がこのどれかのときだけ、X-Forwarded-For から利用者のアドレスを読む（src/web/remote-address.ts）。
+ * 未指定なら X-Forwarded-For を読まない。
+ * 範囲の中の端末は、X-Forwarded-For を書いて送れば、プロキシを通しても通さなくても接続元を偽れる。
+ * そのため、プロキシのアドレスだけを最小の範囲で書く。
+ */
+export const TRUSTED_PROXIES: readonly Cidr[] = parseTrustedProxies(
+  Deno.env.get("TRUSTED_PROXIES"),
 );
-
-/**
- * Pool が同時に開く DB の接続の数。アプリのインスタンスの数を掛けた数が、
- * PostgreSQL の max_connections（既定 100）から管理用の余裕を引いた数に収まるようにする。
- */
-export const DB_POOL_MAX = integer("DB_POOL_MAX", 10, 1);
-
-/**
- * 接続の空きを待つ（空きがなければ新しく接続する）秒数。過ぎたらリクエストに 503 を返す。
- * 待ちに上限がないと、DB が遅くなったときに待つリクエストが無期限にたまるため。
- */
-export const DB_CONNECTION_TIMEOUT_SECONDS = integer("DB_CONNECTION_TIMEOUT_SECONDS", 5, 1);
-
-/** 1 つの問い合わせ（SQL の文）にかけてよい秒数。DB が過ぎた文を取り消し、リクエストに 503 を返す。 */
-export const DB_STATEMENT_TIMEOUT_SECONDS = integer("DB_STATEMENT_TIMEOUT_SECONDS", 10, 1);
 
 /**
  * リクエストの本文を読み終えるまでの秒数。過ぎたら 408 を返す。
@@ -58,6 +43,12 @@ export const DB_STATEMENT_TIMEOUT_SECONDS = integer("DB_STATEMENT_TIMEOUT_SECOND
  * 1 接続あたり最大 1 MB を抱えさせ続けられる（slowloris）。
  */
 export const REQUEST_BODY_TIMEOUT_SECONDS = integer("REQUEST_BODY_TIMEOUT_SECONDS", 30, 1);
+
+/** ログイン中に操作がないまま、この分数が経つとセッションが切れる。0 なら切れない。 */
+export const SESSION_IDLE_TIMEOUT_MINUTES = integer("SESSION_IDLE_TIMEOUT_MINUTES", 30, 0);
+
+/** 操作を続けていても、ログインからこの分数が経つとセッションが切れる。0 なら切れない。 */
+export const SESSION_ABSOLUTE_TIMEOUT_MINUTES = integer("SESSION_ABSOLUTE_TIMEOUT_MINUTES", 720, 0);
 
 /** ログインに続けて失敗してロックしたアカウントを、自動で解除するまでの分数。 */
 export const LOGIN_LOCKOUT_MINUTES = integer("LOGIN_LOCKOUT_MINUTES", 60, 1);
@@ -87,26 +78,35 @@ export const LOGIN_IP_WINDOW_MINUTES = integer("LOGIN_IP_WINDOW_MINUTES", 10, 1)
 /** LOGIN_IP_MAX_FAILED_ATTEMPTS を超えた接続元からのログインを受け付けない分数。 */
 export const LOGIN_IP_LOCKOUT_MINUTES = integer("LOGIN_IP_LOCKOUT_MINUTES", 30, 1);
 
-/** ログイン中に操作がないまま、この分数が経つとセッションが切れる。0 なら切れない。 */
-export const SESSION_IDLE_TIMEOUT_MINUTES = integer("SESSION_IDLE_TIMEOUT_MINUTES", 30, 0);
-
-/** 操作を続けていても、ログインからこの分数が経つとセッションが切れる。0 なら切れない。 */
-export const SESSION_ABSOLUTE_TIMEOUT_MINUTES = integer("SESSION_ABSOLUTE_TIMEOUT_MINUTES", 720, 0);
-
 /** ログイン前に表示したフォーム（ログイン画面など）の CSRF トークンが有効な分数。0 なら切れない。 */
 export const PRE_LOGIN_CSRF_TIMEOUT_MINUTES = integer("PRE_LOGIN_CSRF_TIMEOUT_MINUTES", 60, 0);
 
 /**
- * 信頼するリバースプロキシ・ロードバランサーの IP アドレス。カンマ区切り（例：192.0.2.10）。
- * ロードバランサーのようにアドレスが変わるものは、CIDR（例：10.0.1.0/24）で書ける。
- * TCP の接続元がこのどれかのときだけ、X-Forwarded-For から利用者のアドレスを読む（src/web/remote-address.ts）。
- * 未指定なら X-Forwarded-For を読まない。
- * 範囲の中の端末は、X-Forwarded-For を書いて送れば、プロキシを通しても通さなくても接続元を偽れる。
- * そのため、プロキシのアドレスだけを最小の範囲で書く。
+ * PostgreSQL の接続先（例：postgres://user:password@host:5432/dbname）。パスワードを含むため、ログに出さないこと。
+ * パスワードは DATABASE_URL に含めるか、DATABASE_PASSWORD_FILE にファイルのパスを指定する（compose の secrets 用）。
+ * ファイルは /run/secrets/ の下に置く。deno.json の permissions で、読み込みをそこだけ許可している。
+ * どちらもないと pg が ~/.pgpass を読もうとし、permissions で拒否される。
+ * pg は PGSSLMODE など PG で始まる環境変数も読むため、deno.json の permissions で PG* を許可している。
  */
-export const TRUSTED_PROXIES: readonly Cidr[] = parseTrustedProxies(
-  Deno.env.get("TRUSTED_PROXIES"),
+export const DATABASE_URL = parseDatabaseUrl(
+  Deno.env.get("DATABASE_URL"),
+  Deno.env.get("DATABASE_PASSWORD_FILE"),
 );
+
+/**
+ * Pool が同時に開く DB の接続の数。アプリのインスタンスの数を掛けた数が、
+ * PostgreSQL の max_connections（既定 100）から管理用の余裕を引いた数に収まるようにする。
+ */
+export const DB_POOL_MAX = integer("DB_POOL_MAX", 10, 1);
+
+/**
+ * 接続の空きを待つ（空きがなければ新しく接続する）秒数。過ぎたらリクエストに 503 を返す。
+ * 待ちに上限がないと、DB が遅くなったときに待つリクエストが無期限にたまるため。
+ */
+export const DB_CONNECTION_TIMEOUT_SECONDS = integer("DB_CONNECTION_TIMEOUT_SECONDS", 5, 1);
+
+/** 1 つの問い合わせ（SQL の文）にかけてよい秒数。DB が過ぎた文を取り消し、リクエストに 503 を返す。 */
+export const DB_STATEMENT_TIMEOUT_SECONDS = integer("DB_STATEMENT_TIMEOUT_SECONDS", 10, 1);
 
 /** 不正な値や、範囲が広すぎる値があれば例外を投げる。 */
 export function parseTrustedProxies(raw: string | undefined): Cidr[] {
