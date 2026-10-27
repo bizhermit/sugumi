@@ -1,5 +1,5 @@
 // src/routes/before.tree.ts を、実際のルートとアプリのハンドラを通して確かめる。
-// アプリは dist/public/ を読み込むため、先に deno task build が要る
+// アプリは dist/public/ を読み込むので、先に deno task build が必要。
 import assert from "node:assert/strict";
 import { createSession, sessionCookie } from "../../src/lib/auth/session.ts";
 import { createApp } from "../../src/web/app.ts";
@@ -18,7 +18,7 @@ async function login() {
   return cookiePair(sessionCookie(await createSession(account)));
 }
 
-Deno.test("before.tree: ログインしていなければ、元の URL を to に付けてログイン画面へ送る", async () => {
+Deno.test("before.tree: ログインしていなければ、元の URL を to に付けてログイン画面へリダイレクトする", async () => {
   await resetDb();
   for (const method of ["GET", "HEAD"]) {
     const res = await request("/home?tab=a&b=1", { method });
@@ -27,7 +27,7 @@ Deno.test("before.tree: ログインしていなければ、元の URL を to �
   }
 });
 
-Deno.test("before.tree: 期限切れなどで引けないセッションの Cookie は、ログインしていないものとして扱う", async () => {
+Deno.test("before.tree: 期限切れなどで見つからないセッションの Cookie は、ログインしていないものとして扱う", async () => {
   await resetDb();
   const res = await request("/home", { headers: { cookie: "__Host-sid=unknown" } });
   assert.equal(res.status, 302);
@@ -48,7 +48,7 @@ Deno.test("before.tree: PUBLIC_ROUTES はログインなしで開ける", async 
     assert.equal(res.status, 200, path);
     await res.body?.cancel();
   }
-  // ログインを求めないが、ページがログイン画面へ送る。to を付けないことを確かめる
+  // ログインは求めないが、ページ自体がログイン画面へリダイレクトする。そのとき to を付けないことを確かめる。
   for (const path of ["/", "/logout"]) {
     const res = await request(path);
     assert.equal(res.status, 302, path);

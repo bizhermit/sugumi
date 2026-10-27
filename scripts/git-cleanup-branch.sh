@@ -2,14 +2,14 @@
 
 set -euo pipefail
 
-# gitリポジトリ外での実行を早期に検出する
-# git リポジトリ外では後段の`git status --porcelain`が空出力を返し、「クリーン」と誤判定されたまま分かりにくい箇所で失敗する
+# git リポジトリの外で実行されたことを、早めに検出する。
+# リポジトリの外では、後の `git status --porcelain` が空の出力を返す。「変更なし」と誤って判定したまま、分かりにくい箇所で失敗する。
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "Error: 現在のディレクトリはgitリポジトリではありません。" >&2
+  echo "Error: 現在のディレクトリは git リポジトリではありません。" >&2
   exit 1
 fi
 
-# 既定ブランチは`main`
+# デフォルトのブランチは `main`。
 target_branch="${1:-main}"
 
 is_safe_branch_name() {
@@ -26,19 +26,19 @@ if ! is_safe_branch_name "$target_branch"; then
   exit 1
 fi
 
-# 作業ディレクトリがクリーンかチェックする
+# 作業ディレクトリに変更がないかを確かめる。
 if [ -n "$(git status --porcelain)" ]; then
   echo "Warning: 現在の作業ディレクトリに変更があります。" >&2
   git status --short >&2
 
-  # 非対話実行（VSCodeタスク・CI等で標準入力が端末でない）では問えないため、従来どおり中断する。
+  # 非対話の実行（VS Code のタスクや CI など、標準入力が端末でないとき）では確認できないので、中断する。
   if [ ! -t 0 ]; then
-    echo "Error: 非対話実行のため中断します。" >&2
+    echo "Error: 非対話の実行なので中断します。" >&2
     exit 1
   fi
 
-  # クリーンでなくても、対話実行なら続行可否を問う
-  #（後段の switch / merge --ff-only は変更を上書きしそうな場合にgit自身が失敗するため、強制続行しても未コミットの変更は失われない）
+  # 変更があっても、対話の実行なら続けるかどうかを尋ねる。
+  # 後の switch や merge --ff-only は、変更を上書きしそうなときに git 自身が失敗するので、続けてもコミットしていない変更は失われない。
   read -r -p "コミットしていない変更を残したまま実行しますか？ [y/N]: " force_answer || force_answer=""
   case "$force_answer" in
     (y|Y|yes|YES) echo "続行します。" ;;
@@ -69,7 +69,7 @@ fi
 
 git merge --ff-only "$remote_target_branch"
 
-# 削除対象ブランチ抽出
+# 削除するブランチを探す。
 if ! gone_branches=$(
   git for-each-ref --format '%(refname:short) %(upstream:track)' refs/heads \
   | awk '$2 == "[gone]" {print $1}'
@@ -86,22 +86,22 @@ if [ -z "$gone_branches" ]; then
 else
   echo
   echo "削除対象のブランチ:"
-  # パイプ経由（... | while）だとwhileがサブシェルで実行され、ループ内での変数更新が外側に反映されなくなる
+  # パイプ（... | while）でつなぐと while がサブシェルで実行され、ループの中で変数を更新しても外側に反映されない。
   while IFS= read -r branch; do
-    # 空行対策
+    # 空行を飛ばす。
     if [ -n "$branch" ]; then
       echo "  - $branch"
       if ! is_safe_branch_name "$branch"; then
-        echo "    処理できないブランチ名のため、処理をスキップします。" >&2
+        echo "    処理できないブランチ名なので、スキップします。" >&2
         has_delete_error=1
         continue
       fi
 
-      # squashマージでは元のコミットが祖先に入らず`git branch -d`が拒否するため、履歴ではなく内容で判定する
-      # 対象ブランチへマージしても木が変わらなければ、変更はすべて取り込み済みと見なす
+      # squash マージでは元のコミットが祖先に入らず、`git branch -d` が削除を拒否する。そのため、履歴ではなく内容で判定する。
+      # 対象のブランチへマージしてもツリーが変わらなければ、変更はすべて取り込み済みとみなす。
       if ! merged_tree=$(git merge-tree --write-tree "$target_branch" "$branch" 2>/dev/null) \
         || [ "$merged_tree" != "$(git rev-parse "$target_branch^{tree}")" ]; then
-        echo "    取り込まれていない変更があるため、処理をスキップします。" >&2
+        echo "    取り込まれていない変更があるので、スキップします。" >&2
         continue
       fi
 

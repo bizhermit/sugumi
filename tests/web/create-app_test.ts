@@ -1,5 +1,5 @@
 // createApp() に、テスト用のルートと静的ファイルのディレクトリを渡して確かめる。
-// 実際のルートを使うテストと同じファイルに置くと、layout の対応表が置き換わるため分けている
+// 実際のルートを使うテストと同じファイルに置くと、layout の対応表が置き換わってしまうので、ファイルを分けている。
 import assert from "node:assert/strict";
 import { createApp } from "../../src/web/app.ts";
 import { withTempDir } from "../_support/fixture.ts";
@@ -27,7 +27,7 @@ Deno.test("createApp: 静的ファイルがルートか /assets/ と同じ URL �
         /static\/assets\/a\.txt: ルートか \/assets\/ と同じ URL/,
       );
     });
-    // 重ならなければ起動できる
+    // 重ならなければ起動できる。
     await withTempDir({ "robots.txt": "x" }, async (staticDir) => {
       const app = await createApp({ mock: false, routes, staticDir });
       assert.equal(await (await app(new Request("http://localhost/robots.txt"))).text(), "x");
@@ -51,7 +51,7 @@ Deno.test("createApp: ページや before の例外は、セキュリティヘ�
         const res = await app(new Request(`http://localhost${path}`));
         assert.equal(res.status, 500, path);
         assert.equal(res.headers.get("x-frame-options"), "DENY", path);
-        // 例外の内容は応答に出さない
+        // 例外の内容はレスポンスに出さない。
         assert.doesNotMatch(await res.text(), /テストで投げた例外/, path);
       }
     } finally {
@@ -113,7 +113,7 @@ Deno.test("createApp: 1 リクエストにつき 1 行のアクセスログを�
     assert.equal(first.route, "/user/[id]");
     assert.equal(first.status, 200);
     assert.equal(first.remoteAddress, "192.0.2.1");
-    // ページが受け取る ID と同じで、リクエストごとに変わる
+    // ページが受け取る ID と同じで、リクエストごとに変わる。
     assert.equal(first.requestId, bodies[0]);
     assert.equal(second.requestId, bodies[1]);
     assert.notEqual(first.requestId, second.requestId);
@@ -156,7 +156,7 @@ Deno.test("createApp: ページの例外は、アクセスログと同じリク�
 });
 
 Deno.test("createApp: ページが同じ Response を 2 回返したら、2 回目は書き換えずに 500 にする", async () => {
-  // 基盤はヘッダーをその場で書き足すため、使い回すと 1 回目の利用者の Cookie が 2 回目の応答に混ざる
+  // 基盤はヘッダーをその場で追加するので、使い回すと 1 回目のユーザーの Cookie が 2 回目のレスポンスに混ざる。
   const shared = `const res = new Response(null, { status: 302, headers: { location: "/" } });
 export default async (_req: Request, ctx: { csrfToken: () => Promise<string> }) => {
   await ctx.csrfToken();
@@ -181,21 +181,21 @@ export default async (_req: Request, ctx: { csrfToken: () => Promise<string> }) 
   });
 });
 
-// ctx の値を JSON で返すページ。分割代入で取り出しても動くことも確かめる
+// ctx の値を JSON で返すページ。分割代入で取り出しても動くことも確かめる。
 const CTX_PAGE = `export default async (req: Request, ctx: any) => {
   const { csrfToken, form, query, remoteAddress } = ctx;
   const token = await csrfToken();
   const values = req.method === "POST" ? Object.fromEntries(await form()) : null;
   return Response.json({ token, again: await ctx.csrfToken(), values, q: query.get("q"), remoteAddress });
 };`;
-// ctx.form() で解析した後でも、標準の req.formData() を使えることを確かめるページ
+// ctx.form() でパースした後でも、標準の req.formData() を使えることを確かめるページ。
 const STANDARD_FORM_PAGE = `export default async (req: Request, ctx: any) => {
   const parsed = await ctx.form();
   const standard = await req.formData();
   return Response.json({ parsed: parsed.get("name"), standard: standard.get("name") });
 };`;
 
-Deno.test("createApp: ctx から分割代入で取り出しても使え、フォームは CSRF の検証で解析したものを受け取る", async () => {
+Deno.test("createApp: ctx から分割代入で取り出しても使え、フォームは CSRF の検証でパースしたものを受け取る", async () => {
   await withFixture({
     "get.ts": handler("GET /"),
     "ctx/get.ts": CTX_PAGE,
@@ -212,7 +212,7 @@ Deno.test("createApp: ctx から分割代入で取り出しても使え、フォ
     assert.equal(got.again, got.token);
     assert.equal(got.q, "あ");
     assert.equal(got.remoteAddress, "192.0.2.1");
-    // token() を何度呼んでも、ログイン前の Cookie は 1 つだけ発行する
+    // token() を何度呼んでも、ログイン前の Cookie は 1 つだけ発行する。
     const setCookie = res.headers.get("set-cookie") ?? "";
     assert.equal(setCookie.split("__Host-csrf=").length, 2);
 
@@ -230,7 +230,7 @@ Deno.test("createApp: ctx から分割代入で取り出しても使え、フォ
   });
 });
 
-Deno.test("createApp: ctx.form() で解析できない本文には、ページの代わりに 400 を返す", async () => {
+Deno.test("createApp: ctx.form() でパースできないリクエストボディには、ページの代わりに 400 を返す", async () => {
   await withFixture({
     "get.ts": handler("GET /"),
     "ctx/get.ts": CTX_PAGE,
@@ -240,11 +240,11 @@ Deno.test("createApp: ctx.form() で解析できない本文には、ページ�
     const page = await app(new Request("http://localhost/ctx"));
     const { token } = await page.json();
     const cookie = (page.headers.get("set-cookie") ?? "").split(";")[0];
-    // トークンをヘッダーで送り、CSRF の検証は通す
+    // トークンをヘッダーで送り、CSRF の検証は通す。
     for (
       const [type, body] of [
         ["text/plain", "name=x"],
-        ["multipart/form-data; boundary=x", "壊れた本文"],
+        ["multipart/form-data; boundary=x", "壊れたボディ"],
       ]
     ) {
       const res = await app(
@@ -261,14 +261,14 @@ Deno.test("createApp: ctx.form() で解析できない本文には、ページ�
   });
 });
 
-Deno.test("createApp: 本文が締め切りまでに届かなければ、ページを呼ばずに 408 を返し、本文を読むのをやめる", async () => {
+Deno.test("createApp: リクエストボディがタイムアウトまでに届かなければ、ページを呼ばずに 408 を返し、ボディを読むのをやめる", async () => {
   await withFixture(
     { "get.ts": handler("GET /"), "post.ts": handler("POST /") },
     async (routes) => {
-      // 既定の REQUEST_BODY_TIMEOUT_SECONDS を待たずに確かめるため、締め切りを短くして渡す
+      // デフォルトの REQUEST_BODY_TIMEOUT_SECONDS を待たずに確かめられるよう、タイムアウトを短くして渡す。
       const app = await createApp({ mock: false, routes, bodyTimeoutMs: 50 });
       let canceled = false;
-      // 最初の塊だけ送り、残りを送らないまま接続を開けておくクライアント
+      // 最初のチャンクだけ送り、残りを送らないまま接続を開けておくクライアント。
       const body = new ReadableStream<Uint8Array>({
         start(controller) {
           controller.enqueue(new TextEncoder().encode("_csrf="));
@@ -287,8 +287,8 @@ Deno.test("createApp: 本文が締め切りまでに届かなければ、ペー�
   );
 });
 
-Deno.test("createApp: 応答を返し終えても、ページの req.signal を中断にしない", async () => {
-  // deno.json の unstable の no-legacy-abort を外すと、Deno.serve は応答を返し終えたときにも中断にする
+Deno.test("createApp: レスポンスを返し終えても、ページの req.signal を中断にしない", async () => {
+  // deno.json の unstable の no-legacy-abort を外すと、Deno.serve はレスポンスを返し終えたときにも中断にする。
   const SIGNAL = "(globalThis as unknown as { signal: AbortSignal }).signal";
   await withFixture(
     {
@@ -303,7 +303,7 @@ Deno.test("createApp: 応答を返し終えても、ページの req.signal を�
       try {
         const res = await fetch(`http://127.0.0.1:${server.addr.port}/`);
         assert.equal(await res.text(), "ok");
-        // 応答を送り終えるのを待つ
+        // レスポンスを送り終えるのを待つ。
         await new Promise((resolve) => setTimeout(resolve, 50));
         const { signal } = globalThis as unknown as { signal: AbortSignal };
         assert.equal(signal.aborted, false);

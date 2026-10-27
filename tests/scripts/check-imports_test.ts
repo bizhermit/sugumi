@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { checkImports } from "../../scripts/check-imports.ts";
 import { withTempDir } from "../_support/fixture.ts";
 
-/** files に、空の scripts/ を足してリポジトリの形にし、違反の一覧を返す。 */
+/** files に空の scripts/ を足してリポジトリと同じ構成にし、checkImports() の違反の一覧を返す。 */
 async function violationsOf(files: Record<string, string>) {
   let result: Array<string> = [];
   await withTempDir({ "scripts/.keep": "", ...files }, async (root) => {
@@ -72,7 +72,7 @@ Deno.test("check-imports: src/_shared/・_assets/ の JSX・変数の import() �
 await import(name);
 await import("./ok.ts");`,
     "src/routes/a/_assets/ok.ts": ``,
-    // サーバーでは変数の import() を使ってよい（ルーターが使う）
+    // サーバーでは変数の import() を使ってよい（ルーターが使う）。
     "src/web/router.ts": `const mod = await import(url);`,
   });
   assert.deepEqual(violations.toSorted(), [

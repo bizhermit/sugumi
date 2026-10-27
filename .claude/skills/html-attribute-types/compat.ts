@@ -1,12 +1,12 @@
 /**
- * MDN の browser-compat-data から、要素の属性ごとの仕様上の状態と、主要ブラウザの安定版での対応を表にする。
+ * MDN の browser-compat-data から、要素の属性ごとに、仕様上の状態と主要ブラウザの安定版での対応状況を表にして出す。
  *
  *   deno run --allow-net=raw.githubusercontent.com compat.ts dialog
  *   deno run --allow-net=raw.githubusercontent.com compat.ts input/password
  *   deno run --allow-net=raw.githubusercontent.com compat.ts global
  *
- * 属性の一覧は完全ではない（input の type・value などは載っていない）。一覧は MDN のページで確かめ、
- * ここで分かるのは載っている属性の状態と対応だけ。
+ * 属性の一覧は完全ではない（input の type・value などは載っていない）。一覧は MDN のページで確かめる。
+ * ここで分かるのは、載っている属性の状態と対応状況だけ。
  */
 
 const BASE = "https://raw.githubusercontent.com/mdn/browser-compat-data/main/html/";
@@ -31,7 +31,7 @@ type Node = { __compat?: Compat; [key: string]: unknown };
 
 const target = Deno.args[0];
 if (!target) {
-  console.error("使い方：compat.ts <タグ名 | input/<type> | global>");
+  console.error("使い方: compat.ts <タグ名 | input/<type> | global>");
   Deno.exit(2);
 }
 const [tag, inputType] = target.split("/");
@@ -63,12 +63,12 @@ for (const [name, child] of Object.entries(node)) {
   );
 }
 
-/** 安定版で対応した版を返す。対応していなければ "no"、一部だけなら末尾に "(partial)" を付ける。 */
+/** 安定版で対応したバージョンを返す。対応していなければ "no" を返し、一部だけの対応なら末尾に "(partial)" を付ける。 */
 function supportOf(compat: Compat, browser: string): string {
   const entry = compat.support[browser];
   if (entry === "mirror") return supportOf(compat, MIRROR_OF[browser]);
   const statements = entry === undefined ? [] : Array.isArray(entry) ? entry : [entry];
-  // 接頭辞・別名・フラグが要る対応は、そのままの名前では使えないため数えない
+  // 接頭辞・別名・フラグが要る対応は、そのままの名前では使えないので数えない
   const s = statements.find((s) => !s.flags && !s.prefix && !s.alternative_name);
   if (!s || s.version_removed) return "no";
   const v = s.version_added;

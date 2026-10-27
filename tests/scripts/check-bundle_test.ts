@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { checkBundle } from "../../scripts/check-bundle.ts";
 import { withTempDir } from "../_support/fixture.ts";
 
-/** dist/public/ に、sources を持つソースマップを置いて確かめる。キーは dist/public/ からのパス。 */
+/** maps（dist/public/ からのパス → sources）のソースマップを置いて checkBundle() を実行し、違反の一覧を返す。 */
 async function violationsOf(maps: Record<string, Array<string>>) {
   const files = Object.fromEntries(
     Object.entries(maps).map(([path, sources]) => [
@@ -45,6 +45,6 @@ Deno.test("check-bundle: それ以外のソースがバンドルに入ってい�
   );
 });
 
-Deno.test("check-bundle: ソースマップがなければ、何も確かめられないため違反にする", async () => {
+Deno.test("check-bundle: ソースマップがなければ、何も確かめられないので違反にする", async () => {
   assert.deepEqual(await violationsOf({}), ["dist/public/ にソースマップがありません"]);
 });

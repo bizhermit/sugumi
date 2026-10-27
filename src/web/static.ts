@@ -4,16 +4,16 @@
  * ページから読み込むファイルは、URL にハッシュを付けられる `_assets/` に置く（assets.ts を参照）。
  *
  * 置いたファイルは、ログインなしで誰でも取得できる。
- * ファイルは起動時にすべて読み込み、リクエストはその表で引くだけにする。
- * リクエストのパスからファイルパスを組み立てないため、`../` などで static/ 外のファイルには届かない。
+ * ファイルは起動時にすべて読み込み、リクエストのたびにはその表から探すだけにする。
+ * リクエストのパスからファイルパスを組み立てないので、`../` などで static/ の外のファイルには届かない。
  * 起動後に変更した内容は、再起動するまで反映されない。
  */
 import { methodNotAllowed } from "./error-page.tsx";
 
-// deno.json の permissions と Dockerfile で、static/ の読み取りを許可している
+// deno.json の permissions と Dockerfile で、static/ の読み取りを許可している。
 const STATIC_DIR = new URL("../../static/", import.meta.url);
 
-// HTML・SVG・XML はこのオリジンでスクリプトを実行できる文書になるため、配信できる種類に含めない
+// HTML・SVG・XML は、このオリジンでスクリプトを実行できる文書になるので、配信できる種類に含めない。
 const CONTENT_TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
   ".png": "image/png",
@@ -21,7 +21,7 @@ const CONTENT_TYPES: Record<string, string> = {
   ".webmanifest": "application/manifest+json",
 };
 
-// `.` で始まるもののうち、配信するもの。それ以外は .DS_Store などを誤って公開しないよう読み込まない
+// `.` で始まる名前のうち、配信するもの。.DS_Store などを誤って公開しないよう、それ以外は読み込まない。
 const DOT_NAMES = new Set([".well-known"]);
 
 type StaticFile = { body: Uint8Array<ArrayBuffer>; contentType: string; etag: string };
@@ -29,13 +29,13 @@ type StaticFile = { body: Uint8Array<ArrayBuffer>; contentType: string; etag: st
 export type StaticFiles = {
   /** 配信するファイルの pathname の一覧。ルートとの重複を確かめるのに使う。 */
   paths(): Array<string>;
-  /** pathname が static/ のファイルに当たれば応答を返し、当たらなければ undefined を返す。 */
+  /** pathname が static/ のファイルに当たればレスポンスを返し、当たらなければ undefined を返す。 */
   serve(req: Request, url: URL): Response | undefined;
 };
 
 /**
- * dir のファイルを読み込む。dir は既定で static/ で、テストで別のディレクトリを渡す。
- * 配信できない種類のファイルやシンボリックリンクがあれば例外を投げる。
+ * dir のファイルを読み込む。dir のデフォルトは static/ で、テストでは別のディレクトリを渡す。
+ * 配信できない種類のファイルやシンボリックリンクがあれば、例外を投げる。
  */
 export async function loadStatic(dir: URL = STATIC_DIR): Promise<StaticFiles> {
   const files = await loadFiles(dir);
@@ -49,11 +49,11 @@ function serveFile(
   files: Map<string, StaticFile>,
   req: Request,
   url: URL,
-) {
+): Response | undefined {
   const found = files.get(url.pathname);
   if (!found) return undefined;
   if (req.method !== "GET" && req.method !== "HEAD") return methodNotAllowed(["GET", "HEAD"]);
-  // URL にハッシュを付けられないため、内容を変えたときに古いものを使わせないよう毎回 ETag で確かめさせる
+  // URL にハッシュを付けられないので、内容を変えたときに古いものが使われないよう、毎回 ETag で確かめさせる。
   const headers = new Headers({
     "content-type": found.contentType,
     etag: found.etag,
@@ -65,7 +65,7 @@ function serveFile(
   return new Response(req.method === "HEAD" ? null : found.body, { headers });
 }
 
-// キーはリクエストの pathname と同じく、区切りごとにエンコードしたもの
+// キーは、リクエストの pathname と同じく、セグメントごとにエンコードしたパス。
 async function loadFiles(dir: URL) {
   const files = new Map<string, StaticFile>();
   try {

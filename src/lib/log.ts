@@ -2,11 +2,12 @@
  * アプリのログ（アクセスログ・エラーログ・警告・監査ログ）を、1 行の JSON で出す。
  * 標準出力（エラーと警告は標準エラー）に出すだけで、ファイルには書かない。
  * 本番では compose.yaml の log-forwarder が受け取り、サーバーの外（CloudWatch か社内のログ用のサーバー）へ送る。
- * アプリにログを書き換える・消す権限を持たせないため。
+ * ファイルに書かないのは、アプリにログを書き換えたり消したりする権限を持たせないため。
  * パスワード・トークン・セッション ID は渡さないこと。
  */
 
-// Docker は 16 KB を超える行を分けて渡し、1 行 1 つの JSON が崩れるため、例外の内容は JSON にしてこのバイト数までに切る
+// Docker は 16 KB を超える行を分割して渡すので、1 行に 1 つの JSON という形が崩れる。
+// そのため、例外の内容は JSON にしたうえで、このバイト数までに切り詰める。
 const MAX_ERROR_BYTES = 8 * 1024;
 
 const encoder = new TextEncoder();
@@ -24,7 +25,7 @@ export function logError(e: unknown, requestId?: string): void {
     type: "error",
     time: new Date().toISOString(),
     requestId,
-    // スタックトレースの改行で行が分かれないよう、ほかのログと同じく 1 行の JSON にする
+    // スタックトレースの改行で行が分かれないよう、ほかのログと同じく 1 行の JSON にする。
     error: truncateError(errorText(e)),
   }, true);
 }
@@ -38,7 +39,7 @@ function errorText(e: unknown) {
   return e instanceof Error ? e.stack ?? String(e) : String(e);
 }
 
-// 例外のときにしか通らないため、読みやすさを優先して、収まるまで縮める
+// 例外のときしか通らないので、速さより読みやすさを優先し、収まるまで少しずつ縮める。
 function truncateError(text: string) {
   while (encoder.encode(JSON.stringify(text)).byteLength > MAX_ERROR_BYTES) {
     text = text.slice(0, Math.floor(text.length * 0.9));

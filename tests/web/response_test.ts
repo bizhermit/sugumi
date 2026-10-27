@@ -5,7 +5,7 @@ function setX(headers: Headers, value: string) {
   headers.set("x-test", value);
 }
 
-Deno.test("response: ヘッダーを変更できる Response は、複製せずに書き換える", async () => {
+Deno.test("response: ヘッダーを変更できる Response は、コピーせずに書き換える", async () => {
   const res = new Response("ok");
   const out = editHeaders(res, setX, "1");
   assert.equal(out, res);
@@ -13,7 +13,7 @@ Deno.test("response: ヘッダーを変更できる Response は、複製せず�
   assert.equal(await out.text(), "ok");
 });
 
-Deno.test("response: ヘッダーが変更不可の Response は、複製して書き換え、元は変えない", () => {
+Deno.test("response: ヘッダーが変更不可の Response は、コピーして書き換え、元は変えない", () => {
   const res = Response.redirect("http://localhost/", 302);
   const out = editHeaders(res, setX, "1");
   assert.notEqual(out, res);

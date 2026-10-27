@@ -13,7 +13,7 @@ if (password) {
   });
   (password.closest("label") ?? password).after(toggle);
 
-  // 表示したまま送信すると、ブラウザがパスワードとして保存を提案しないことがある
+  // 表示したまま送信すると、ブラウザがパスワードの保存を提案しないことがある。
   password.form?.addEventListener("submit", () => {
     password.type = "password";
     toggle.setAttribute("aria-pressed", "false");

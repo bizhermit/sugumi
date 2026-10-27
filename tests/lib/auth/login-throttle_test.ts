@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { refundAttempt, reserveAttempt } from "../../../src/lib/auth/login-throttle.ts";
+import type { ReserveResult } from "../../../src/lib/auth/login-throttle.ts";
 import { db } from "../../../src/lib/db.ts";
 import {
   LOGIN_IP_LOCKOUT_MINUTES,
@@ -14,13 +15,17 @@ const LOCKOUT_MS = LOGIN_IP_LOCKOUT_MINUTES * 60 * 1000;
 const ignore = MAX === 0;
 
 /** address から now の時刻に count 回試し、最後の結果を返す。 */
-async function reserveTimes(address: string | undefined, count: number, now: number) {
-  let result;
+async function reserveTimes(
+  address: string | undefined,
+  count: number,
+  now: number,
+): Promise<ReserveResult | undefined> {
+  let result: ReserveResult | undefined;
   for (let i = 0; i < count; i++) result = await reserveAttempt(address, now);
   return result;
 }
 
-async function failedAttempts(key: string) {
+async function failedAttempts(key: string): Promise<number | undefined> {
   const { rows } = await db.query<{ failed_attempts: number }>(
     "SELECT failed_attempts FROM login_throttles WHERE address = $1",
     [key],
@@ -29,7 +34,7 @@ async function failedAttempts(key: string) {
 }
 
 Deno.test({
-  name: "login-throttle: LOGIN_IP_MAX_FAILED_ATTEMPTS 回までは試せ、超えると制限する",
+  name: "login-throttle: LOGIN_IP_MAX_FAILED_ATTEMPTS 回までは試せて、超えると制限する",
   ignore,
   async fn() {
     await resetDb();
@@ -40,19 +45,19 @@ Deno.test({
       blocks: true,
       key: "192.0.2.1",
     });
-    // 制限を始めたことは 1 回だけ返す
+    // 制限を始めたことは、最初の 1 回だけ返す。
     assert.deepEqual(await reserveAttempt("192.0.2.1", now), {
       status: "blocked",
       blocks: false,
       key: "192.0.2.1",
     });
-    // ほかの接続元は制限しない
+    // ほかの接続元は制限しない。
     assert.equal((await reserveAttempt("192.0.2.2", now)).status, "allowed");
   },
 });
 
 Deno.test({
-  name: "login-throttle: 並行して試しても、上限を超えて通さない",
+  name: "login-throttle: 同時に試しても、上限を超えて通さない",
   ignore,
   async fn() {
     await resetDb();
@@ -85,7 +90,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "login-throttle: 接続元が分からないか解析できなければ数えない",
+  name: "login-throttle: 接続元が分からないか、パースできなければ数えない",
   ignore,
   async fn() {
     await resetDb();
@@ -96,8 +101,8 @@ Deno.test({
         attempt: undefined,
       });
     }
-    const { rows } = await db.query("SELECT * FROM login_throttles");
-    assert.equal(rows.length, 0);
+    const { rows } = await db.query<{ count: string }>("SELECT count(*) FROM login_throttles");
+    assert.equal(rows[0].count, "0");
   },
 });
 
@@ -114,7 +119,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "login-throttle: 制限は LOGIN_IP_LOCKOUT_MINUTES で解け、最初から数え直す",
+  name: "login-throttle: 制限は LOGIN_IP_LOCKOUT_MINUTES が経つと解け、最初から数え直す",
   ignore,
   async fn() {
     await resetDb();
@@ -128,7 +133,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "login-throttle: refundAttempt は 1 回だけ取り消し、数え直した後の回は取り消さない",
+  name: "login-throttle: refundAttempt は 1 回分だけ取り消し、数え直した後の回は取り消さない",
   ignore,
   async fn() {
     await resetDb();
@@ -140,7 +145,7 @@ Deno.test({
     await refundAttempt(reserved.attempt);
     assert.equal(await failedAttempts("192.0.2.1"), 2);
 
-    // 期間が過ぎて数え直したあとに、前の期間の回を取り消しても変わらない
+    // 期間が過ぎて数え直したあとに、前の期間の回を取り消しても変わらない。
     await reserveAttempt("192.0.2.1", start + WINDOW_MS);
     await refundAttempt(reserved.attempt);
     assert.equal(await failedAttempts("192.0.2.1"), 1);

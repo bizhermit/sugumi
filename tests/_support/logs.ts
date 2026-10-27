@@ -1,6 +1,6 @@
 /**
- * fn の実行中に console.log・console.error に出したログを、JSON として解析して出した順に返す。
- * 集めたログは端末に出さない。アプリのログは 1 行の JSON のため、解析できなければ例外にする。
+ * fn の実行中に console.log・console.error へ出力されたログを、出力された順に JSON としてパースして返す。
+ * 集めたログは端末には出さない。アプリのログは 1 行に 1 つの JSON なので、パースできない行があれば例外を投げる。
  */
 export async function captureLogs(
   fn: () => void | Promise<void>,

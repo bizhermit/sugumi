@@ -1,4 +1,4 @@
-/* layout() が全ページで読み込む。 */
+/* htmlDocument() が全ページで読み込む。 */
 
 :root {
   color-scheme: light dark;
@@ -12,7 +12,7 @@ body {
   padding: 1rem;
 }
 
-/* prevent-double-submit.ts が送信中のフォームに付ける */
+/* aria-busy は、prevent-double-submit.ts が送信中のフォームに付ける。 */
 form[aria-busy="true"] button {
   cursor: progress;
   opacity: 0.6;

@@ -3,7 +3,7 @@ import { logError } from "../../src/lib/log.ts";
 import { captureLogs } from "../_support/logs.ts";
 
 Deno.test("log: 例外の内容は、JSON にして 8 KB までに切る", async () => {
-  // 日本語は UTF-8 で 3 バイト、制御文字は JSON で 6 文字になるため、文字数では収まらない
+  // 日本語は UTF-8 で 1 文字 3 バイト、制御文字は JSON で 6 文字になるので、文字数で切っても収まらない。
   for (const message of ["a".repeat(20_000), "あ".repeat(20_000), "\u0001".repeat(20_000)]) {
     const [log] = await captureLogs(() => logError(new Error(message), "req-1"));
     const error = String(log.error);

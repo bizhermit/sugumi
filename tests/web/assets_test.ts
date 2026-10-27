@@ -1,4 +1,4 @@
-// dist/public/ を読み込むため、先に deno task build が要る
+// dist/public/ を読み込むので、先に deno task build が必要。
 import assert from "node:assert/strict";
 import { asset, assetsOf, serveAsset } from "../../src/web/assets.ts";
 
@@ -19,7 +19,7 @@ Deno.test("assets: assetsOf() は、ページと同じディレクトリの _ass
   const login = assetsOf(new URL("login/view.tsx", routes).href);
   assert.match(login.style ?? "", /^\/assets\/routes\/login\/_assets\/index\.css\?v=/);
   assert.match(login.script ?? "", /^\/assets\/routes\/login\/_assets\/index\.js\?v=/);
-  // home は JS だけ、ルートは _assets/ がない
+  // home は JS だけ、ルートは _assets/ がない。
   const home = assetsOf(new URL("home/get.tsx", routes).href);
   assert.equal(home.style, undefined);
   assert.match(home.script ?? "", /^\/assets\/routes\/home\/_assets\/index\.js\?v=/);
@@ -62,7 +62,7 @@ Deno.test("assets: ソースマップと、ないファイルは 404 にする",
   }
 });
 
-Deno.test("assets: HEAD には本文を返さず、GET・HEAD 以外には 405 を返す", async () => {
+Deno.test("assets: HEAD にはレスポンスボディを返さず、GET・HEAD 以外には 405 を返す", async () => {
   const head = serve(asset(COMMON_JS), { method: "HEAD" });
   assert.equal(head.status, 200);
   assert.equal(head.body, null);

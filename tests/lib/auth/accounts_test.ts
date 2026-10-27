@@ -46,7 +46,7 @@ Deno.test("accounts: パスワードの誤りと、存在しないユーザー�
   assert.deepEqual(await authenticate("bob", TEST_PASSWORD, undefined, undefined), {
     status: "unknown_user",
   });
-  // 上限を超える長さは、計算せずに失敗にする（失敗として数える）
+  // 上限を超える長さのパスワードは、ハッシュを計算せずに失敗にする（失敗の回数にも数える）。
   const long = await authenticate(
     "alice",
     "x".repeat(PASSWORD_MAX_LENGTH + 1),
@@ -78,7 +78,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "accounts: ロックは LOGIN_LOCKOUT_MINUTES で解け、失敗の回数は数え直す",
+  name: "accounts: ロックは LOGIN_LOCKOUT_MINUTES が経つと解け、失敗の回数は 0 から数え直す",
   ignore: MAX === 0,
   async fn() {
     await resetDb();
@@ -102,7 +102,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "accounts: 並行して試しても、上限を超えてパスワードを確かめない",
+  name: "accounts: 同時に試しても、上限を超えてパスワードを確かめない",
   ignore: MAX === 0,
   async fn() {
     await resetDb();
@@ -131,26 +131,28 @@ Deno.test({
       blocks: true,
       blockedAddress: "192.0.2.1",
     });
-    // 制限中はアカウントの失敗として数えない
+    // 制限中はアカウントの失敗として数えない。
     assert.equal((await accountRow()).failed_attempts, 0);
     assert.equal((await authenticate("alice", TEST_PASSWORD, "192.0.2.2", undefined)).status, "ok");
   },
 });
 
 Deno.test({
-  name: "accounts: ログインに成功すると、接続元の失敗の回数を 1 回取り消す",
+  name: "accounts: ログインに成功すると、接続元の失敗の回数を 1 回分取り消す",
   ignore: LOGIN_IP_MAX_FAILED_ATTEMPTS === 0,
   async fn() {
     await resetDb();
     await addAccount();
     await authenticate("alice", "wrong password", "192.0.2.1", undefined);
     await authenticate("alice", TEST_PASSWORD, "192.0.2.1", undefined);
-    const { rows } = await db.query("SELECT failed_attempts FROM login_throttles");
+    const { rows } = await db.query<{ failed_attempts: number }>(
+      "SELECT failed_attempts FROM login_throttles",
+    );
     assert.deepEqual(rows, [{ failed_attempts: 1 }]);
   },
 });
 
-Deno.test("accounts: createAccount は入力を確かめ、使われているユーザー名を断る", async () => {
+Deno.test("accounts: createAccount は入力を確かめ、使われているユーザー名を拒否する", async () => {
   await resetDb();
   const ok = "valid password";
   const invalid: Array<[string, string, string, RegExp]> = [
@@ -171,7 +173,7 @@ Deno.test("accounts: createAccount は入力を確かめ、使われているユ
   assert.deepEqual(await findAccount(account.id), account);
 
   await addAccount("alice");
-  await assert.rejects(addAccount("alice"), /ユーザー名 alice は使われています/);
+  await assert.rejects(addAccount("alice"), /ユーザー名 alice はすでに使われています/);
 });
 
 /** 失敗を重ねて alice をロックする。 */
@@ -224,14 +226,14 @@ Deno.test({
     const result = await authenticate("alice", TEST_PASSWORD, undefined, token);
     assert.ok(result.status === "ok");
     assert.equal(result.trustedDevice, true);
-    // 成功のたびにトークンを作り直し、前のものは使えなくする
+    // 成功のたびにトークンを作り直し、前のものは使えなくする。
     assert.notEqual(result.deviceToken, token);
     assert.equal((await authenticate("alice", TEST_PASSWORD, undefined, token)).status, "locked");
     assert.equal(
       (await authenticate("alice", TEST_PASSWORD, undefined, result.deviceToken)).status,
       "ok",
     );
-    // 端末からの成功では、ほかの端末に対するロックは解かない
+    // 端末からの成功では、ほかの端末に対するロックは解かない。
     assert.equal(
       (await authenticate("alice", TEST_PASSWORD, undefined, undefined)).status,
       "locked",
@@ -253,7 +255,7 @@ Deno.test({
       assert.equal(result.locked, false);
     }
     assert.equal((await accountRow()).failed_attempts, 0);
-    // 上限に達した端末からの試行は、ほかの端末と同じくアカウントに数える
+    // 上限に達した端末からの試行は、ほかの端末と同じくアカウントの失敗として数える。
     const next = await authenticate("alice", "wrong password", undefined, token);
     assert.ok(next.status === "wrong_password");
     assert.equal(next.trustedDevice, false);
@@ -262,7 +264,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "accounts: 端末からの失敗も、並行して試して上限を超えてパスワードを確かめない",
+  name: "accounts: 端末からのログインでも、同時に試したときに上限を超えてパスワードを確かめない",
   ignore: MAX === 0,
   async fn() {
     await resetDb();
@@ -317,7 +319,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "accounts: 端末のトークンの行は、期限切れと上限に達したものを消す",
+  name: "accounts: 端末のトークンは、期限切れのものと上限に達したものを消す",
   ignore: MAX === 0,
   async fn() {
     await resetDb();

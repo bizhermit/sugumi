@@ -6,12 +6,16 @@ import { type AppPath, path } from "../../web/url.ts";
 /** to は、ログイン後の戻り先。appPathOf() で確かめた値を渡す。 */
 type FormState = { status?: number; username?: string; message?: string; to?: AppPath };
 
+/**
+ * ログインのフォームを、status のレスポンスにして返す。
+ * username は入力欄に戻す値、message はフォームの上に出す案内やエラー。
+ */
 export async function loginForm(
   ctx: RouteContext,
   { status = 200, username = "", message, to }: FormState,
 ): Promise<Response> {
-  // パスワード欄の spellcheck などは、_assets/index.ts で表示に切り替えたときに
-  // 入力がスペルチェックや予測変換に渡らないようにするため
+  // パスワード欄に spellcheck などを付けるのは、_assets/index.ts で表示に切り替えたときに、
+  // 入力がスペルチェックや予測変換に渡らないようにするため。
   const html = await htmlDocument(ctx, {
     title: "ログイン",
     page: import.meta.url,

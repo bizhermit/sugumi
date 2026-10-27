@@ -10,7 +10,7 @@
 
 - DevContainer では、開発用とテスト用の PostgreSQL が別のコンテナで起動する。
   - 接続先は、環境変数 `DATABASE_URL`（開発用）と `TEST_DATABASE_URL`（テスト用）に設定される。
-  - テスト用の DB はテストのたびに空にし、コンテナを止めるとデータが消える。
+  - テスト用の DB はテストのたびに空にする。コンテナを止めると、データは消える。
 - DevContainer の外で動かすときは、`DATABASE_URL` と `TEST_DATABASE_URL` に接続先を設定する。
   - 例：`postgres://user:password@host:5432/dbname`
   - 2 つは別の DB にし、テスト用の DB は名前を `_test` で終わらせる（例：`app_test`）。
@@ -31,13 +31,13 @@ deno task test   # テストを実行（TEST_DATABASE_URL の DB を使う。先
 
 ## 本番
 
-`compose.yaml` で、アプリ（`docker/app/`）・DB（`docker/db/`）・ログの送り出し口（`docker/log-forwarder/`）のコンテナを起動する。
-ログは、送り出し口が CloudWatch Logs か、別のサーバーに置く社内のログ用のサーバー（`docker/log-server/`）へ送る。手順は
+`compose.yaml` で、アプリ（`docker/app/`）・DB（`docker/db/`）・ログの転送役（`docker/log-forwarder/`）のコンテナを起動する。
+ログは転送役が、CloudWatch Logs か、別のサーバーに置いた社内のログ用のサーバー（`docker/log-server/`）へ送る。手順は
 [docker/README.md](docker/README.md) を参照。
 
 ```mermaid
 flowchart LR
-  user(["利用者"]) -->|"HTTPS"| proxy
+  user(["ユーザー"]) -->|"HTTPS"| proxy
 
   subgraph appserver["アプリのサーバー（compose.yaml）"]
     proxy["リバースプロキシ<br>（compose の外）"] -->|"127.0.0.1:3000"| app["app"]

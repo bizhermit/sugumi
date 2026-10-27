@@ -3,10 +3,11 @@ import { htmlDocument } from "../../web/html-document.tsx";
 import type { RouteContext } from "../../web/router.ts";
 import { path, redirect } from "../../web/url.ts";
 
+/** ログアウトの確認画面を出す。ログインしていなければ /login へリダイレクトする。 */
 export default async function (_req: Request, ctx: RouteContext): Promise<Response> {
   if (!ctx.session) return redirect(path("/login"));
-  // 外部サイトのリンクや、ブラウザの先読み・リンクを確認するツールが GET するだけで
-  // ログアウトさせられないよう、GET では確認画面を出し、そこからの POST でだけログアウトする
+  // 外部サイトのリンクや、ブラウザの先読み・リンクを確認するツールが GET しただけでは
+  // ログアウトしないよう、GET では確認画面を出し、そこから POST されたときだけログアウトする。
   return await confirmPage(ctx);
 }
 

@@ -1,12 +1,12 @@
 /**
  * ハッシュは `scrypt$N$r$p$ソルト$ハッシュ`（ソルトとハッシュは base64url）の形で保存する。
- * パラメータも一緒に保存しているため、PARAMS を強くしても既存のハッシュはそのまま検証できる。
+ * パラメータも一緒に保存しているので、PARAMS を強くしても、既存のハッシュはそのまま検証できる。
  */
 import { scrypt } from "node:crypto";
 import { timingSafeEqual } from "../crypto.ts";
 
-// OWASP が同等の強さとして挙げる組み合わせのうち、1 回のメモリが 32 MiB で済むもの。
-// ログインが同時に来るとその分だけメモリを使うため、メモリの少ない組み合わせにしている
+// OWASP が同じ強さとして挙げる組み合わせのうち、1 回に使うメモリが 32 MiB で済むもの。
+// ログインが同時に来ると、その数だけメモリを使うので、メモリの少ない組み合わせを選んでいる。
 const PARAMS = { N: 2 ** 15, r: 8, p: 3 };
 const KEY_LENGTH = 32;
 const SALT_LENGTH = 16;
@@ -14,13 +14,14 @@ const SALT_LENGTH = 16;
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
+/** DB に保存するパスワードのハッシュを返す。長さの検証は呼び出し側で済ませておく。 */
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
   const key = await derive(password, salt, PARAMS);
   return ["scrypt", PARAMS.N, PARAMS.r, PARAMS.p, base64url(salt), base64url(key)].join("$");
 }
 
-/** hash の形式が不正な場合も false を返す。 */
+/** password が hashPassword() で作った hash と一致すれば true を返す。hash の形式が不正なときも false を返す。 */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   const [scheme, n, r, p, salt, key] = hash.split("$");
   if (scheme !== "scrypt" || key === undefined) return false;

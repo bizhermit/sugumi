@@ -14,7 +14,7 @@ COPY scripts/ ./scripts/
 RUN deno task build && deno cache --frozen src/main.ts
 
 # ---- runtime: サーバーを実行する ----
-# distroless はシェルやパッケージマネージャを含まないため、攻撃対象を小さくできる
+# distroless はシェルやパッケージマネージャを含まないので、攻撃対象を小さくできる
 FROM denoland/deno:distroless-2.9.7@sha256:16583ef81ce73d6fdf806174fbda68bf4c57e914659ffe6b1c2b600ac2327962
 
 WORKDIR /app
@@ -29,7 +29,7 @@ USER 65532:65532
 
 EXPOSE 3000
 
-# ENTRYPOINT は /tini -- /bin/deno のため、deno のサブコマンドから書く
+# ENTRYPOINT が /tini -- /bin/deno なので、deno のサブコマンドから書く
 # 権限は deno.json の permissions.default で管理する
 # --cached-only で、DENO_DIR にない依存を実行時にダウンロードしない
 CMD ["run", "--cached-only", "-P", "src/main.ts"]

@@ -1,5 +1,5 @@
 /**
- * アカウントを追加する。パスワードは画面に表示せずに入力させるため、端末から実行すること。
+ * アカウントを追加する。パスワードは画面に表示せずに入力するので、端末から実行すること。
  *
  *   deno task account:add <ユーザー名> <表示名>
  */
@@ -12,7 +12,7 @@ if (username === undefined || displayName === undefined) {
   Deno.exit(1);
 }
 if (!Deno.stdin.isTerminal()) {
-  console.error("パスワードを入力するため、端末から実行してください");
+  console.error("パスワードを入力するので、端末から実行してください");
   Deno.exit(1);
 }
 
@@ -24,7 +24,7 @@ if (password !== await readHidden("パスワード（確認）: ")) {
 try {
   const account = await createAccount(username, displayName, password);
   console.log(`追加しました（id: ${account.id}）`);
-  // 接続を閉じないと、Pool が接続を持ったままプロセスが終わらない
+  // 接続を閉じないと、Pool が接続を持ったままになり、プロセスが終わらない。
   await db.end();
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
@@ -46,7 +46,7 @@ async function readHidden(label: string) {
       }
       if (b === 0x0d || b === 0x0a) break;
       if (b === 0x7f || b === 0x08) {
-        // UTF-8 の継続バイト（10xxxxxx）ごと消し、1 文字分を戻す
+        // 1 文字分を消す。UTF-8 の継続バイト（10xxxxxx）もまとめて消す。
         while (bytes.length > 0 && (bytes.pop()! & 0xc0) === 0x80);
         continue;
       }

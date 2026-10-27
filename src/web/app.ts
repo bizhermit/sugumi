@@ -18,30 +18,30 @@ import { path, redirect } from "./url.ts";
 import { remoteAddressOf } from "./remote-address.ts";
 import type { RoutePath } from "../routes.gen.ts";
 
-// Deno の req.url は Host ヘッダーを検証せずに連結して作られるため、
-// Host に `/` や `#` を含めると URL として解析したときの pathname を差し替えられる。
+// Deno の req.url は、Host ヘッダーを検証せずに連結して作られる。
+// そのため Host に `/` や `#` を含めると、URL としてパースしたときの pathname を差し替えられる。
 const VALID_HOST = /^(?:[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$/;
 
-// ファイルのアップロードなど大きな本文を受けるルートを作るときは、ルートごとに上限を変えられるようにすること
+// ファイルのアップロードなど、大きなリクエストボディを受けるルートを作るときは、ルートごとに上限を変えられるようにすること。
 const MAX_BODY_BYTES = 1024 * 1024;
 
-// 締め切りを過ぎて読むのをやめた本文の reader。
-// リクエストごとに関数を作らないよう、setTimeout にはモジュールの expireBody() と reader を渡し、結果はここに残す
+// タイムアウトして読むのをやめたリクエストボディの reader。
+// リクエストごとに関数を作らないよう、setTimeout にはモジュールの expireBody() と reader を渡し、結果はここに残す。
 const expiredBodies = new WeakSet<ReadableStreamDefaultReader<Uint8Array>>();
 
-// ctx.session が常に undefined になるため、src/routes/before.tree.ts の PUBLIC_ROUTES にも入れること
+// ここに入れたルートは ctx.session が常に undefined になるので、src/routes/before.tree.ts の PUBLIC_ROUTES にも入れること。
 const SESSIONLESS_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/healthz"]);
 
-// ページの Response のヘッダーはその場で書き足す（response.ts）。同じ Response を使い回すページがあると、
-// 前のリクエストで足した Cookie などが次の利用者に渡るため、2 回目は書き足す前に例外にする
+// ページが返した Response のヘッダーには、その場で追加する（response.ts）。同じ Response を使い回すページがあると、
+// 前のリクエストで追加した Cookie などが次のユーザーに渡ってしまう。そこで 2 回目は、追加する前に例外にする。
 const claimed = new WeakSet<Response>();
 
-// 照合できない長い URL を送り続けて、ログを埋められないようにする
+// どのルートにもマッチしない長い URL を送り続けて、ログをあふれさせることができないようにする。
 const MAX_LOGGED_PATH_LENGTH = 1024;
 
-// Deno はメソッドを長さの制限なく（約 60 KB まで）受け付けるため、これ以外は OTHER にまとめてログに出す。
-// そのまま出すと、1 リクエストで長い行を書かせてログを埋めさせたり、Docker に行を分けさせて
-// 1 行 1 つの JSON を崩させたりできる
+// Deno はメソッド名をほぼ無制限（約 60 KB まで）に受け付ける。そのままログに出すと、1 回のリクエストで
+// 長い行を書き込んでログをあふれさせたり、Docker に行を分割させて「1 行に 1 つの JSON」を崩したりできてしまう。
+// そのため、ここにないメソッドは OTHER にまとめる。
 const LOGGED_METHODS: ReadonlySet<string> = new Set([
   "GET",
   "HEAD",
@@ -55,9 +55,9 @@ const LOGGED_METHODS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * 1 リクエストにつき 1 行出すアクセスログ。キーを揃えておき、handle() が分かった値を書き足す。
- * クエリ文字列・Cookie・本文は出さない。ログイン後の戻り先やトークンが入るため。
- * time はほかのログと同じく書き出した時刻で、durationMs は Response を返すまでの時間（本文を送り終えるまでではない）。
+ * 1 リクエストにつき 1 行出すアクセスログ。キーを先に揃えておき、handle() が分かった値から埋めていく。
+ * クエリ文字列・Cookie・リクエストボディは出さない。ログイン後の戻り先やトークンが入るため。
+ * time はほかのログと同じく書き出した時刻。durationMs は Response を返すまでの時間で、レスポンスボディを送り終えるまでではない。
  */
 type AccessLog = {
   type: "access";
@@ -65,16 +65,16 @@ type AccessLog = {
   requestId: string;
   /** LOGGED_METHODS にないメソッドは OTHER。 */
   method: string;
-  /** pathname。URL として解析できなければ undefined。 */
+  /** pathname。URL としてパースできなければ undefined。 */
   path: string | undefined;
-  /** 照合したルートのパターン。照合しなければ undefined。 */
+  /** マッチしたルートのパターン。どのルートにもマッチしなければ undefined。 */
   route: RoutePath | undefined;
   status: number;
   durationMs: number;
   remoteAddress: string | undefined;
   /** ログインしていれば、そのアカウントの ID。 */
   accountId: number | undefined;
-  /** ログインしていれば、そのセッションの logId。監査ログの login_succeeded と突き合わせ、どのログインかを調べる。 */
+  /** ログインしていれば、そのセッションの logId。監査ログの login_succeeded と突き合わせて、どのログインによるリクエストかを調べる。 */
   sessionLogId: string | undefined;
 };
 
@@ -83,9 +83,9 @@ type Router = Awaited<ReturnType<typeof loadRouter>>;
 
 /**
  * ルートと静的ファイルを読み込み、Deno.serve に渡すハンドラを返す。
- * routes・staticDir は既定で src/routes/・static/ で、テストで別のディレクトリを渡す。
- * bodyTimeoutMs は既定で REQUEST_BODY_TIMEOUT_SECONDS で、テストで短い値を渡す。
- * 静的ファイルがルートか /assets/ と同じ URL になる場合は例外を投げる。
+ * routes・staticDir のデフォルトは src/routes/・static/ で、テストでは別のディレクトリを渡す。
+ * bodyTimeoutMs のデフォルトは REQUEST_BODY_TIMEOUT_SECONDS で、テストでは短い値を渡す。
+ * 静的ファイルがルートか /assets/ と同じ URL になるときは、例外を投げる。
  */
 export async function createApp(
   { mock, routes, staticDir, bodyTimeoutMs = REQUEST_BODY_TIMEOUT_SECONDS * 1000 }: {
@@ -98,7 +98,7 @@ export async function createApp(
   const match = await loadRouter({ mock, root: routes });
   const statics = await loadStatic(staticDir);
 
-  // 静的ファイルはルーターより先に引くため、同じ URL に照合するルートがあると、そのルートに届かなくなる
+  // 静的ファイルはルーターより先に探すので、同じ URL のルートがあっても、そのルートには届かない。
   for (const pathname of statics.paths()) {
     if (pathname.startsWith(ASSETS_PREFIX) || match(pathname, "GET")) {
       throw new Error(
@@ -111,8 +111,8 @@ export async function createApp(
     const start = performance.now();
     const addr = info?.remoteAddr;
     const tcpAddress = addr && "hostname" in addr ? addr.hostname : undefined;
-    // 静的ファイルのリクエストも出す。/assets/ はブラウザにずっとキャッシュされ、static/ は 304 で済むため量は少なく、
-    // 存在しないファイルを探して回る接続元も追えるようにするため
+    // 静的ファイルのリクエストもログに出す。/assets/ はブラウザにずっとキャッシュされ、static/ は 304 で済むので量は少ない。
+    // 出しておけば、存在しないファイルを探して回る接続元も追える。
     const log: AccessLog = {
       type: "access",
       time: "",
@@ -130,9 +130,9 @@ export async function createApp(
     try {
       res = await handle(match, statics, req, log, bodyTimeoutMs);
     } catch (e) {
-      // Deno の既定の 500 にはセキュリティヘッダーが付かないため、ページの外の例外もここで受ける
+      // Deno のデフォルトの 500 にはセキュリティヘッダーが付かないので、ページの外の例外もここで受ける。
       logError(e, log.requestId);
-      // DB の混雑は待てば直るため、プロキシやクライアントがやり直せるよう 500 と分ける
+      // DB の混雑は待てば直る。プロキシやクライアントがやり直せるよう、500 と分けて 503 を返す。
       res = errorPage(isDbTimeout(e) ? 503 : 500);
     }
     res = withSecurityHeaders(res);
@@ -160,11 +160,11 @@ async function handle(
     return errorPage(400);
   }
   if (url.hash !== "") return errorPage(400);
-  // パスはそのまま出すため、トークンなど秘密の値をパスに入れるルートを作らないこと
+  // パスはそのままログに出すので、トークンなど秘密の値をパスに入れるルートを作らないこと。
   log.path = url.pathname.length > MAX_LOGGED_PATH_LENGTH
     ? url.pathname.slice(0, MAX_LOGGED_PATH_LENGTH)
     : url.pathname;
-  // 静的ファイルはログインの有無で内容が変わらないため、セッションや CSRF を確かめない
+  // 静的ファイルはログインの有無で内容が変わらないので、セッションや CSRF を確かめない。
   if (url.pathname.startsWith(ASSETS_PREFIX)) return serveAsset(req, url);
   const staticFile = statics.serve(req, url);
   if (staticFile) return staticFile;
@@ -174,10 +174,12 @@ async function handle(
   log.route = route.route;
   const { handler: pageHandler } = route;
   if (!pageHandler) return methodNotAllowed(route.allow);
-  const buffered = await bufferBody(req, MAX_BODY_BYTES, bodyTimeoutMs);
-  if (typeof buffered === "number") return errorPage(buffered);
+  const result = await bufferBody(req, MAX_BODY_BYTES, bodyTimeoutMs);
+  if (result.status === "too_large") return errorPage(413);
+  if (result.status === "timeout") return errorPage(408);
+  const buffered = result.req;
 
-  // ヘルスチェックは DB が止まっていても応答させるため、Cookie が付いていてもセッションを引かない
+  // ヘルスチェックは DB が止まっていてもレスポンスを返したいので、Cookie が付いていてもセッションを読まない。
   const session = SESSIONLESS_ROUTES.has(route.route) ? undefined : await getSession(buffered);
   if (session) {
     log.accountId = session.account.id;
@@ -186,7 +188,7 @@ async function handle(
   const csrf = csrfFor(buffered, session);
   if (!(await csrf.verify(buffered))) {
     if (session) return errorPage(403);
-    // セッションがなければ書き換えられる状態もないため、期限切れ後の送信などはやり直せるようにする
+    // セッションがなければ、書き換えられて困る状態もない。期限が切れたあとの送信などは、ログインからやり直せるようにする。
     const staleSession = hasSessionCookie(buffered);
     const res = redirect(
       path("/login", { query: { expired: staleSession || csrf.stale ? 1 : null } }),
@@ -224,61 +226,72 @@ async function handle(
   return csrf.apply(res);
 }
 
+type BufferResult = { status: "ok"; req: Request } | { status: "too_large" } | {
+  status: "timeout";
+};
+
+// リクエストごとにオブジェクトを作らないよう、失敗の結果はモジュールに 1 つずつ置いて使い回す。
+const TOO_LARGE: BufferResult = { status: "too_large" };
+const TIMEOUT: BufferResult = { status: "timeout" };
+
 /**
- * 本文を上限まで読み込み、何度でも読める Request にして返す。
- * 上限を超えたら 413、timeoutMs ミリ秒で読み終わらなければ 408 を返す。
- * Content-Length は省略や偽装ができるため、実際に読んだ量でも判定する。
+ * リクエストボディを上限まで読み込み、何度でも読める Request にして返す。
+ * 上限を超えたら too_large を、timeoutMs ミリ秒で読み終わらなければ timeout を返す。
+ * Content-Length は省略も偽装もできるので、実際に読んだ量でも判定する。
  */
 async function bufferBody(
   req: Request,
   limit: number,
   timeoutMs: number,
-) {
-  if (req.body === null) return req;
-  if (Number(req.headers.get("content-length")) > limit) return 413;
+): Promise<BufferResult> {
+  if (req.body === null) return { status: "ok", req };
+  if (Number(req.headers.get("content-length")) > limit) return TOO_LARGE;
   const reader = req.body.getReader();
-  // 締め切りは塊ごとではなく本文全体に付ける。塊ごとだと、1 バイトずつ送り続ける接続を止められない
+  // タイムアウトはチャンクごとではなく、リクエストボディ全体に設定する。チャンクごとだと、1 バイトずつ送り続ける接続を止められない。
   const timer = setTimeout(expireBody, timeoutMs, reader);
   const chunks: Array<Uint8Array> = [];
   let size = 0;
   try {
     for (;;) {
       const { done, value } = await reader.read();
-      if (expiredBodies.has(reader)) return 408;
+      if (expiredBodies.has(reader)) return TIMEOUT;
       if (done) break;
       size += value.byteLength;
       if (size > limit) {
         await reader.cancel();
-        return 413;
+        return TOO_LARGE;
       }
       chunks.push(value);
     }
   } finally {
     clearTimeout(timer);
   }
-  // 小さな本文はほとんど 1 つの塊で届くため、そのときは複製しない。
-  // Content-Length で先に確保すると、大きく宣言して少しだけ送る接続ごとにメモリを確保させられるため、届いた分だけ使う
-  // Deno の本文の塊は ArrayBuffer の上にあるが、ストリームの型は SharedArrayBuffer も含むため型を絞る
-  if (chunks.length === 1) return new Request(req, { body: chunks[0] as Uint8Array<ArrayBuffer> });
+  // 小さなリクエストボディはほとんど 1 つのチャンクで届くので、そのときはコピーしない。
+  // Content-Length の分を先に確保すると、大きな値を宣言して少しだけ送る接続のたびにメモリを取られてしまう。
+  // そこで、届いた分だけを使う。
+  // Deno のチャンクは ArrayBuffer の上にあるが、ストリームの型は SharedArrayBuffer も含むので、型を絞る。
+  if (chunks.length === 1) {
+    return { status: "ok", req: new Request(req, { body: chunks[0] as Uint8Array<ArrayBuffer> }) };
+  }
   const body = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) {
     body.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new Request(req, { body });
+  return { status: "ok", req: new Request(req, { body }) };
 }
 
-/** 読み込み中の read() を done で終わらせ、bufferBody() に 408 を返させる。 */
+/** 読み込み中の read() を done で終わらせ、bufferBody() に timeout を返させる。 */
 function expireBody(reader: ReadableStreamDefaultReader<Uint8Array>) {
   expiredBodies.add(reader);
-  // 取り消しの失敗は応答に関わらないが、捨てずにログに残す
+  // 取り消しに失敗してもレスポンスには影響しないが、握りつぶさずにログに残す。
   reader.cancel().catch(logError);
 }
 
 /**
- * ページに渡す ctx。リクエストごとに作るため、ページが使わない値は読まれたときに作る。
- * 関数の値は、分割代入で取り出してから呼んでも動くよう、this を使わないものを読まれたときに作る。
+ * ページに渡す ctx。リクエストごとに作るので、ページが使わないかもしれない値は、読まれたときに作る。
+ * 関数の値は、分割代入で取り出してから呼んでも動くよう、this に頼らない関数を読まれたときに作る。
  */
 class Context implements RouteContext {
   readonly #req: Request;

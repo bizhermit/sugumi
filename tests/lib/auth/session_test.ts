@@ -43,12 +43,12 @@ Deno.test("session: Cookie のセッションを返す", async () => {
     await getSession(new Request("http://localhost/", { headers: { cookie: "__Host-sid=x" } })),
     undefined,
   );
-  // DB にはトークンそのものを保存しない
+  // DB にはトークンそのものを保存しない。
   const { rows } = await db.query<{ token_hash: string }>("SELECT token_hash FROM sessions");
   assert.notEqual(rows[0].token_hash, session.id);
 });
 
-Deno.test("session: ログでセッションを指す logId は、セッションごとに振り、トークンと関係しない", async () => {
+Deno.test("session: ログでセッションを識別する logId は、セッションごとに振られ、トークンとは関係しない", async () => {
   const session = await newSession();
   const other = await createSession(session.account);
   assert.notEqual(session.logId, other.logId);
@@ -64,7 +64,7 @@ Deno.test({
     await age("last_access_at", idle - MINUTE_MS);
     assert.deepEqual(await getSession(requestWith(session)), session);
 
-    // アクセスすると期限が延びる
+    // アクセスすると期限が延びる。
     const { rows } = await db.query<{ last_access_at: Date }>(
       "SELECT last_access_at FROM sessions",
     );
@@ -91,16 +91,14 @@ Deno.test({
   },
 });
 
-Deno.test("session: randomToken の形式でない Cookie では DB を引かない", async () => {
+Deno.test("session: randomToken の形式でない Cookie では DB を読みに行かない", async () => {
   const session = await newSession();
   const values = ["x", session.id.slice(1), `${session.id}A`, `${session.id.slice(1)}+`];
   let queries = 0;
   const query = db.query;
-  // deno-lint-ignore no-explicit-any
-  db.query = ((...args: Array<any>) => {
+  db.query = ((...args: Array<unknown>) => {
     queries++;
-    // deno-lint-ignore no-explicit-any
-    return (query as any).apply(db, args);
+    return Reflect.apply(query, db, args);
   }) as typeof db.query;
   try {
     for (const value of values) {
@@ -108,7 +106,7 @@ Deno.test("session: randomToken の形式でない Cookie では DB を引かな
       assert.equal(await getSession(req), undefined, value);
     }
     assert.equal(queries, 0);
-    // 形式が合っていれば DB を引く（数え方が正しいことの確かめ）
+    // 形式が合っていれば DB を読みに行く（クエリの数え方が正しいことを確かめるため）。
     assert.deepEqual(await getSession(requestWith(session)), session);
     assert.ok(queries > 0);
   } finally {

@@ -3,12 +3,12 @@
 # 更新時は `docker buildx imagetools inspect <イメージ>:<タグ>` で manifest list のダイジェストを取得して置き換える
 
 # ---- dirs: ログとためる場所を、nonroot の所有で作る ----
-# fluent-bit のイメージはシェルを含まないため、ここで作ってからコピーする。
+# fluent-bit のイメージはシェルを含まないので、ここで作ってからコピーする。
 # 名前付きボリュームは、初めてマウントするときにこの所有者を引き継ぐ。
-# ログには接続元の IP アドレスなどが入るため、所有者だけが読めるようにする
+# ログには接続元の IP アドレスなどが入るので、所有者だけが読めるようにする
 FROM busybox:1.38.0@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e AS dirs
 RUN mkdir -p /out/buffer /out/logs
-# TLS のサーバー証明書と秘密鍵（docker/README.md の手順で作る）。COPY の --chmod はディレクトリにもかかるため、ここで絞る
+# TLS のサーバー証明書と秘密鍵（docker/README.md の手順で作る）。COPY の --chmod はディレクトリにもかかるので、ここで絞る
 COPY certs/server.crt certs/server.key /out/certs/
 RUN chmod 400 /out/certs/*
 

@@ -4,7 +4,7 @@
  */
 const FIXTURES_DIR = new URL("../../dist/test/", import.meta.url);
 
-/** files（ディレクトリからの相対パス → 内容）でディレクトリを作って fn に渡し、終わったら消す。 */
+/** files（ディレクトリからの相対パス → 内容）のとおりにファイルを置いた一時ディレクトリを作って fn に渡し、fn が終わったら消す。 */
 export async function withTempDir(
   files: Record<string, string | Uint8Array>,
   fn: (dir: URL) => void | Promise<void>,

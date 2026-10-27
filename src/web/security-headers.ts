@@ -2,7 +2,7 @@ import { editHeaders } from "./response.ts";
 
 /**
  * 外部のスクリプト・スタイル・iframe を使わない前提で、許可を最小にしている。
- * 緩めたいページは、そのページのレスポンスで同じ名前のヘッダーを設定する。
+ * 制限を緩めたいページは、そのページのレスポンスに同じ名前のヘッダーを設定する。
  */
 
 export type CspDirectives = Record<string, ReadonlyArray<string>>;
@@ -18,14 +18,14 @@ const DEFAULT_CSP: CspDirectives = {
   "form-action": ["'self'"],
   "frame-ancestors": ["'none'"],
   "base-uri": ["'none'"],
-  // innerHTML などへの文字列代入を禁止し、DOM 経由の XSS を防ぐ
+  // innerHTML などに文字列を代入できなくして、DOM 経由の XSS を防ぐ。
   "require-trusted-types-for": ["'script'"],
   "trusted-types": ["'none'"],
 };
 
 /**
- * 既定の CSP のうち、overrides に渡したディレクティブだけを置き換えた値を返す。
- * 空配列を渡したディレクティブは出力しない。
+ * デフォルトの CSP のうち、overrides に渡したディレクティブだけを置き換えた値を返す。
+ * 空の配列を渡したディレクティブは出力しない。
  *
  *   contentSecurityPolicy({ "img-src": ["'self'", "data:"] })
  */
@@ -39,13 +39,14 @@ export function contentSecurityPolicy(overrides: CspDirectives = {}): string {
 const DEFAULT_HEADERS: Array<[string, string]> = [
   ["content-security-policy", contentSecurityPolicy()],
   ["x-content-type-options", "nosniff"],
-  // ログイン後のページを共有 PC のブラウザやプロキシに残さないよう、キャッシュさせてよい応答のほうで設定させる
+  // ログイン後のページが共有 PC のブラウザやプロキシに残らないよう、デフォルトではキャッシュさせない。
+  // キャッシュしてよいレスポンスは、自分で cache-control を設定する。
   ["cache-control", "no-store"],
-  // HTTPS で配信する前提。ブラウザは HTTP で受け取った HSTS を無視するため、開発中の http://localhost には影響しない
+  // HTTPS で配信する前提。ブラウザは HTTP で受け取った HSTS を無視するので、開発中の http://localhost には影響しない。
   ["strict-transport-security", "max-age=31536000; includeSubDomains"],
-  // no-referrer にすると同一オリジンへの POST でも Origin が null になり、Origin による CSRF 対策ができない
+  // no-referrer にすると同一オリジンへの POST でも Origin が null になり、Origin による CSRF 対策ができない。
   ["referrer-policy", "same-origin"],
-  // frame-ancestors を解釈しないブラウザ向け
+  // frame-ancestors を解釈しないブラウザ向け。
   ["x-frame-options", "DENY"],
   ["cross-origin-opener-policy", "same-origin"],
   ["cross-origin-embedder-policy", "require-corp"],
@@ -75,8 +76,8 @@ const DEFAULT_HEADERS: Array<[string, string]> = [
 ];
 
 /**
- * res に未設定の既定ヘッダーを足したレスポンスを返す。res のヘッダーが変更不可でもよい。
- * res をその場で書き換えるため、ほかの応答に使い回さないこと（response.ts を参照）。
+ * res にまだないセキュリティヘッダーを追加して返す。res のヘッダーは変更できなくてもよい。
+ * res をその場で書き換えるので、ほかのレスポンスに使い回さないこと（response.ts を参照）。
  */
 export function withSecurityHeaders(res: Response): Response {
   return editHeaders(res, setDefaults, undefined);

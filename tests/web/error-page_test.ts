@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { errorPage, methodNotAllowed } from "../../src/web/error-page.tsx";
 
-Deno.test("error-page: ステータスごとの HTML を返し、応答は毎回別に作る", async () => {
+Deno.test("error-page: ステータスごとの HTML を返し、レスポンスは毎回新しく作る", async () => {
   const first = errorPage(404);
   const second = errorPage(404);
   assert.notEqual(first, second);
@@ -12,9 +12,9 @@ Deno.test("error-page: ステータスごとの HTML を返し、応答は毎回
   assert.match(await errorPage(500).text(), /<h1>500<\/h1>/);
 });
 
-Deno.test("error-page: 405 の Allow は、その応答だけに付ける", () => {
+Deno.test("error-page: 405 の Allow は、そのレスポンスだけに付ける", () => {
   assert.equal(methodNotAllowed(["GET", "HEAD"]).headers.get("allow"), "GET, HEAD");
-  // ヘッダーを使い回すと、前の応答で足したヘッダーが残る
+  // ヘッダーを使い回すと、前のレスポンスで追加したヘッダーが残ってしまう。
   assert.equal(errorPage(405).headers.get("allow"), null);
   assert.equal(methodNotAllowed(["POST"]).headers.get("allow"), "POST");
 });

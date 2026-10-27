@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import { cidrContains, formatIp, parseCidr, parseIp } from "../../src/lib/ip.ts";
 
-/** 解析して表記を揃えた文字列。解析できなければ undefined。 */
-function normalize(text: string) {
+/** パースして表記を揃えた文字列を返す。パースできなければ undefined。 */
+function normalize(text: string): string | undefined {
   const bytes = parseIp(text);
   return bytes && formatIp(bytes);
 }
 
-Deno.test("ip: IPv4 を解析し、先頭の 0 や範囲外の値は受け付けない", () => {
+Deno.test("ip: IPv4 をパースし、先頭の 0 や範囲外の値は受け付けない", () => {
   assert.equal(normalize("192.0.2.1"), "192.0.2.1");
   assert.equal(normalize("0.0.0.0"), "0.0.0.0");
   assert.equal(normalize("255.255.255.255"), "255.255.255.255");
-  // 先頭の 0 は 8 進数と解釈する実装があり、別のアドレスを指しうる
+  // 先頭の 0 は 8 進数と解釈する実装があり、別のアドレスを指しうる。
   for (
     const text of [
       "192.0.2.01",
@@ -29,17 +29,17 @@ Deno.test("ip: IPv4 を解析し、先頭の 0 や範囲外の値は受け付け
   }
 });
 
-Deno.test("ip: IPv6 を解析し、RFC 5952 の表記に揃える", () => {
+Deno.test("ip: IPv6 をパースし、RFC 5952 の表記に揃える", () => {
   const cases: Array<[string, string]> = [
     ["2001:DB8:0:0:0:0:0:1", "2001:db8::1"],
     ["2001:0db8::0001", "2001:db8::1"],
     ["::", "::"],
     ["::1", "::1"],
     ["1::", "1::"],
-    // 最も長い 0 の連続を省き、同じ長さなら前のほうを省く
+    // 最も長い 0 の連続を省き、同じ長さなら前のほうを省く。
     ["2001:0:0:1:0:0:0:1", "2001:0:0:1::1"],
     ["2001:db8:0:0:1:0:0:1", "2001:db8::1:0:0:1"],
-    // 1 つだけの 0 は省かない
+    // 1 つだけの 0 は省かない。
     ["2001:db8:0:1:1:1:1:1", "2001:db8:0:1:1:1:1:1"],
     ["64:ff9b::192.0.2.1", "64:ff9b::c000:201"],
   ];
@@ -49,7 +49,7 @@ Deno.test("ip: IPv6 を解析し、RFC 5952 の表記に揃える", () => {
 Deno.test("ip: IPv4 射影アドレスは IPv4 にする", () => {
   assert.equal(normalize("::ffff:192.0.2.1"), "192.0.2.1");
   assert.equal(normalize("::FFFF:c000:0201"), "192.0.2.1");
-  // 先頭の 80 ビットがすべて 0 でなければ、IPv4 射影アドレスではない
+  // 先頭の 80 ビットがすべて 0 でなければ、IPv4 射影アドレスではない。
   assert.equal(normalize("::1:ffff:c000:201"), "::1:ffff:c000:201");
   assert.equal(parseIp("::ffff:192.0.2.1")?.length, 4);
 });
@@ -89,7 +89,7 @@ Deno.test("ip: CIDR はホスト部が 0 のものだけを受け付ける", () 
       "10.0.0.0/",
       "10.0.0.0/8/8",
       "10.0.0.0/-1",
-      // IPv4 射影アドレスに IPv6 のプレフィックス長を付けると、IPv4 の長さと合わなくなる
+      // IPv4 射影アドレスに IPv6 のプレフィックス長を付けると、IPv4 の長さと合わなくなる。
       "::ffff:10.0.0.0/104",
     ]
   ) {

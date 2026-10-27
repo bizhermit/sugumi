@@ -38,7 +38,7 @@ Deno.test("db: transaction は fn が例外を投げたら ROLLBACK し、例外
     }),
     /途中で失敗/,
   );
-  // SQL の失敗でも同じく戻し、接続は次の問い合わせに使える
+  // SQL が失敗したときも同じくロールバックし、その接続は次のクエリに使える。
   await assert.rejects(
     transaction(async (client) => {
       await insert(client, "bob");
@@ -63,18 +63,18 @@ Deno.test("db: secret は最初に作った値を返し続ける", async () => {
   }
 });
 
-Deno.test("db: Pool の大きさと時間制限は env.ts の値にする", async () => {
+Deno.test("db: Pool のサイズとタイムアウトには env.ts の値を使う", async () => {
   assert.equal(db.options.max, DB_POOL_MAX);
   assert.equal(db.options.connectionTimeoutMillis, DB_CONNECTION_TIMEOUT_SECONDS * 1000);
-  // current_setting() は 60 秒を 1min のように単位を変えて返すため、ミリ秒の値で比べる
+  // current_setting() は 60 秒を 1min のように単位を変えて返すので、ミリ秒の値で比べる。
   const { rows } = await db.query<{ setting: string }>(
     "SELECT setting FROM pg_settings WHERE name = 'statement_timeout'",
   );
   assert.equal(Number(rows[0].setting), DB_STATEMENT_TIMEOUT_SECONDS * 1000);
 });
 
-Deno.test("db: isDbTimeout は、問い合わせの時間制限で止まった例外を見分ける", async () => {
-  // DB_STATEMENT_TIMEOUT_SECONDS を待たずに確かめるため、このトランザクションだけ短くする
+Deno.test("db: isDbTimeout は、クエリがタイムアウトで止まったときの例外を見分ける", async () => {
+  // DB_STATEMENT_TIMEOUT_SECONDS を待たずに確かめられるよう、このトランザクションだけタイムアウトを短くする。
   await assert.rejects(
     transaction(async (client) => {
       await client.query("SET LOCAL statement_timeout = 10");

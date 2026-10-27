@@ -9,5 +9,5 @@
 static/**/.*
 !static/.well-known
 static/.well-known/**/.*
-# モックは開発用のため、本番のイメージに含めない
+# モックは開発用なので、本番のイメージに含めない
 **/*.mock.*

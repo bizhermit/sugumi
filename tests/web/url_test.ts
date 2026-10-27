@@ -147,13 +147,13 @@ Deno.test("path: パラメータとクエリをエンコードする", () => {
   );
 });
 
-// RoutePath にパラメータのあるルートがまだないため、型を外して渡す
+// RoutePath にパラメータのあるルートがまだないので、型を外して渡す。
 const userPath = path as unknown as (
   route: string,
   options?: { params?: Record<string, string | number>; query?: Query },
 ) => string;
 
-Deno.test("path: パラメータは区切りごとにエンコードし、呼ぶたびに渡した値を使う", () => {
+Deno.test("path: パラメータはセグメントごとにエンコードし、呼ぶたびに渡した値を使う", () => {
   assert.equal(userPath("/user/[id]/edit", { params: { id: "a/b c" } }), "/user/a%2Fb%20c/edit");
   assert.equal(userPath("/user/[id]/edit", { params: { id: 2 } }), "/user/2/edit");
   for (const id of ["", ".", ".."]) {

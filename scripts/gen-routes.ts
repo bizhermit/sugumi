@@ -1,6 +1,6 @@
 /**
- * src/routes/ からルートの一覧を型 RoutePath として、GET で開けるルートを GET_ROUTES として src/routes.gen.ts に書き出す。
- * `--watch` を付けると、生成したあと src/routes/ の変更を監視して生成し直す。
+ * src/routes/ を読み、ルートの一覧を型 RoutePath に、GET で開けるルートを GET_ROUTES にして、src/routes.gen.ts に書き出す。
+ * `--watch` を付けると、生成したあとも src/routes/ の変更を監視して、生成し直す。
  */
 import { patternOf, scanRoutes } from "../src/web/router.ts";
 
@@ -19,8 +19,8 @@ if (import.meta.main) {
 }
 
 /**
- * routes のルートの一覧を out に書き出す。内容が変わらなければ書き込まない。
- * routes・out はテストで別の場所を渡す。
+ * routes のルートの一覧を out に書き出す。
+ * テストでは routes・out に別の場所を渡す。
  */
 export async function generateRoutes(routes: URL, out: URL): Promise<void> {
   const dirs = (await scanRoutes({ root: routes })).map(({ segments, methods }) => ({
@@ -39,6 +39,6 @@ export type RoutePath =${union};
 export const GET_ROUTES: ReadonlyArray<RoutePath> = [${gets}${gets ? "\n" : ""}];
 `;
   const current = await Deno.readTextFile(out).catch(() => undefined);
-  // 内容が同じなら書き込まない（監視しているツールを無駄に反応させないため）
+  // 監視しているツールが無駄に反応しないよう、内容が同じなら書き込まない。
   if (content !== current) await Deno.writeTextFile(out, content);
 }

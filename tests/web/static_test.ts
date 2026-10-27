@@ -6,7 +6,7 @@ const ROBOTS = await Deno.readTextFile(new URL("../../static/robots.txt", import
 
 const statics = await loadStatic();
 
-function serve(path: string, init?: RequestInit) {
+function serve(path: string, init?: RequestInit): Response | undefined {
   const url = new URL(`http://localhost${path}`);
   return statics.serve(new Request(url, init), url);
 }
@@ -22,7 +22,7 @@ Deno.test("static: static/ のファイルを、同じパスの URL で配信す
   assert.equal(serve("/static/robots.txt"), undefined);
 });
 
-Deno.test("static: URL にハッシュを付けられないため、毎回 ETag で確かめさせる", async () => {
+Deno.test("static: URL にハッシュを付けられないので、毎回 ETag で確かめさせる", async () => {
   const res = serve("/robots.txt");
   const etag = res?.headers.get("etag");
   assert.ok(etag);
@@ -37,7 +37,7 @@ Deno.test("static: URL にハッシュを付けられないため、毎回 ETag 
   await changed?.body?.cancel();
 });
 
-Deno.test("static: HEAD には本文を返さず、GET・HEAD 以外には 405 を返す", async () => {
+Deno.test("static: HEAD にはレスポンスボディを返さず、GET・HEAD 以外には 405 を返す", async () => {
   const head = serve("/robots.txt", { method: "HEAD" });
   assert.equal(head?.status, 200);
   assert.equal(head?.body, null);
@@ -47,7 +47,7 @@ Deno.test("static: HEAD には本文を返さず、GET・HEAD 以外には 405 �
   await post?.body?.cancel();
 });
 
-Deno.test("static: . で始まるものは .well-known/ だけを配信し、名前は区切りごとにエンコードする", async () => {
+Deno.test("static: . で始まるものは .well-known/ だけを配信し、名前はセグメントごとにエンコードする", async () => {
   await withTempDir({
     "robots.txt": "x",
     ".DS_Store": "x",
@@ -72,7 +72,7 @@ Deno.test("static: . で始まるものは .well-known/ だけを配信し、名
 });
 
 Deno.test("static: 配信できない種類のファイルがあれば、読み込むときに例外になる", async () => {
-  // HTML・SVG・XML はこのオリジンでスクリプトを実行できる文書になる
+  // HTML・SVG・XML はこのオリジンでスクリプトを実行できる文書になる。
   for (const name of ["index.html", "logo.svg", "sitemap.xml", "README", "a/b.js"]) {
     await withTempDir({ [name]: "x" }, async (dir) => {
       await assert.rejects(loadStatic(dir), /この種類のファイルは配信できません/, name);

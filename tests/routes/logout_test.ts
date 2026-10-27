@@ -1,4 +1,4 @@
-// アプリは dist/public/ を読み込むため、先に deno task build が要る
+// アプリは dist/public/ を読み込むので、先に deno task build が必要。
 import assert from "node:assert/strict";
 import { createSession, sessionCookie } from "../../src/lib/auth/session.ts";
 import { db } from "../../src/lib/db.ts";

@@ -1,4 +1,4 @@
-// アプリは dist/public/ を読み込むため、先に deno task build が要る
+// アプリは dist/public/ を読み込むので、先に deno task build が必要。
 import assert from "node:assert/strict";
 import { createSession, sessionCookie } from "../../src/lib/auth/session.ts";
 import { db } from "../../src/lib/db.ts";
@@ -40,7 +40,7 @@ async function sessionCount() {
   return Number(rows[0].count);
 }
 
-Deno.test("login: 画面の応答は no-store で、そのトークンでログインすると to に戻る", async () => {
+Deno.test("login: 画面のレスポンスは no-store で、そのトークンでログインすると to に戻る", async () => {
   await resetDb();
   await addAccount();
   const page = await request("/login?to=%2Fhome%3Ftab%3Da");
@@ -58,7 +58,7 @@ Deno.test("login: 画面の応答は no-store で、そのトークンでログ�
   assert.equal(res.headers.get("location"), "/home?tab=a");
   const cookies = res.headers.getSetCookie();
   assert.ok(cookies.some((c) => c.startsWith("__Host-sid=") && !c.includes("Max-Age=0")));
-  // ログイン前の Cookie は消す
+  // ログイン前の Cookie は消す。
   assert.ok(cookies.some((c) => c.startsWith("__Host-csrf=;") && c.includes("Max-Age=0")));
 });
 
@@ -91,7 +91,7 @@ Deno.test("login: サイトの外を指す戻り先は捨てる", async () => {
   assert.equal(res.headers.get("location"), "/home");
 });
 
-Deno.test("login: 期限切れで送られてきたら、その旨を表示する", async () => {
+Deno.test("login: 期限切れでリダイレクトされてきたら、その旨を表示する", async () => {
   await resetDb();
   const res = await request("/login?expired=1");
   assert.match(await res.text(), /有効期限が切れました/);
@@ -112,14 +112,14 @@ Deno.test("login: ログインのたびにセッションを作り直す", async
   await resetDb();
   const account = await addAccount();
   const old = cookiePair(sessionCookie(await createSession(account)));
-  // ログイン中のフォーム（ホームのログアウト）のトークンで、そのまま /login に送る
+  // ログイン中のフォーム（ホームのログアウト）のトークンで、そのまま /login に送る。
   const form = await openForm("/home", old);
   const res = await postLogin({ username: "alice", password: TEST_PASSWORD }, form);
   assert.equal(res.status, 303);
   const renewed = res.headers.getSetCookie().find((c) => c.startsWith("__Host-sid="));
   assert.ok(renewed !== undefined);
   assert.notEqual(cookiePair(renewed), old);
-  // 前のセッションは消え、新しいセッションだけが残る
+  // 前のセッションは消え、新しいセッションだけが残る。
   assert.equal(await sessionCount(), 1);
   const home = await request("/home", { headers: { cookie: old } });
   assert.equal(home.status, 302);

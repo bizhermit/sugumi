@@ -10,9 +10,9 @@ Deno.test("slot: set した値を、同じ ctx でだけ読める", () => {
   account.set(ctx, "alice");
   assert.equal(account.get(ctx), "alice");
   assert.equal(account.find(ctx), "alice");
-  // ほかのリクエストの ctx からは見えない
+  // ほかのリクエストの ctx からは見えない。
   assert.equal(account.find(newCtx()), undefined);
-  // 同じ ctx でも、別の slot とは混ざらない
+  // 同じ ctx でも、別の slot とは混ざらない。
   assert.equal(slot<string>("account").find(ctx), undefined);
 });
 

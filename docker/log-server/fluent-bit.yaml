@@ -32,13 +32,13 @@ pipeline:
       emitter_storage.type: filesystem
 
   outputs:
-    # ファイル名から送り手の値を使わない。送り手が乗っ取られても、/logs の外に書かせないため
+    # ファイル名に送り手の値を使わない。送り手が乗っ取られても、/logs の外に書かせないため
     - name: file
       match: sugumi.app
       path: /logs
       file: app-%Y-%m-%d.jsonl
       enable_strftime: on
-      # 日付ごとのファイルは、日数がたつほど増えるため、数で打ち切らない
+      # 日付ごとのファイルは日数がたつほど増えるので、数で打ち切らない
       max_dynamic_files: 0
       on_missing_field: fallback
       fallback_path: /logs
@@ -46,8 +46,8 @@ pipeline:
       format: plain
       rotate: on
       rotate_max_size: ${LOG_FILE_MAX_SIZE}
-      # 上限は 1 以上で、無制限にできない。数で消すのは、1 日に 100M × 1 万を超えたときだけになるよう大きくする。
-      # 量を送られると押し出されるのは、log-cleaner の合計の上限と同じく、アクセスログなどでは受け入れる
+      # 上限は 1 以上で、無制限にはできない。数で消すのが、1 日に 100M × 1 万を超えたときだけになるよう、大きくしておく。
+      # 大量に送られると古いものが押し出されるが、log-cleaner の合計の上限と同じく、アクセスログなどではそれを受け入れる
       rotate_max_files: 10000
       retry_limit: no_limits
     - name: file
@@ -55,13 +55,13 @@ pipeline:
       path: /logs
       file: audit-%Y-%m-%d.jsonl
       enable_strftime: on
-      # 日付ごとのファイルは、日数がたつほど増えるため、数で打ち切らない
+      # 日付ごとのファイルは日数がたつほど増えるので、数で打ち切らない
       max_dynamic_files: 0
       on_missing_field: fallback
       fallback_path: /logs
       fallback_file: audit-fallback.jsonl
       format: plain
-      # 分けない。分けると、rotate_max_files を超えた古いものを Fluent Bit が消すため、
-      # 共有の鍵を持つ送り手が量を送るだけで、その日の監査ログを押し出せる。増えた分はディスクの監視で気づく
+      # 分けない。分けると、rotate_max_files を超えた古いものを Fluent Bit が消してしまい、
+      # 共有の鍵を持つ送り手が大量に送るだけで、その日の監査ログを押し出せる。増えた分には、ディスクの監視で気づく
       rotate: off
       retry_limit: no_limits

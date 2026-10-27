@@ -9,7 +9,7 @@ import {
 import { formatIp } from "../../src/lib/ip.ts";
 import { withTempDir } from "../_support/fixture.ts";
 
-Deno.test("env: 整数は、未設定なら既定値にし、min 以上の整数でなければ例外にする", () => {
+Deno.test("env: 整数は、未設定ならデフォルト値にし、min 以上の整数でなければ例外にする", () => {
   assert.equal(parseInteger("X", undefined, 30, 0), 30);
   assert.equal(parseInteger("X", "", 30, 0), 30);
   assert.equal(parseInteger("X", "0", 30, 0), 0);
@@ -39,7 +39,7 @@ Deno.test("env: TRUSTED_PROXIES は、カンマ区切りの IP アドレスと C
   );
 });
 
-Deno.test("env: TRUSTED_PROXIES に解析できない値や、広すぎる範囲があれば例外にする", () => {
+Deno.test("env: TRUSTED_PROXIES にパースできない値や、広すぎる範囲があれば例外にする", () => {
   for (const raw of ["proxy", "192.0.2.10,", "10.0.0.5/8", "192.0.2.256"]) {
     assert.throws(
       () => parseTrustedProxies(raw),
@@ -47,7 +47,7 @@ Deno.test("env: TRUSTED_PROXIES に解析できない値や、広すぎる範囲
       raw,
     );
   }
-  // 全体を信頼する書き間違いを防ぐ。分けて書いても 1 つずつ断る
+  // すべてのアドレスを信頼してしまう書き間違いを防ぐ。範囲を分けて書いても、1 つずつ拒否する。
   for (const raw of ["0.0.0.0/0", "0.0.0.0/1,128.0.0.0/1", "10.0.0.0/7", "::/0", "2001:db8::/31"]) {
     assert.throws(() => parseTrustedProxies(raw), /範囲が広すぎます/, raw);
   }
@@ -66,7 +66,7 @@ Deno.test("env: DATABASE_URL は必須で、パスワードはファイルから
     empty: "\n",
   }, (dir) => {
     const file = (name: string) => decodeURIComponent(new URL(name, dir).pathname);
-    // 末尾の改行は取り除き、URL で意味を持つ文字はエンコードする
+    // 末尾の改行は取り除き、URL で意味を持つ文字はエンコードする。
     const url = new URL(parseDatabaseUrl(raw, file("password")));
     assert.equal(decodeURIComponent(url.password), "p@ss/w%rd:#");
     assert.equal(url.username, "app");

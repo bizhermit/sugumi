@@ -1,7 +1,7 @@
 import { parseCidr } from "../../src/lib/ip.ts";
 import { remoteAddressOf } from "../../src/web/remote-address.ts";
 
-// 本番を想定し、信頼するプロキシの裏で X-Forwarded-For を読む
+// 本番を想定して、信頼するプロキシの裏で X-Forwarded-For を読む。
 const TRUSTED = [parseCidr("10.0.0.0/8")!, parseCidr("fd00::/8")!];
 const v4 = new Request("http://localhost/", {
   headers: { "x-forwarded-for": "203.0.113.9, 198.51.100.1, 10.0.1.5" },
