@@ -1,0 +1,108 @@
+#!/bin/sh
+# DB のスキーマ app（アプリのテーブル）のバックアップを、/backups に取り、そこから復元する。
+# /backups には、compose.yaml がホストの BACKUP_DIR をマウントする。
+#
+#   db-backup create                 バックアップを取り、ファイル名を出力する
+#   db-backup list                   バックアップのファイル名と大きさを、古い順に出力する
+#   db-backup delete <ファイル名>...  バックアップを消す
+#   db-backup restore <ファイル名>    スキーマ app をバックアップの内容で置き換える。アプリを止めてから実行し、終わったら起動し直す
+#
+# ユーザー app はバックアップに含めない。復元先の DB には、初期化（init/10-app-role.sh）で作られている。
+set -eu
+# バックアップには、パスワードのハッシュやアプリの鍵が入るので、ほかのユーザーに読ませない
+umask 077
+
+BACKUP_DIR=/backups
+
+usage() {
+  echo "使い方: db-backup create | list | delete <ファイル名>... | restore <ファイル名>" >&2
+  exit 1
+}
+
+# 引数のファイル名を、BACKUP_DIR の中のパスにする。
+# / や .. で BACKUP_DIR の外を指されないよう、create が付ける形の名前だけを受け付ける。
+backup_path() {
+  case "$1" in
+    sugumi-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z.dump) ;;
+    *)
+      echo "バックアップのファイル名ではありません: $1" >&2
+      exit 1
+      ;;
+  esac
+  if [ ! -f "$BACKUP_DIR/$1" ]; then
+    echo "バックアップがありません: $1" >&2
+    exit 1
+  fi
+  echo "$BACKUP_DIR/$1"
+}
+
+create() {
+  # 時刻は UTC。ファイル名の順が、取った順になる
+  name=sugumi-$(date -u +%Y%m%dT%H%M%SZ).dump
+  if [ -e "$BACKUP_DIR/$name" ]; then
+    echo "同じ名前のバックアップがあります。時間を置いてから実行してください: $name" >&2
+    exit 1
+  fi
+  # 書き終わるまでは . で始まる名前にし、list や restore に書きかけのファイルが出ないようにする
+  tmp="$BACKUP_DIR/.$name.tmp"
+  trap 'rm -f "$tmp"' EXIT
+  # pg_dump は 1 つのスナップショットから読むので、アプリが書き込んでいる最中でも、ある時点のそろった状態になる
+  pg_dump --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --schema=app --format=custom --file="$tmp"
+  # コンテナの root のファイルのままだと、ホストで別の場所へ写すのに root の権限が要るので、
+  # ホストのディレクトリの持ち主のファイルにする
+  chown "$(stat -c %u:%g "$BACKUP_DIR")" "$tmp"
+  mv "$tmp" "$BACKUP_DIR/$name"
+  echo "$name"
+}
+
+list() {
+  found=false
+  for path in "$BACKUP_DIR"/sugumi-*.dump; do
+    # 1 つもないと、パターンがそのまま path に入る
+    if [ ! -f "$path" ]; then continue; fi
+    found=true
+    printf '%s\t%s\n' "${path##*/}" "$(du -h "$path" | cut -f 1)"
+  done
+  if [ "$found" = false ]; then
+    echo "バックアップがありません" >&2
+  fi
+}
+
+delete() {
+  if [ $# -eq 0 ]; then usage; fi
+  # 1 つでも誤った名前があれば、どれも消さない
+  for name in "$@"; do
+    backup_path "$name" >/dev/null
+  done
+  for name in "$@"; do
+    rm -- "$BACKUP_DIR/$name"
+  done
+}
+
+restore() {
+  if [ $# -ne 1 ]; then usage; fi
+  path=$(backup_path "$1")
+  sql=$(mktemp)
+  trap 'rm -f "$sql"' EXIT
+  # 先にすべて SQL に変換する。psql にパイプで流すと、バックアップが途中で壊れていたときに、そこまでの内容でコミットされる
+  pg_restore --file="$sql" "$path"
+  # バックアップより後のマイグレーションで足したテーブルが残らないよう、スキーマごと消してから作り直す。
+  # 1 つのトランザクションで実行するので、途中で失敗したら元のデータのままになる
+  PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 --no-psqlrc --quiet --single-transaction \
+    --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "DROP SCHEMA app CASCADE" -f "$sql" >/dev/null
+}
+
+if [ ! -d "$BACKUP_DIR" ]; then
+  echo "$BACKUP_DIR がありません。compose.yaml で BACKUP_DIR をマウントしてください" >&2
+  exit 1
+fi
+if [ $# -eq 0 ]; then usage; fi
+command=$1
+shift
+case "$command" in
+  create) create ;;
+  list) list ;;
+  delete) delete "$@" ;;
+  restore) restore "$@" ;;
+  *) usage ;;
+esac

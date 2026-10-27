@@ -95,6 +95,8 @@ services:
     volumes:
       # PostgreSQL 18 のイメージは /var/lib/postgresql の下にバージョンごとのディレクトリを作る
       - db-data:/var/lib/postgresql
+      # db-backup（docker/db/bin/）がバックアップを置く。ホストから別の場所へ写せるよう、ホストのディレクトリにする
+      - ${BACKUP_DIR:?docker/.env に BACKUP_DIR を書いてください}:/backups
     networks:
       - db
     healthcheck:
