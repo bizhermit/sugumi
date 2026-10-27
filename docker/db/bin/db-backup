@@ -9,14 +9,30 @@
 #
 # ユーザー app はバックアップに含めない。復元先の DB には、初期化（init/10-app-role.sh）で作られている。
 set -eu
+set -o pipefail
 # バックアップには、パスワードのハッシュやアプリの鍵が入るので、ほかのユーザーに読ませない
 umask 077
 
 BACKUP_DIR=/backups
 
+# 後片付けするファイル。空なら何もしない
+tmp=""
+list=""
+
 usage() {
   echo "使い方: db-backup create | list | delete <ファイル名>... | restore <ファイル名>" >&2
   exit 1
+}
+
+cleanup() {
+  if [ -n "$tmp" ]; then rm -f -- "$tmp"; fi
+  if [ -n "$list" ]; then rm -f -- "$list"; fi
+}
+
+# BACKUP_DIR のファイルは、コンテナの root ではなく、ディレクトリの持ち主の権限で読み書きする。
+# ホストでこのディレクトリに書き込める人がシンボリックリンクなどを置いても、その人が元から触れるものにしか届かないようにするため。
+as_owner() {
+  gosu "$owner" "$@"
 }
 
 # 引数のファイル名を、BACKUP_DIR の中のパスにする。
@@ -29,37 +45,49 @@ backup_path() {
       exit 1
       ;;
   esac
-  if [ ! -f "$BACKUP_DIR/$1" ]; then
+  if [ -L "$BACKUP_DIR/$1" ] || [ ! -f "$BACKUP_DIR/$1" ]; then
     echo "バックアップがありません: $1" >&2
     exit 1
   fi
   echo "$BACKUP_DIR/$1"
 }
 
+# バックアップを取り、ファイル名を created に入れる。
+# restore からも呼ぶので、$(...) の中で呼ばない。サブシェルでは trap が効かず、書きかけのファイルが残る。
 create() {
   # 時刻は UTC。ファイル名の順が、取った順になる
   name=sugumi-$(date -u +%Y%m%dT%H%M%SZ).dump
-  if [ -e "$BACKUP_DIR/$name" ]; then
+  # 取った直前に restore すると、復元の前のバックアップと同じ秒になるので、1 回だけ待って取り直す
+  if [ -e "$BACKUP_DIR/$name" ] || [ -L "$BACKUP_DIR/$name" ]; then
+    sleep 1
+    name=sugumi-$(date -u +%Y%m%dT%H%M%SZ).dump
+  fi
+  if [ -e "$BACKUP_DIR/$name" ] || [ -L "$BACKUP_DIR/$name" ]; then
     echo "同じ名前のバックアップがあります。時間を置いてから実行してください: $name" >&2
     exit 1
   fi
   # 書き終わるまでは . で始まる名前にし、list や restore に書きかけのファイルが出ないようにする
   tmp="$BACKUP_DIR/.$name.tmp"
-  trap 'rm -f "$tmp"' EXIT
-  # pg_dump は 1 つのスナップショットから読むので、アプリが書き込んでいる最中でも、ある時点のそろった状態になる
-  pg_dump --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --schema=app --format=custom --file="$tmp"
-  # コンテナの root のファイルのままだと、ホストで別の場所へ写すのに root の権限が要るので、
-  # ホストのディレクトリの持ち主のファイルにする
-  chown "$(stat -c %u:%g "$BACKUP_DIR")" "$tmp"
-  mv "$tmp" "$BACKUP_DIR/$name"
-  echo "$name"
+  # pg_dump は 1 つのスナップショットから読むので、アプリが書き込んでいる最中でも、ある時点のそろった状態になる。
+  # set -C で、すでにある名前（シンボリックリンクを含む）には書かない
+  pg_dump --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --schema=app --format=custom |
+    as_owner sh -c 'set -C; cat > "$1"' sh "$tmp"
+  # -T で、同じ名前のディレクトリがあっても、その中へ移さない
+  as_owner mv -n -T -- "$tmp" "$BACKUP_DIR/$name"
+  # mv -n は、同じ名前があると何もせずに成功するので、移せたかを確かめる
+  if [ -e "$tmp" ]; then
+    echo "同じ名前のバックアップがあります。時間を置いてから実行してください: $name" >&2
+    exit 1
+  fi
+  tmp=""
+  created=$name
 }
 
 list() {
   found=false
   for path in "$BACKUP_DIR"/sugumi-*.dump; do
     # 1 つもないと、パターンがそのまま path に入る
-    if [ ! -f "$path" ]; then continue; fi
+    if [ -L "$path" ] || [ ! -f "$path" ]; then continue; fi
     found=true
     printf '%s\t%s\n' "${path##*/}" "$(du -h "$path" | cut -f 1)"
   done
@@ -79,28 +107,66 @@ delete() {
   done
 }
 
+# スキーマ app を消し、バックアップ（$1 のパス）の内容で作り直す。失敗したら 1 を返す。
+# if の条件で呼ぶと set -e が効かないので、失敗はコマンドごとに return で返す。
+load() {
+  # スキーマを作るには DB への CREATE の権限が要り、app にはないので、ここだけ管理者で実行する
+  PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 --no-psqlrc --quiet --single-transaction \
+    --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
+    -c "DROP SCHEMA app CASCADE" -c "CREATE SCHEMA app AUTHORIZATION app" || return 1
+  # バックアップの中身は app の権限で実行する。管理者で実行すると、app が仕込んだ関数（CHECK 制約など）が、
+  # データを入れるときに管理者の権限で動き、DB の管理者やコンテナを乗っ取られるため。
+  # スキーマはもう作ったので、一覧から除く
+  as_owner cat -- "$1" | pg_restore --list | grep -v ' SCHEMA - app ' >"$list" || return 1
+  as_owner cat -- "$1" |
+    pg_restore --single-transaction --exit-on-error --no-owner --no-privileges --use-list="$list" \
+      --username app --dbname "$POSTGRES_DB" || return 1
+}
+
 restore() {
   if [ $# -ne 1 ]; then usage; fi
   path=$(backup_path "$1")
-  sql=$(mktemp)
-  trap 'rm -f "$sql"' EXIT
-  # 先にすべて SQL に変換する。psql にパイプで流すと、バックアップが途中で壊れていたときに、そこまでの内容でコミットされる
-  pg_restore --file="$sql" "$path"
-  # バックアップより後のマイグレーションで足したテーブルが残らないよう、スキーマごと消してから作り直す。
-  # 1 つのトランザクションで実行するので、途中で失敗したら元のデータのままになる
-  PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 --no-psqlrc --quiet --single-transaction \
-    --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -c "DROP SCHEMA app CASCADE" -f "$sql" >/dev/null
+  list=$(mktemp)
+  # アプリを起動する前に取ったものなど、テーブルのないバックアップで、データをすべて消さないようにする
+  as_owner cat -- "$path" | pg_restore --list >"$list"
+  if ! grep -q ' TABLE app schema_migrations ' "$list"; then
+    echo "アプリのテーブルがないバックアップです: $1" >&2
+    exit 1
+  fi
+  # スキーマを消してから作り直すまでは 1 つのトランザクションにできない（作り直しは管理者、中身は app で実行する）。
+  # 途中で失敗したときに戻せるよう、今の状態のバックアップを取っておく
+  create
+  echo "復元の前のバックアップを取りました: $created"
+  # ここから戻し終わるまでに中断すると、スキーマが空のまま残るので、シグナルを受けても続ける
+  trap '' HUP INT TERM
+  if ! load "$path"; then
+    echo "復元に失敗しました。復元の前のバックアップに戻します: $created" >&2
+    if ! load "$BACKUP_DIR/$created"; then
+      echo "復元の前のバックアップに戻せませんでした。このバックアップから復元し直してください: $created" >&2
+    fi
+    exit 1
+  fi
 }
 
 if [ ! -d "$BACKUP_DIR" ]; then
   echo "$BACKUP_DIR がありません。compose.yaml で BACKUP_DIR をマウントしてください" >&2
   exit 1
 fi
+owner=$(stat -c %u:%g "$BACKUP_DIR")
+# trap の EXIT は、シグナルで終わったときには動かないので、シグナルでも exit させる
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 if [ $# -eq 0 ]; then usage; fi
 command=$1
 shift
 case "$command" in
-  create) create ;;
+  create)
+    create
+    echo "$created"
+    ;;
   list) list ;;
   delete) delete "$@" ;;
   restore) restore "$@" ;;
