@@ -97,8 +97,8 @@ https://raw.githubusercontent.com/mdn/content/main/files/en-us/<スラッグを�
 
      ```json
      {
-         "compilerOptions": { "jsx": "precompile", "jsxImportSource": "#jsx" },
-         "imports": { "#jsx/jsx-runtime": "<リポジトリ>/src/lib/jsx-runtime.ts" }
+       "compilerOptions": { "jsx": "precompile", "jsxImportSource": "#jsx" },
+       "imports": { "#jsx/jsx-runtime": "<リポジトリ>/src/lib/jsx-runtime.ts" }
      }
      ```
 
