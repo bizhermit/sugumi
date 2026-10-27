@@ -13,6 +13,7 @@ import { PRE_LOGIN_CSRF_TIMEOUT_MINUTES } from "../lib/env.ts";
 import { parseForm } from "./form.ts";
 import { editHeaders } from "./response.ts";
 import type { Session } from "../lib/auth/session.ts";
+import type { Html } from "../lib/jsx-runtime.ts";
 
 const FIELD_NAME = "_csrf";
 const HEADER_NAME = "x-csrf-token";
@@ -91,7 +92,7 @@ export function clearPreLoginCookie(): string {
 }
 
 /** フォームの中に置く hidden input。 */
-export function CsrfInput({ token }: { token: string }) {
+export function CsrfInput({ token }: { token: string }): Html {
   return <input type="hidden" name={FIELD_NAME} value={token} />;
 }
 

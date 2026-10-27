@@ -220,6 +220,9 @@
   },
   "lint": {
     "rules": {
+      "include": [
+        "explicit-module-boundary-types"
+      ],
       "exclude": [
         "jsx-key"
       ]
@@ -227,6 +230,7 @@
   },
   "fmt": {
     "lineWidth": 100,
-    "proseWrap": "preserve"
+    "proseWrap": "preserve",
+    "quoteProps": "asNeeded"
   }
 }

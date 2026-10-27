@@ -86,42 +86,12 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 ## テスト
 
 - `deno task test` で実行する。ファイルを指定すると、そのファイルだけを実行する。
+  - テストは環境変数 `TEST_DATABASE_URL` の DB を使う。`deno task test` が `DATABASE_URL` を差し替えて実行するため、`deno test` を直接実行しない。
   - `dist/public/` を読み込むテスト（`src/web/app.ts` の `createApp()` や `src/web/assets.ts` を使うもの）は、先に `deno task build` が要る。
 - `src/`・`scripts/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`、`scripts/gen-routes.ts` → `tests/scripts/gen-routes_test.ts`）。
-  - アサーションは `node:assert/strict` を使う。ライブラリは足さない。
-  - ディレクトリやファイルを読むものは、テスト用のものを `tests/_support/fixture.ts` の `withTempDir()` で `dist/test/` に作って渡す。
-    - そのため、読む場所を引数で受け取れるようにしておく（`loadRouter()` の `root`、`createApp()` の `routes`・`staticDir` など）。
-  - 環境変数の検証は、`src/lib/env.ts` の `parse` で始まる関数に値を渡して確かめる。
-- テストは環境変数 `TEST_DATABASE_URL` の DB を使う。開発用の DB とは分ける。
-  - `deno task test` が `DATABASE_URL` を差し替えて実行する。`deno test` を直接実行しない。
-  - DB を使うテストは、初めに `tests/_support/db.ts` の `resetDb()` で空にする。
-  - テスト用の DB は、名前を `_test` で終わらせる。`resetDb()` は、それ以外の名前の DB を空にしない。
-- 失敗したテストの DB を確かめるときは、そのテストだけを実行してから接続する。
-  - ほかのテストも実行すると、次のテストの `resetDb()` で行が消える。
-  - `deno task test tests/routes/before.tree_test.ts --filter "テストの名前の一部"`
-  - DevContainer では `docker exec -it sugumi_devcontainer-db-test-1 psql -U app -d app_test` で接続する。
-- タイムアウトなどの値は、テストに書かず `src/lib/env.ts` の値を使う。開発環境で変えていても通るようにするため。
+  - 書き方は `tests/CLAUDE.md` に従う。
 - `_assets/` の JS と、画面が CSP の違反なく動くことは、`e2e/` のテストでブラウザを動かして確かめる。`deno task test:e2e` で実行する。
-  - テストは、`e2e/` の同じパスに置く（`src/routes/login/_assets/index.ts` → `e2e/routes/login/_assets/index_test.ts`）。
-  - ファイルは `e2e/` からのパスで指定する（`deno task test:e2e routes_test.ts --filter "テストの名前の一部"`）。
-  - `deno task test:e2e` は、テスト用の DB を空にしてアカウントを作り、本番と同じ方法でアプリを起動してから、`e2e/` のテストを実行する（`scripts/test-e2e.ts`）。
-    - 環境変数 `E2E_BASE_URL` があれば、アプリを起動せず、そこで動いているアプリに対して実行する。そのアプリは `TEST_DATABASE_URL` と同じ DB に接続しておく。
-      - このマシンのアプリ（`127.0.0.1`・`localhost`・`[::1]`）だけを受け付ける。テスト用のアカウントで何度もログインするため、本番やステージングに向けると、同じ名前のアカウントや接続元をロックさせる。
-    - CI は、本番のイメージ（`docker/app/Dockerfile`）を起動して渡す。デプロイするものと同じイメージで確かめるため。
-  - `e2e/` のテストは、アプリを外から操作するだけにする。
-    - DB を触らない。アプリの部品を import しない（`src/web/url.ts` の `path()` と `src/routes.gen.ts` は使ってよい）。
-    - 使うデータは `scripts/test-e2e.ts` で用意し、環境変数で渡す。
-  - テストどうしが影響し合わないようにする。並列や CI のジョブの分割で実行できるようにするため。
-    - ページは `e2e/_support/browser.ts` の `withPage()` で開く。テストごとに Cookie などの保存先を分ける。
-    - ログインは、テストごとに `login()` でする。GET でも状態を変えるルートがある（`/login` はログアウトする）。
-    - アカウントの状態（パスワード、ロックなど）を変えるテストは、そのテスト用のアカウントを `scripts/test-e2e.ts` で作る。
-  - `withPage()` は、コンソールのエラーか、ページで捕まえていない例外があれば失敗にする。
-    - CSP・Trusted Types で止められた処理は、ブラウザがコンソールのエラーか例外として出す。
-  - `e2e/routes_test.ts` が、GET で開けるすべてのルートを、ログインせずに・ログインして開く。
-    - パラメータのあるルートを足したら、`SAMPLE_URLS` に開く URL を書く。書いていないと失敗する。
-    - 応答の CSP が緩んでいないこと（`script-src` が `'self'` だけ、Trusted Types の指定がある、`'unsafe-` を含まない）も確かめる。CSP が緩むと違反が起きなくなり、`withPage()` では気づけないため。
-      - ページで CSP を緩めるときは、ここで認める範囲も見直す。
-  - `evaluate()` などに渡す関数はブラウザで動くため、ファイルの先頭に `/// <reference lib="dom" />` を書く。
+  - 書き方は `e2e/CLAUDE.md` に従う。
   - ルートの `deno fmt`・`deno lint`・`deno check` は `e2e/` を除外する。`e2e/` の中で実行する。
 - PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`（ルートと `e2e/`）・`routes.gen.ts` の差分・`deno task build`・本番のイメージのビルド・`deno task test`・本番のイメージに対する `deno task test:e2e` を確かめる。
 
@@ -144,10 +114,6 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
   - ライブラリが読む環境変数やファイルにも、`deno.json` の `permissions` での許可が要る。
     - 使わない環境変数は、`env.ignore` に入れて未設定として扱わせる（`pg` の `USER` など）。
     - 許可も `ignore` もしないと、端末から起動したときに確認が出る。端末がない本番では拒否される。
-- Playwright のバージョンを変えるときは、次の 2 つを揃え、DevContainer をリビルドする。ずれると、ブラウザを起動できない。
-  - `e2e/deno.json` の `imports`
-  - `e2e/deno.json` の `permissions` の `run`（パスにブラウザのリビジョンが入る）
-  - DevContainer と CI は、`e2e/deno.json` の `imports` のバージョンを、`e2e/deno.lock` でハッシュを確かめて入れる。
 
 ## DB
 
@@ -188,6 +154,37 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
   - `bench/` の同じパスの `*_bench.ts` で測る。DB は `deno task test` と同じく `TEST_DATABASE_URL` を使う。
   - 比べるときは、直す前のコミットを `git worktree` で別に取り出し、両方で実行する。
 
+## コードの書き方
+
+- 整形は `deno fmt` に任せる。設定は `deno.json` と `e2e/deno.json` の `fmt` に同じ値で書く。
+  - 既定と同じ値は書かない。
+- 名前のある関数は `function` で宣言する。アロー関数は、引数に渡すその場の関数だけに使う。
+- 状態を持つ部品は、関数（関数を並べたオブジェクトを返すもの）で作る。
+  - クラスにするのは、リクエストごとに作るもの（メソッドを毎回作らないため）・`instanceof` で判定するもの・文字列などと区別する型が要るものだけ。理由をコメントに書く。
+- `if` の中が `return`・`continue`・`break`・`throw` の 1 文だけなら、1 行で波括弧を付けない。それ以外は波括弧を付ける。
+- 値がないことは `undefined` で表し、`=== undefined` で判定する。
+  - 標準の API や DB が返す `null` は `=== null` で判定する。
+  - `null` と `undefined` の両方が来る外部の値（JSON など）だけ `== null` を使う。
+- 名前は省略しない。
+  - ループの添字や、数行で終わる範囲の一時的な値は短くてよい。
+  - `req`・`res`・`ctx`・`db` は使ってよい。
+- 変数は 1 つの文で 1 つだけ宣言する。
+- リクエストの処理で通らないコードのループは、値の変換なら `map()`・`filter()`、それ以外は `for...of` にする。`forEach()` は使わない。
+  - リクエストの処理で通るコードは「サーバーの性能」に従う。
+- 比較は、調べる値を左、定数を右に置く（`c === "@"`）。
+- オブジェクトの型は `type` で書く。`interface` は JSX の型など、仕組みで必要なときだけ使う。
+- 配列の型は `Array<T>`、読み取り専用は `ReadonlyArray<T>` で書く。`T[]` は使わない。
+  - `string | number[]` のように、括弧の付け忘れで別の型になるのを防ぐため。
+- `export` する関数には、戻り値の型を書く（`deno lint` の `explicit-module-boundary-types` で検出する）。ファイルの中だけで使う関数は、推論に任せる。
+- 想定内の失敗（パスワードの誤り、ロックなど）は、例外にせず `status` で判別する union で返す。結果が 2 通りでも `status` にする。
+  - 例：`{ status: "ok"; account: Account } | { status: "locked" }`
+  - 例外は想定外のことだけに使う。
+- 中身ごと変わらないモジュールの定数（固定の値・正規表現・固定の `Set` など）は `UPPER_SNAKE_CASE`、中身が変わるものやインスタンスは camelCase にする。
+- ファイル名はケバブケースにする。
+- 例外とログのメッセージは日本語で書く。値を添えるときは半角の `:` と空白で区切る（`属性名に使えません: ${name}`）。
+  - 検索や集計に使う値は、決まった英語の値をフィールドに持たせる（監査ログの `event` など）。メッセージの文で検索しない。
+  - 利用者に見せる文言は、例外のメッセージを使わない。
+
 ## コメント
 
 - 設計書は書かない。コードとコメントで説明する。
@@ -199,7 +196,11 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 - 理由のコメントは、その判断をしているコードのそばに書く。
   - 呼び出し側の判断（どの関数を呼ぶか、どの条件で分岐するか）の理由は、呼び出し・分岐の直前に書く。呼ばれる関数のコメントには書かない。
   - 関数のコメントに書く理由は、その関数自身の作りについてのものだけにする。
+- `export` する関数には、必ず JSDoc を書く。
+  - 名前の言い換えしか書けないときは、戻り値の意味・呼ぶ場面・前提など、使う人が知るべきことを書く。
+  - `@param`・`@returns` は、説明があるときだけ書く。
 - 名前やコードを言い換えただけの説明は書かない（例：`loginPage` に「ログインページ。」）。
+- コメントの文末には「。」を付ける。
 - 処理の流れの説明や変更の経緯は書かない。経緯はコミットメッセージに残す。
 - `.env.example` には、見出しと値だけを書く。値の意味や選び方は、環境構築の手順と同じドキュメントに書く。
   - 本番は `docker/README.md`、開発環境は `.devcontainer/README.md`。
