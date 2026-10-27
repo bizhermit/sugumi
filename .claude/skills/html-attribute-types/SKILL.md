@@ -5,14 +5,11 @@ description: src/lib/html-attributes.ts の JSX の属性の型に、MDN の情�
 
 # HTML の属性の型を追加・更新する
 
-`src/lib/html-attributes.ts` の `HtmlElements` は、JSX
-で属性を型チェックするタグと、その属性の一覧。 ここにないタグはどの属性でも書ける。このスキルで、MDN
-をもとにタグを足したり、既存のタグを最新の仕様と対応状況に合わせたりする。
+`src/lib/html-attributes.ts` の `HtmlElements` は、JSX で属性を型チェックするタグと、その属性の一覧。ここにないタグには、どの属性でも書ける。このスキルでは、MDN をもとにタグを足したり、既存のタグを最新の仕様と対応状況に合わせたりする。
 
 ## 1. 対象を決める
 
-- 引数や依頼にタグ名があれば、それを対象にする。全要素共通の属性（`Global`）を見直すときは `global`
-  を対象にする。
+- 引数や依頼にタグ名があれば、それを対象にする。全要素共通の属性（`Global`）を見直すときは `global` を対象にする。
 - 「全部更新」なら、`HtmlElements` のすべてのキーと `global` を対象にする。
 - 対象が分からなければ、ユーザーに聞く。
 - 先に `src/lib/html-attributes.ts` を読み、いまの型と書き方を把握する。
@@ -29,32 +26,23 @@ description: src/lib/html-attributes.ts の JSX の属性の型に、MDN の情�
 deno run --allow-net=raw.githubusercontent.com .claude/skills/html-attribute-types/compat.ts <対象>
 ```
 
-- `<対象>` はタグ名（`dialog`）、input の
-  type（`input/password`）、全要素共通の属性（`global`）のいずれか。
+- `<対象>` は、タグ名（`dialog`）、input の type（`input/password`）、全要素共通の属性（`global`）のいずれか。
 - 1 行目はタグ自体の状態で、最後の列が MDN のページの URL。2 行目以降が属性ごとの行。
-- 列は「名前・状態（`deprecated`・`experimental`・`non-standard`、なければ
-  `-`）・各ブラウザの安定版で対応した版（未対応は `no`）・MDN の URL」。
-- 属性ではない項目（`no_ua_styles_…` のような挙動の違い）も行に出る。MDN
-  の属性の一覧にないものは無視する。
-- 属性の一覧は完全ではない（`input` の `type`・`value` などは出ない）。一覧は次の MDN
-  のページで確かめる。
+- 列は「名前・状態（`deprecated`・`experimental`・`non-standard`、なければ `-`）・各ブラウザの安定版で対応したバージョン（未対応は `no`）・MDN の URL」。
+- 属性ではない項目（`no_ua_styles_…` のような挙動の違い）も行に出る。MDN の属性の一覧にないものは無視する。
+- 属性の一覧は完全ではない（`input` の `type`・`value` などは出ない）。一覧は、次の MDN のページで確かめる。
 
 ### 属性の一覧と値：MDN のページ
 
-1 行目の URL `https://developer.mozilla.org/docs/<スラッグ>` から、ページの元の Markdown
-を取得する。
+1 行目の URL `https://developer.mozilla.org/docs/<スラッグ>` から、ページの元の Markdown を取得する。
 
 ```
 https://raw.githubusercontent.com/mdn/content/main/files/en-us/<スラッグを小文字にしたもの>/index.md
 ```
 
-- 例：`h1` は `Web/HTML/Reference/Elements/Heading_Elements` →
-  `.../files/en-us/web/html/reference/elements/heading_elements/index.md`
-- `## Attributes`
-  の節に属性の一覧がある。`{{deprecated_inline}}`・`{{experimental_inline}}`・`{{non-standard_inline}}`
-  が付いた属性は、その状態として扱う。
-- 値が決まっている属性は、各属性の説明にある値の一覧（`Possible values`
-  など）を読む。説明が別ページにある属性（`autocomplete` など）は、リンク先の Markdown も読む。
+- 例：`h1` は `Web/HTML/Reference/Elements/Heading_Elements` → `.../files/en-us/web/html/reference/elements/heading_elements/index.md`
+- `## Attributes` の節に属性の一覧がある。`{{deprecated_inline}}`・`{{experimental_inline}}`・`{{non-standard_inline}}` が付いた属性は、その状態として扱う。
+- 値が決まっている属性は、各属性の説明にある値の一覧（`Possible values` など）を読む。説明が別のページにある属性（`autocomplete` など）は、リンク先の Markdown も読む。
 - `global` は `web/html/reference/global_attributes/index.md` と、属性ごとのページを読む。
 
 ## 3. 入れるかどうかを決める
@@ -66,24 +54,20 @@ https://raw.githubusercontent.com/mdn/content/main/files/en-us/<スラッグを�
 
 1. **入れない**
    - `deprecated` か `non-standard` のもの。
-   - Chrome・Firefox・Safari のどれも対応していないもの。`experimental`
-     のものも、どれかが対応するまでは入れない。
-   - `on*`（イベントハンドラ）と `style`。CSP で使えないため、型に入れずエラーにしている。
-   - `-` を含むもの（`data-*`・`aria-*`・`accept-charset` など）。TypeScript が JSX
-     でチェックしないため。
+   - Chrome・Firefox・Safari のどれも対応していないもの。`experimental` のものも、どれかが対応するまでは入れない。
+   - `on*`（イベントハンドラ）と `style`。CSP で使えないので、型に入れず、書くとエラーになるようにしている。
+   - `-` を含むもの（`data-*`・`aria-*`・`accept-charset` など）。TypeScript が JSX でチェックしないため。
 2. **入れる**：それ以外のもの（Chrome・Firefox・Safari のどれかが対応しているもの）。
    - どれかのブラウザが対応していなければ、その属性の行の末尾にコメントで注釈を入れる。
      - 書き方：`// 未対応：Safari（2026-10 時点）`。日付は作業した年月にする。
-     - Safari がデスクトップか iOS の片方だけ対応しているときは、`Safari（iOS）`
-       のように対応していない方を書く。
+     - Safari がデスクトップか iOS の片方だけ対応しているときは、`Safari（iOS）` のように、対応していないほうを書く。
    - タグ自体が未対応のブラウザがあるときは、タグの行の末尾に同じ形で書く。
 
 更新のときは、既存のタグと属性も同じ基準で見直す。
 
 - すべてのブラウザが対応した属性は、注釈を消す。未対応のブラウザが変わったら、注釈を書き直す。
 - 基準を満たさなくなった属性は、削除の候補にする。
-- 削除の前に `grep -rn '<属性名>=' src/`
-  などで使われているかを確かめる。使われている属性の削除は、場所を示してユーザーに確認する。
+- 削除の前に、`grep -rn '<属性名>=' src/` などで使われているかを確かめる。使われている属性を削除するときは、場所を示してユーザーに確認する。
 
 ## 4. 型を書く
 
@@ -94,14 +78,12 @@ https://raw.githubusercontent.com/mdn/content/main/files/en-us/<スラッグを�
 - 値の種類ごとの型：
   - 真偽値の属性（あるかないかで意味が決まる）：`boolean`
   - 値が決まっている属性：文字列のリテラルの組み合わせ（`"get" | "post"`）
-    - 値を省略した形にも意味がある属性（`hidden` の `until-found` など）は、`boolean`
-      と組み合わせる。
+    - 値を省略した形にも意味がある属性（`hidden` の `until-found` など）は、`boolean` と組み合わせる。
   - 数値の属性：`Num`（`{1}` と `"1"` の両方を受ける）
   - 数値と文字列のどちらもとる属性（`input` の `min` など）：`string | number`
   - 自由な文字列：`string`
   - 仕様で必須の属性（`img` の `src`・`alt`）は `?` を付けない。
-- 複数のタグで同じ値の組み合わせを使うものは、既存の型（`Target`・`FormMethod`
-  など）を使うか、新しく型にまとめる。
+- 複数のタグで同じ値の組み合わせを使うものは、既存の型（`Target`・`FormMethod` など）を使うか、新しく型にまとめる。
 - 型は `interface` ではなく `type` で書く。`Record<string, unknown>` に代入できるようにするため。
 - タグは、似た用途のタグの近くに置く。
 - コメントは、コードを読んでも分からない制約だけを書く（CLAUDE.md の「コメント」に従う）。
@@ -115,8 +97,8 @@ https://raw.githubusercontent.com/mdn/content/main/files/en-us/<スラッグを�
 
      ```json
      {
-         "compilerOptions": { "jsx": "precompile", "jsxImportSource": "#jsx" },
-         "imports": { "#jsx/jsx-runtime": "<リポジトリ>/src/lib/jsx-runtime.ts" }
+       "compilerOptions": { "jsx": "precompile", "jsxImportSource": "#jsx" },
+       "imports": { "#jsx/jsx-runtime": "<リポジトリ>/src/lib/jsx-runtime.ts" }
      }
      ```
 

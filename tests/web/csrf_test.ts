@@ -11,7 +11,7 @@ const FORM_URL = "http://localhost/form";
 function post(
   token: string | undefined,
   { cookie, header = false }: { cookie?: string; header?: boolean } = {},
-): Request {
+) {
   const headers = new Headers(cookie ? { cookie } : {});
   if (header && token !== undefined) {
     headers.set("x-csrf-token", token);
@@ -22,7 +22,7 @@ function post(
 }
 
 /** ログイン前のトークンを発行し、そのトークンと、ブラウザが次に送る Cookie を返す。 */
-async function issuePreLogin(): Promise<{ token: string; cookie: string }> {
+async function issuePreLogin() {
   const csrf = csrfFor(new Request(FORM_URL), undefined);
   const token = await csrf.token();
   const setCookie = csrf.apply(new Response()).headers.get("set-cookie");
@@ -30,7 +30,7 @@ async function issuePreLogin(): Promise<{ token: string; cookie: string }> {
   return { token, cookie: cookiePair(setCookie) };
 }
 
-function preLoginCookie(issuedAt: number): string {
+function preLoginCookie(issuedAt: number) {
   return `__Host-csrf=${issuedAt}.${randomToken()}`;
 }
 
@@ -41,7 +41,7 @@ Deno.test("csrf: GET などは検証せずに通す", async () => {
   }
 });
 
-Deno.test("csrf: ログイン前のトークンを、発行した Cookie と照合する", async () => {
+Deno.test("csrf: ログイン前のトークンは、発行したときの Cookie と一致するかを検証する", async () => {
   const { token, cookie } = await issuePreLogin();
   const csrf = csrfFor(post(token, { cookie }), undefined);
   assert.equal(csrf.stale, false);
@@ -50,15 +50,15 @@ Deno.test("csrf: ログイン前のトークンを、発行した Cookie と照�
   assert.equal(await csrf.verify(post(undefined, { cookie })), false);
   assert.equal(await csrf.verify(post(token.slice(1), { cookie })), false);
 
-  // 別のブラウザの Cookie で発行したトークンは通さない
+  // 別のブラウザの Cookie で発行したトークンは通さない。
   const other = await issuePreLogin();
   assert.equal(await csrfFor(post(token, other), undefined).verify(post(token, other)), false);
-  // Cookie がなければ照合先がないため通さない
+  // Cookie がなければ紐付け先がないので通さない。
   assert.equal(await csrfFor(post(token), undefined).verify(post(token)), false);
 });
 
 Deno.test({
-  name: "csrf: ログイン前の Cookie は期限を過ぎると stale になり、照合しない",
+  name: "csrf: ログイン前の Cookie は期限を過ぎると stale になり、紐付け先として使わない",
   ignore: PRE_LOGIN_CSRF_TIMEOUT_MINUTES === 0,
   async fn() {
     const ttl = PRE_LOGIN_CSRF_TIMEOUT_MINUTES * 60 * 1000;
@@ -71,7 +71,7 @@ Deno.test({
     const cookie = preLoginCookie(Date.now() - ttl);
     const csrf = csrfFor(post("x", { cookie }), undefined);
     assert.equal(csrf.stale, true);
-    // 期限切れの Cookie で発行したトークンでも、照合先がないため通さない
+    // 期限切れの Cookie で発行したトークンでも、紐付け先がないので通さない。
     const issued = await csrfFor(new Request(FORM_URL, { headers: { cookie } }), undefined).token();
     assert.equal(await csrf.verify(post(issued, { cookie })), false);
   },
@@ -83,7 +83,7 @@ Deno.test("csrf: 未来の時刻や形式の違う Cookie は stale になる", 
   }
 });
 
-Deno.test("csrf: ログイン中はセッションに結び付いたトークンだけを通す", async () => {
+Deno.test("csrf: ログイン中はセッションに紐付いたトークンだけを通す", async () => {
   await resetDb();
   const account = await addAccount();
   const session = await createSession(account);
@@ -91,7 +91,7 @@ Deno.test("csrf: ログイン中はセッションに結び付いたトークン
   const csrf = csrfFor(post(token), session);
   assert.equal(await csrf.verify(post(token)), true);
 
-  // 別のセッションのトークンや、ログイン前のトークンは通さない
+  // 別のセッションのトークンや、ログイン前のトークンは通さない。
   const otherSession = await createSession(account);
   assert.equal(await csrfFor(post(token), otherSession).verify(post(token)), false);
   const preLogin = await issuePreLogin();
@@ -101,8 +101,10 @@ Deno.test("csrf: ログイン中はセッションに結び付いたトークン
   );
 });
 
-Deno.test("csrf: token() を呼んだ応答は、ページの指定によらず no-store にする", async () => {
-  const page = () => new Response("ok", { headers: { "cache-control": "public, max-age=60" } });
+Deno.test("csrf: token() を呼んだレスポンスは、ページの指定によらず no-store にする", async () => {
+  function page() {
+    return new Response("ok", { headers: { "cache-control": "public, max-age=60" } });
+  }
 
   const unused = csrfFor(new Request(FORM_URL), undefined).apply(page());
   assert.equal(unused.headers.get("cache-control"), "public, max-age=60");
@@ -114,7 +116,7 @@ Deno.test("csrf: token() を呼んだ応答は、ページの指定によらず 
   assert.equal(used.headers.get("cache-control"), "no-store");
   assert.equal(await used.text(), "ok");
 
-  // 照合先の Cookie が既にあれば、Cookie を発行し直さない
+  // 紐付け先の Cookie が既にあれば、Cookie を発行し直さない。
   const { cookie } = await issuePreLogin();
   const again = csrfFor(new Request(FORM_URL, { headers: { cookie } }), undefined);
   await again.token();

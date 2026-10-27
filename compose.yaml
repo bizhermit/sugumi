@@ -12,26 +12,27 @@ services:
     environment:
       DATABASE_URL: postgres://app@db:5432/app
       DATABASE_PASSWORD_FILE: /run/secrets/db_app_password
-      # docker/.env の値を渡す。書いていなければ空になり、アプリの既定値を使う。
+      # docker/.env の値を渡す。書いていなければ空になり、アプリのデフォルト値が使われる。
       # env_file で渡さないのは、docker/.env のパスワードまでアプリの環境変数に入ってしまうため
-      DB_POOL_MAX: ${DB_POOL_MAX:-}
-      DB_CONNECTION_TIMEOUT_SECONDS: ${DB_CONNECTION_TIMEOUT_SECONDS:-}
-      DB_STATEMENT_TIMEOUT_SECONDS: ${DB_STATEMENT_TIMEOUT_SECONDS:-}
+      APP_MODE: ${APP_MODE:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       REQUEST_BODY_TIMEOUT_SECONDS: ${REQUEST_BODY_TIMEOUT_SECONDS:-}
+      SESSION_IDLE_TIMEOUT_MINUTES: ${SESSION_IDLE_TIMEOUT_MINUTES:-}
+      SESSION_ABSOLUTE_TIMEOUT_MINUTES: ${SESSION_ABSOLUTE_TIMEOUT_MINUTES:-}
       LOGIN_LOCKOUT_MINUTES: ${LOGIN_LOCKOUT_MINUTES:-}
       LOGIN_MAX_FAILED_ATTEMPTS: ${LOGIN_MAX_FAILED_ATTEMPTS:-}
       LOGIN_DEVICE_DAYS: ${LOGIN_DEVICE_DAYS:-}
       LOGIN_IP_MAX_FAILED_ATTEMPTS: ${LOGIN_IP_MAX_FAILED_ATTEMPTS:-}
       LOGIN_IP_WINDOW_MINUTES: ${LOGIN_IP_WINDOW_MINUTES:-}
       LOGIN_IP_LOCKOUT_MINUTES: ${LOGIN_IP_LOCKOUT_MINUTES:-}
-      SESSION_IDLE_TIMEOUT_MINUTES: ${SESSION_IDLE_TIMEOUT_MINUTES:-}
-      SESSION_ABSOLUTE_TIMEOUT_MINUTES: ${SESSION_ABSOLUTE_TIMEOUT_MINUTES:-}
       PRE_LOGIN_CSRF_TIMEOUT_MINUTES: ${PRE_LOGIN_CSRF_TIMEOUT_MINUTES:-}
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      DB_POOL_MAX: ${DB_POOL_MAX:-}
+      DB_CONNECTION_TIMEOUT_SECONDS: ${DB_CONNECTION_TIMEOUT_SECONDS:-}
+      DB_STATEMENT_TIMEOUT_SECONDS: ${DB_STATEMENT_TIMEOUT_SECONDS:-}
     secrets:
       - db_app_password
     ports:
-      # Cookie に Secure を付けているため、HTTPS を受けるリバースプロキシを同じサーバーに置き、そこから転送する。
+      # Cookie に Secure を付けているので、HTTPS を受けるリバースプロキシを同じサーバーに置き、そこから転送する。
       # このポートへの接続は、どこからでも APP_NETWORK_GATEWAY から届いたように見える。
       # TRUSTED_PROXIES を書いたまま 127.0.0.1 以外にも公開すると、外から X-Forwarded-For で接続元を偽れる
       - 127.0.0.1:3000:3000
@@ -68,10 +69,10 @@ services:
       CLOUDWATCH_LOG_GROUP: ${CLOUDWATCH_LOG_GROUP:-}
       LOG_SERVER_HOST: ${LOG_SERVER_HOST:-}
       LOG_SERVER_PORT: ${LOG_SERVER_PORT:-24224}
-      # Fluent Bit は設定の値をファイルから読めないため、secrets ではなく環境変数で渡す
+      # Fluent Bit は設定の値をファイルから読めないので、secrets ではなく環境変数で渡す
       LOG_SERVER_SHARED_KEY: ${LOG_SERVER_SHARED_KEY:-}
-    # ホストのネットワークで動かす。次の 2 つのため（待ち受けは 127.0.0.1 だけ。docker/log-forwarder/pipeline.yaml）
-    # - Docker の fluentd ログドライバーはホストから接続する。アプリのコンテナからは届かず、ログを送り込めない
+    # 理由は次の 2 つで、ホストのネットワークで動かす（待ち受けは 127.0.0.1 だけ。docker/log-forwarder/pipeline.yaml）
+    # - Docker の fluentd ログドライバーはホストから接続する。アプリのコンテナからは届かないので、ログを送り込めない
     # - EC2 のメタデータ（IAM ロールの権限）に、ホップ数 1 のまま届く。ブリッジのネットワークにいるアプリのコンテナからは届かない
     network_mode: host
     volumes:
@@ -97,7 +98,7 @@ services:
     networks:
       - db
     healthcheck:
-      # 初期化の途中は Unix ソケットだけで待ち受けるため、TCP で確かめて初期化の完了を待つ
+      # 初期化の途中は Unix ソケットだけで待ち受けるので、TCP で確かめて初期化の完了を待つ
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "admin", "-d", "app"]
       interval: 5s
       timeout: 5s
@@ -105,14 +106,14 @@ services:
 
 networks:
   # 同じサーバーのリバースプロキシから 127.0.0.1:3000 への接続は、アプリにはこのネットワークのゲートウェイから届く。
-  # 作り直すたびにアドレスが変わると TRUSTED_PROXIES と合わなくなるため、固定する。
-  # サーバーのほかのネットワークと重ならない範囲はサーバーごとに違うため、docker/.env で指定する
+  # 作り直すたびにアドレスが変わると TRUSTED_PROXIES と合わなくなるので、固定する。
+  # サーバーのほかのネットワークと重ならない範囲はサーバーごとに違うので、docker/.env で指定する
   default:
     ipam:
       config:
         - subnet: ${APP_NETWORK_SUBNET:?docker/.env に APP_NETWORK_SUBNET を書いてください}
           gateway: ${APP_NETWORK_GATEWAY:?docker/.env に APP_NETWORK_GATEWAY を書いてください}
-  # DB はこのネットワークだけに置く。internal のため、外部とも通信できない
+  # DB はこのネットワークだけに置く。internal なので、外部とも通信できない
   db:
     internal: true
 
@@ -120,8 +121,8 @@ volumes:
   db-data:
   log-buffer:
 
-# 環境変数に置くと docker inspect などで見えるため、docker/.env の値からファイルを作り、/run/secrets/ に置く。
-# --env-file を付け忘れると、値がないため起動しない
+# 環境変数に置くと docker inspect などで見えてしまうので、docker/.env の値からファイルを作り、/run/secrets/ に置く。
+# --env-file を付け忘れると、値がないので起動しない
 secrets:
   db_admin_password:
     environment: DB_ADMIN_PASSWORD

@@ -23,7 +23,7 @@
     {
       "id": "cleanupTargetBranch",
       "type": "promptString",
-      "description": "切り替え先ブランチ（何も入力せずにEnterを押すとmain）",
+      "description": "切り替え先ブランチ",
       "default": "main"
     }
   ]

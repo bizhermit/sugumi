@@ -1,21 +1,21 @@
 /**
  * src/ と scripts/ の import が、サーバー・クライアント・共有の取り決めに沿っているかを確かめる。
- * 違反があれば一覧を出して終了コード 1 で終わる。
+ * 違反があれば、一覧を出して終了コード 1 で終わる。
  *
  *   `_assets/` の中（クライアント）：同じ `_assets/` の中と `_shared/` だけを import できる
  *   `_shared/` の中（共有）        ：`_shared/` だけを import できる
  *   それ以外（サーバー）            ：`_assets/` を import できない
  *
- * また、`*.mock.*` は `*.mock.*` からだけ import できる。モックは本番のイメージに含めない（.dockerignore）ため。
+ * モックは本番のイメージに含めない（.dockerignore）ので、`*.mock.*` は `*.mock.*` からだけ import できるようにする。
  *
  * あわせて、src/_shared/ とシンボリックリンクがないこと、`_assets/` と `_shared/` に JSX のファイルがないことを確かめる。
- * JSX は src/lib/jsx-runtime.ts を暗黙に import し、指定子がソースに現れないため、ファイルの拡張子で判定する。
+ * JSX は src/lib/jsx-runtime.ts を暗黙に import するので、指定子がソースに現れない。そのため、ファイルの拡張子で判定する。
  * ディレクトリをまたぐ共有の部品は src/lib/_shared/ に置く。
- * シンボリックリンクは、リンクの置き場所とリンク先で取り決めの判定が食い違うため使わない。
+ * シンボリックリンクは、リンクの置き場所とリンク先とで判定が食い違うので使わない。
  *
- * import の指定子は正規表現で拾うため、文字列やコメントの中の `from "..."` も import として扱い、
+ * import の指定子は正規表現で拾う。そのため、文字列やコメントの中の `from "..."` も import として扱い、
  * `from` と指定子の間にコメントを挟んだものは見逃す。
- * 見逃しは deno task build のあとに check-bundle.ts が、実際にバンドルされたソースで検出する。
+ * 見逃したものは、deno task build のあとに check-bundle.ts が、実際にバンドルされたソースで検出する。
  */
 
 type Kind = "client" | "shared" | "server";
@@ -33,11 +33,13 @@ if (import.meta.main) {
   }
 }
 
-/** root（リポジトリの直下）の src/ と scripts/ を確かめ、違反の一覧を返す。root はテストで別のディレクトリを渡す。 */
-export async function checkImports(root: URL): Promise<string[]> {
-  const violations: string[] = [];
+/** root（リポジトリのルート）の src/ と scripts/ を確かめ、違反の一覧を返す。テストでは root に別のディレクトリを渡す。 */
+export async function checkImports(root: URL): Promise<Array<string>> {
+  const violations: Array<string> = [];
   const rootPath = decodeURIComponent(root.pathname);
-  const relative = (url: URL) => decodeURIComponent(url.pathname).slice(rootPath.length);
+  function relative(url: URL) {
+    return decodeURIComponent(url.pathname).slice(rootPath.length);
+  }
   if (await exists(new URL("src/_shared/", root))) {
     violations.push("src/_shared/: 作れません（src/lib/_shared/ に置いてください）");
   }
@@ -49,22 +51,24 @@ export async function checkImports(root: URL): Promise<string[]> {
   return violations;
 }
 
-async function checkFile(file: URL, relative: (url: URL) => string): Promise<string[]> {
-  const violations: string[] = [];
+async function checkFile(file: URL, relative: (url: URL) => string) {
+  const violations: Array<string> = [];
   const from = relative(file);
   const fromKind = kindOf(from);
   if (fromKind !== "server" && /x$/.test(file.pathname)) {
     violations.push(`${from}: JSX はサーバー専用です`);
   }
   const text = await Deno.readTextFile(file);
-  const lineOf = (index: number) => text.slice(0, index).split("\n").length;
+  function lineOf(index: number) {
+    return text.slice(0, index).split("\n").length;
+  }
   for (const { 2: specifier, index } of text.matchAll(SPECIFIER)) {
     const reason = check(from, fromKind, specifier, () => relative(new URL(specifier, file)));
     if (reason) {
       violations.push(`${from}:${lineOf(index)}: ${specifier} を import できません（${reason}）`);
     }
   }
-  // 読み込む先を変数で決めると、どこを読み込むかを確かめられない
+  // 読み込む先を変数で決めると、何を読み込むのか確かめられない。
   if (fromKind !== "server") {
     for (const { index } of text.matchAll(DYNAMIC_IMPORT)) {
       violations.push(`${from}:${lineOf(index)}: import() には文字列を直接書いてください`);
@@ -73,7 +77,7 @@ async function checkFile(file: URL, relative: (url: URL) => string): Promise<str
   return violations;
 }
 
-/** 違反なら理由を、問題なければ undefined を返す。resolve は相対パスの指定子を、リポジトリの直下からのパスにする。 */
+/** 違反なら理由を、問題がなければ undefined を返す。resolve は、相対パスの指定子をリポジトリのルートからのパスにする関数。 */
 function check(
   from: string,
   fromKind: Kind,
@@ -82,7 +86,7 @@ function check(
 ): string | undefined {
   const isRelative = specifier.startsWith("./") || specifier.startsWith("../");
   if (!isRelative) {
-    // node: などはサーバーの API で、ブラウザでは動かない
+    // node: などはサーバーの API なので、ブラウザでは動かない。
     return fromKind === "server"
       ? undefined
       : "_assets/ と _shared/ からは相対パスだけを import できます";
@@ -111,11 +115,11 @@ function kindOf(path: string): Kind {
   return "server";
 }
 
-function assetsRoot(path: string): string {
+function assetsRoot(path: string) {
   return path.slice(0, path.indexOf("/_assets/"));
 }
 
-async function exists(url: URL): Promise<boolean> {
+async function exists(url: URL) {
   try {
     await Deno.stat(url);
     return true;
@@ -128,7 +132,7 @@ async function exists(url: URL): Promise<boolean> {
 async function* walk(
   dir: URL,
   relative: (url: URL) => string,
-  violations: string[],
+  violations: Array<string>,
 ): AsyncGenerator<URL> {
   for await (const entry of Deno.readDir(dir)) {
     const url = new URL(encodeURIComponent(entry.name), dir);

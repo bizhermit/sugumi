@@ -1,10 +1,10 @@
 /**
  * dist/public/ のバンドルに、クライアント（`_assets/`）と共有（`_shared/`）以外のソースが入っていないかを確かめる。
- * 入っていれば一覧を出して終了コード 1 で終わる。deno task build がバンドルのあとに実行する。
+ * 入っていれば、一覧を出して終了コード 1 で終わる。deno task build がバンドルのあとに実行する。
  *
  * deno bundle はサーバー専用のコードを import してもエラーにせず、そのまま公開するファイルに含める。
- * check-imports.ts は import の書き方を見るだけで見逃しがあるため、実際にバンドルされたソースを
- * ソースマップの sources で確かめる。シンボリックリンクは解決された先のパスで記録される。
+ * check-imports.ts は import の書き方しか見ないので、見逃すことがある。そこで、実際にバンドルされたソースを
+ * ソースマップの sources で確かめる。シンボリックリンクは、リンク先のパスで記録される。
  */
 
 if (import.meta.main) {
@@ -15,26 +15,32 @@ if (import.meta.main) {
   }
 }
 
-/** root（リポジトリの直下）の dist/public/ を確かめ、違反の一覧を返す。root はテストで別のディレクトリを渡す。 */
-export async function checkBundle(root: URL): Promise<string[]> {
+/** root（リポジトリのルート）の dist/public/ を確かめ、違反の一覧を返す。テストでは root に別のディレクトリを渡す。 */
+export async function checkBundle(root: URL): Promise<Array<string>> {
   const rootPath = decodeURIComponent(root.pathname);
-  const relative = (url: URL) => decodeURIComponent(url.pathname).slice(rootPath.length);
-  const violations: string[] = [];
+  function relative(url: URL) {
+    return decodeURIComponent(url.pathname).slice(rootPath.length);
+  }
+  const violations: Array<string> = [];
   let maps = 0;
   for await (const file of walk(new URL("dist/public/", root))) {
     if (!file.pathname.endsWith(".map")) continue;
     maps++;
-    const { sources } = JSON.parse(await Deno.readTextFile(file)) as { sources: string[] };
+    const { sources } = JSON.parse(await Deno.readTextFile(file)) as { sources: Array<string> };
     for (const source of sources) {
       const path = relative(new URL(source, file));
       const segments = path.split("/");
       const allowed = segments[0] === "src" &&
         (segments.includes("_assets") || segments.includes("_shared"));
-      if (!allowed) violations.push(`${relative(file)}: ${path} がバンドルに含まれています`);
+      if (!allowed) {
+        violations.push(`${relative(file)}: ${path} がバンドルに含まれています`);
+      }
     }
   }
-  // ソースマップがなければ何も確かめられないため、出力の設定が変わったことに気づけるようにする
-  if (maps === 0) violations.push("dist/public/ にソースマップがありません");
+  // ソースマップがないと何も確かめられないので、出力の設定が変わったときに気づけるようにする。
+  if (maps === 0) {
+    violations.push("dist/public/ にソースマップがありません");
+  }
   return violations;
 }
 

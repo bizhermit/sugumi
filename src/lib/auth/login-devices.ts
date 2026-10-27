@@ -1,7 +1,7 @@
 /**
- * ログインに成功したことのある端末。その端末からのログインは、アカウントのロックと接続元ごとの制限を受けない。
- * ユーザー名を知っているだけの第三者が、失敗を重ねて本人を締め出せないようにするため。
- * Cookie を盗まれても無制限には試せないよう、端末ごとにも LOGIN_MAX_FAILED_ATTEMPTS 回まで数える。
+ * ログインに成功したことのある端末を覚えておく。その端末からのログインは、アカウントのロックと接続元ごとの制限を受けない。
+ * ユーザー名を知っているだけの第三者が、わざと失敗を重ねて本人を締め出せないようにするため。
+ * ただし、Cookie を盗まれたときに無制限に試されないよう、端末ごとにも LOGIN_MAX_FAILED_ATTEMPTS 回まで失敗を数える。
  */
 import { hostCookie, readCookie } from "../cookie.ts";
 import { hashToken, isRandomToken, randomToken } from "../crypto.ts";
@@ -14,21 +14,21 @@ const SWEEP_INTERVAL_MS = 60 * 1000;
 
 let nextSweepAt = 0;
 
-/** Cookie の端末のトークン。authenticate() に渡す。 */
+/** Cookie から端末のトークンを読む。戻り値は、そのまま authenticate() に渡す。 */
 export function readLoginDevice(req: Request): string | undefined {
   return readCookie(req, COOKIE_NAME);
 }
 
-/** authenticate() が返した deviceToken を渡す。 */
+/** 端末のトークンを保存する Set-Cookie ヘッダーの値を返す。token には authenticate() が返した deviceToken を渡す。 */
 export function loginDeviceCookie(token: string): string {
   return `${hostCookie(COOKIE_NAME, token)}; Max-Age=${LIFETIME_SECONDS}`;
 }
 
 /**
- * token が username のアカウントで有効な端末なら、検証の前に失敗として 1 回数えて true を返す。
- * 上限に達した端末は false にし、ほかの端末と同じくアカウントのロックを受けさせる。
- * LOGIN_MAX_FAILED_ATTEMPTS が 0 なら、どの端末も信頼しない。アカウントのロックがないため、
- * 接続元ごとの制限を外すと、盗んだ Cookie で無制限に試せてしまう。
+ * token が username のアカウントで有効な端末なら、パスワードの検証の前に失敗として 1 回数え、true を返す。
+ * 上限に達した端末には false を返す。その端末は、ほかの端末と同じくアカウントのロックの対象になる。
+ * LOGIN_MAX_FAILED_ATTEMPTS が 0 なら、どの端末も信頼しない。このときはアカウントのロックもないので、
+ * 接続元ごとの制限まで外すと、盗んだ Cookie で無制限に試せてしまう。
  */
 export async function reserveAttempt(
   token: string | undefined,
@@ -36,7 +36,7 @@ export async function reserveAttempt(
   now: number,
 ): Promise<boolean> {
   if (token === undefined || !isRandomToken(token) || LOGIN_MAX_FAILED_ATTEMPTS === 0) return false;
-  // 1 つの文で確かめて数えるため、並行して送られたリクエストも上限を超えて数えない
+  // 上限の確認と加算を 1 つの文で行うので、同時に送られたリクエストがあっても上限を超えて数えない。
   const { rowCount } = await db.query(
     `UPDATE login_devices SET failed_attempts = login_devices.failed_attempts + 1
      FROM accounts
@@ -49,8 +49,8 @@ export async function reserveAttempt(
 }
 
 /**
- * ログインに成功した端末の、新しいトークンを返す。replacing はその端末が送ってきたトークンで、使えなくする。
- * LOGIN_MAX_FAILED_ATTEMPTS が 0 なら端末を信頼しないため、作らずに undefined を返す。
+ * ログインに成功した端末に渡す、新しいトークンを返す。replacing には、その端末が送ってきた古いトークンを渡す。古いトークンは使えなくなる。
+ * LOGIN_MAX_FAILED_ATTEMPTS が 0 なら端末を信頼しないので、トークンを作らずに undefined を返す。
  */
 export async function issue(
   accountId: number,
@@ -73,7 +73,7 @@ export async function issue(
   return token;
 }
 
-/** reserveAttempt() で信頼しなくなった行を消す。 */
+/** 期限が切れた端末と、reserveAttempt() で上限に達した端末の行を消す。 */
 export async function sweep(now: number): Promise<void> {
   await db.query("DELETE FROM login_devices WHERE expires_at <= $1 OR failed_attempts >= $2", [
     new Date(now),

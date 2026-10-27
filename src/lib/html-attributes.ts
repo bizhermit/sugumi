@@ -1,12 +1,12 @@
 /**
  * JSX で属性を型チェックするタグと、その属性。jsx-runtime.ts の JSX.IntrinsicElements で使う。
- * ここにないタグは、どの属性でも書ける。ここにあるタグに属性が足りなければ、仕様を確かめて足す。
+ * ここにないタグには、どの属性でも書ける。ここにあるタグに属性が足りなければ、仕様を確かめて足す。
  *
- * TypeScript は `-` を含む属性名（data-*・aria-* など）をチェックしないため、ここには書かない。
- * on* と style は CSP で使えないため、型に入れずエラーにしている。
+ * TypeScript は `-` を含む属性名（data-*・aria-* など）をチェックしないので、ここには書かない。
+ * on* と style は CSP で使えないので、型に入れず、書くとエラーになるようにしている。
  * 各型は Record<string, unknown> に代入できるよう、interface ではなく type で書く。
  *
- * Chrome・Firefox・Safari のどれかが対応していれば入れ、未対応のブラウザは行末の「未対応：」に書く。
+ * Chrome・Firefox・Safari のどれかが対応していれば入れ、対応していないブラウザは行末の「未対応：」に書く。
  * 追加と更新は .claude/skills/html-attribute-types/ のスキルで行う。
  */
 
@@ -64,7 +64,7 @@ type ReferrerPolicy =
 type FormMethod = "get" | "post" | "dialog";
 type FormEnctype = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
 
-// section-*・home・work などの前置きは、使うときに足す
+// section-*・home・work などの接頭辞は、使うときに足す。
 type AutofillField =
   | "name"
   | "honorific-prefix"
@@ -125,7 +125,7 @@ type Autocomplete =
   | `${"shipping" | "billing"} ${AutofillField}`
   | `${AutofillField} webauthn`;
 
-/** フォームの外のボタンなどから、送信先や方法を上書きする属性。 */
+/** フォームの外にあるボタンなどから、送信先や送信方法を上書きする属性。 */
 type FormOverride = {
   form?: string;
   formaction?: string;
@@ -277,7 +277,7 @@ export type HtmlElements = {
     label?: string;
   };
   textarea: Global & FormControl & {
-    // 本文が初期値になる。タグを入れても HTML としては扱われない
+    // 中身のテキストが初期値になる。タグを入れても HTML としては扱われない。
     children?: string;
     required?: boolean;
     readonly?: boolean;

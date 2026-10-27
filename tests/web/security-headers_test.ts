@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { contentSecurityPolicy, withSecurityHeaders } from "../../src/web/security-headers.ts";
 
-Deno.test("security-headers: 既定のヘッダーを付ける", () => {
+Deno.test("security-headers: デフォルトのヘッダーを付ける", () => {
   const { headers } = withSecurityHeaders(new Response("ok"));
   assert.equal(headers.get("content-security-policy"), contentSecurityPolicy());
   assert.equal(headers.get("x-content-type-options"), "nosniff");
@@ -33,7 +33,7 @@ Deno.test("security-headers: ヘッダーが変更不可の Response にも付�
   assert.equal(res.headers.get("x-frame-options"), "DENY");
 });
 
-Deno.test("security-headers: CSP は既定を保ち、指定したディレクティブだけを置き換える", () => {
+Deno.test("security-headers: CSP はデフォルトを保ち、指定したディレクティブだけを置き換える", () => {
   const csp = contentSecurityPolicy();
   for (
     const directive of [
@@ -49,7 +49,7 @@ Deno.test("security-headers: CSP は既定を保ち、指定したディレク�
   const custom = contentSecurityPolicy({ "img-src": ["'self'", "data:"], "trusted-types": [] })
     .split("; ");
   assert.ok(custom.includes("img-src 'self' data:"));
-  // 空配列のディレクティブは出力しない
+  // 空配列のディレクティブは出力しない。
   assert.ok(!custom.some((d) => d.startsWith("trusted-types")));
   assert.ok(custom.includes("default-src 'none'"));
 });

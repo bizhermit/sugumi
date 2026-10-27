@@ -1,5 +1,7 @@
 {
-  "lock": { "frozen": true },
+  "lock": {
+    "frozen": true
+  },
   "imports": {
     "playwright": "npm:playwright@1.64.1"
   },
@@ -15,21 +17,39 @@
           "/run/.containerenv",
           "/.dockerenv"
         ],
-        "ignore": ["/proc/version", "/proc/self/cgroup", "/proc/sys/fs/binfmt_misc/WSLInterop"]
+        "ignore": [
+          "/proc/version",
+          "/proc/self/cgroup",
+          "/proc/sys/fs/binfmt_misc/WSLInterop"
+        ]
       },
-      "write": ["../dist/e2e"],
+      "write": [
+        "../dist/e2e"
+      ],
       "run": [
         "/usr/local/share/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell"
       ],
-      "sys": ["homedir", "osRelease", "uid"],
+      "sys": [
+        "homedir",
+        "osRelease",
+        "uid"
+      ],
       "env": true
     }
   },
   "tasks": {
     "test": "deno test -P=test"
   },
+  "lint": {
+    "rules": {
+      "include": [
+        "explicit-module-boundary-types"
+      ]
+    }
+  },
   "fmt": {
     "lineWidth": 100,
-    "proseWrap": "preserve"
+    "proseWrap": "preserve",
+    "quoteProps": "asNeeded"
   }
 }

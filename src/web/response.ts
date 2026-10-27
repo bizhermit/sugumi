@@ -1,8 +1,8 @@
 /**
- * res のヘッダーを edit で書き換えた Response を返す。複製を作らないよう、res をその場で書き換える。
- * ヘッダーが変更不可の res（Response.redirect() など）だけは、複製してから書き換える。
- * その場で書き換えるため、app.ts はページが同じ Response を使い回していないことを確かめてから呼ぶ。
- * edit はモジュールの関数にし、リクエストごとの値は arg で渡す（呼ぶたびに関数を作らないため）。
+ * res のヘッダーを edit で書き換えて返す。コピーを作らずに、res をその場で書き換える。
+ * ヘッダーを変更できない res（Response.redirect() など）のときだけ、コピーしてから書き換える。
+ * res をその場で書き換えるので、app.ts は、ページが同じ Response を使い回していないことを確かめてから呼ぶ。
+ * edit にはモジュールの関数を渡し、リクエストごとの値は arg で渡す。呼ぶたびに関数を作らずに済む。
  */
 export function editHeaders<T>(
   res: Response,
@@ -10,7 +10,7 @@ export function editHeaders<T>(
   arg: T,
 ): Response {
   try {
-    // 変更不可なら最初の書き換えで例外になるため、途中まで書き換わることはない
+    // 変更できないヘッダーは最初の書き換えで例外になるので、途中まで書き換わった状態にはならない。
     edit(res.headers, arg);
     return res;
   } catch (e) {

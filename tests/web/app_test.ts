@@ -1,4 +1,4 @@
-// アプリは dist/public/ を読み込むため、先に deno task build が要る
+// アプリは dist/public/ を読み込むので、先に deno task build が必要。
 import assert from "node:assert/strict";
 import { createSession, sessionCookie } from "../../src/lib/auth/session.ts";
 import { randomToken } from "../../src/lib/crypto.ts";
@@ -12,11 +12,11 @@ import { captureLogs } from "../_support/logs.ts";
 
 const handler = await createApp({ mock: false });
 
-// src/web/app.ts の MAX_BODY_BYTES
+// src/web/app.ts の MAX_BODY_BYTES。
 const MAX_BODY_BYTES = 1024 * 1024;
 
-/** 本文を読み捨てて、ステータスとヘッダーだけを返す。 */
-async function head(path: string, init?: RequestInit): Promise<Response> {
+/** レスポンスボディを読み捨てて、ステータスとヘッダーだけを返す。 */
+async function head(path: string, init?: RequestInit) {
   const res = await handler(new Request(`http://localhost${path}`, init));
   await res.body?.cancel();
   return res;
@@ -28,17 +28,17 @@ Deno.test("app: Host ヘッダーがホスト名とポートの形でなけれ�
   ) {
     assert.equal((await head("/healthz", { headers: { host } })).status, 200, host);
   }
-  // Deno の req.url は Host を検証せずに連結して作るため、`/` や `#` で pathname を差し替えられる
+  // Deno の req.url は Host を検証せずに連結して作られるので、Host に `/` や `#` を含めると pathname を差し替えられる。
   for (const host of ["evil/login", "evil#", "a b", "evil@localhost", "localhost:", ""]) {
     assert.equal((await head("/healthz", { headers: { host } })).status, 400, host);
   }
 });
 
-Deno.test("app: 本文が上限を超えたら、ページを呼ばずに 413 を返す", async () => {
+Deno.test("app: リクエストボディが上限を超えたら、ページを呼ばずに 413 を返す", async () => {
   await resetDb();
   const body = new Uint8Array(MAX_BODY_BYTES + 1);
   assert.equal((await head("/login", { method: "POST", body })).status, 413);
-  // Content-Length は偽れるため、読んだ量でも判定する。宣言が上限を超えていれば読まずに断る
+  // Content-Length は偽れるので、実際に読んだ量でも判定する。宣言された長さが上限を超えていれば、読まずに拒否する。
   assert.equal(
     (await head("/login", {
       method: "POST",
@@ -47,7 +47,7 @@ Deno.test("app: 本文が上限を超えたら、ページを呼ばずに 413 �
     })).status,
     413,
   );
-  // 上限ちょうどは受け付け、CSRF の検証に進む
+  // 上限ちょうどは受け付け、CSRF の検証に進む。
   const atLimit = await head("/login", { method: "POST", body: body.subarray(1) });
   assert.equal(atLimit.status, 303);
 });
@@ -56,7 +56,7 @@ Deno.test("app: DB の接続の空きを待ちきれなければ 503 を返す",
   await resetDb();
   const account = await addAccount();
   const cookie = cookiePair(sessionCookie(await createSession(account)));
-  // 接続をすべて使い切り、セッションを引く問い合わせを DB_CONNECTION_TIMEOUT_SECONDS だけ待たせる
+  // 接続をすべて使い切って、セッションを読むクエリを DB_CONNECTION_TIMEOUT_SECONDS の間待たせる。
   const clients = [];
   for (let i = 0; i < DB_POOL_MAX; i++) clients.push(await db.connect());
   const error = console.error;
@@ -69,18 +69,18 @@ Deno.test("app: DB の接続の空きを待ちきれなければ 503 を返す",
     console.error = error;
     for (const client of clients) client.release();
   }
-  // 接続が空けば、また応答できる
+  // 接続が空けば、またレスポンスを返せる。
   assert.equal((await head("/home", { headers: { cookie } })).status, 200);
 });
 
-Deno.test("app: CSRF の検証に失敗したら、ログイン前ならログイン画面へ送る", async () => {
+Deno.test("app: CSRF の検証に失敗したら、ログイン前ならログイン画面へリダイレクトする", async () => {
   await resetDb();
   const res = await head("/logout", { method: "POST" });
   assert.equal(res.status, 303);
   assert.equal(res.headers.get("location"), "/login");
 });
 
-Deno.test("app: 期限切れのセッションやログイン前の Cookie なら、expired を付けて送る", async () => {
+Deno.test("app: 期限切れのセッションやログイン前の Cookie なら、expired を付けてリダイレクトする", async () => {
   await resetDb();
   const stale = await head("/logout", {
     method: "POST",
@@ -113,9 +113,9 @@ Deno.test("app: ログイン中に CSRF の検証に失敗したら 403 を返�
   assert.equal(res.status, 403);
 });
 
-Deno.test("app: どの応答にもセキュリティヘッダーを付ける", async () => {
+Deno.test("app: どのレスポンスにもセキュリティヘッダーを付ける", async () => {
   await resetDb();
-  const cases: [string, RequestInit | undefined, number][] = [
+  const cases: Array<[string, RequestInit | undefined, number]> = [
     ["/healthz", undefined, 200],
     ["/login", undefined, 200],
     ["/", undefined, 302],
@@ -147,7 +147,7 @@ Deno.test("app: 静的ファイルと /assets/ は、ログインなしで取得
 Deno.test("app: ログにパスワード・トークン・セッション ID・クエリ文字列を出さず、リクエスト ID で突き合わせられる", async () => {
   await resetDb();
   const account = await addAccount();
-  const secrets: string[] = [TEST_PASSWORD, "secret-query"];
+  const secrets: Array<string> = [TEST_PASSWORD, "secret-query"];
   const logs = await captureLogs(async () => {
     const page = await handler(new Request("http://localhost/login?to=%2Fhome%3Fq%3Dsecret-query"));
     const preLogin = cookiePair(page.headers.get("set-cookie")!);
@@ -195,7 +195,7 @@ Deno.test("app: ログにパスワード・トークン・セッション ID・�
   assert.deepEqual(audits.map((log) => log.event), ["login_succeeded", "logged_out"]);
   assert.equal(audits[0].requestId, accesses[1].requestId);
   assert.equal(audits[1].requestId, accesses[3].requestId);
-  // ログインの後のリクエストを、どのログインによるものか突き合わせられる
+  // ログインの後のリクエストを、どのログインによるものか突き合わせられる。
   assert.equal(typeof audits[0].sessionLogId, "string");
   assert.equal(accesses[2].sessionLogId, audits[0].sessionLogId);
   assert.equal(accesses[3].sessionLogId, audits[0].sessionLogId);

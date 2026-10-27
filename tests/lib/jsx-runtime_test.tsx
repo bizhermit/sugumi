@@ -4,7 +4,7 @@ import { type Html, jsx, jsxAttr, jsxEscape } from "../../src/lib/jsx-runtime.ts
 const ATTACK = `<script>alert("x")</script>&'`;
 const ESCAPED = "&#60;script&#62;alert(&#34;x&#34;)&#60;/script&#62;&#38;&#39;";
 
-Deno.test("jsx: 埋め込んだ文字列は、本文でも属性でもエスケープする", () => {
+Deno.test("jsx: 埋め込んだ文字列は、要素の中身でも属性値でもエスケープする", () => {
   assert.equal((<p>{ATTACK}</p>).value, `<p>${ESCAPED}</p>`);
   assert.equal((<a href={ATTACK}>x</a>).value, `<a href="${ESCAPED}">x</a>`);
   assert.equal((<input value={`" onfocus="x`} />).value, `<input value="&#34; onfocus=&#34;x">`);
@@ -22,17 +22,17 @@ Deno.test("jsx: Html はエスケープせずに埋め込み、配列は連結�
     </>).value,
     "&#60;i&#62;<br>",
   );
-  // JSX に直接書いた文字列は、変換するときにエスケープされる
+  // JSX に直接書いた文字列は、変換するときにエスケープされる。
   assert.equal((<p>{"<i>"}</p>).value, "<p>&lt;i&gt;</p>");
 });
 
-Deno.test("jsx: true・false・null・undefined は本文に出さない", () => {
+Deno.test("jsx: true・false・null・undefined は要素の中身に出さない", () => {
   assert.equal((<p>{true}{false}{null}{undefined}{0}</p>).value, "<p>0</p>");
 });
 
 Deno.test("jsx: 真偽値の属性は名前だけにし、aria-* は true・false を文字列で出す", () => {
   const off = false;
-  // 出力しない属性の位置には空白が残る
+  // 出力しない属性の位置には空白が残る。
   assert.equal((<input required disabled={off} />).value, "<input required >");
   assert.equal(
     (<button type="button" aria-pressed={false} aria-busy>x</button>).value,
@@ -53,14 +53,18 @@ Deno.test("jsx: 空要素は閉じタグを付けない", () => {
 });
 
 Deno.test("jsx: コンポーネントが文字列を返しても、HTML としては扱わない", () => {
-  const Raw = () => "<b>x</b>" as unknown as Html;
+  function Raw() {
+    return "<b>x</b>" as unknown as Html;
+  }
   assert.equal(
     (<p>
       <Raw />
     </p>).value,
     "<p>&#60;b&#62;x&#60;/b&#62;</p>",
   );
-  const Echo = ({ children }: { children?: unknown }) => <span>{children}</span>;
+  function Echo({ children }: { children?: unknown }) {
+    return <span>{children}</span>;
+  }
   assert.equal((<Echo>{"<y>"}</Echo>).value, "<span>&#60;y&#62;</span>");
 });
 
@@ -96,6 +100,6 @@ Deno.test("jsx: 属性の展開では、自身のプロパティだけを書い�
   props.b = "1";
   props.a = "2";
   assert.equal((<p {...props} />).value, `<p b="1" a="2"></p>`);
-  // JSX の展開は自身のプロパティだけを写すため、継承したプロパティは jsx() を直接呼んで確かめる
+  // JSX の展開は自身のプロパティしかコピーしないので、継承したプロパティは jsx() を直接呼んで確かめる。
   assert.equal(jsx("p", props).value, `<p b="1" a="2"></p>`);
 });

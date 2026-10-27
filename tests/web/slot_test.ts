@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import type { RouteContext } from "../../src/web/router.ts";
 import { slot } from "../../src/web/slot.ts";
 
-const newCtx = () => ({}) as RouteContext;
+function newCtx() {
+  return ({}) as RouteContext;
+}
 
 Deno.test("slot: set した値を、同じ ctx でだけ読める", () => {
   const account = slot<string>("account");
@@ -10,9 +12,9 @@ Deno.test("slot: set した値を、同じ ctx でだけ読める", () => {
   account.set(ctx, "alice");
   assert.equal(account.get(ctx), "alice");
   assert.equal(account.find(ctx), "alice");
-  // ほかのリクエストの ctx からは見えない
+  // ほかのリクエストの ctx からは見えない。
   assert.equal(account.find(newCtx()), undefined);
-  // 同じ ctx でも、別の slot とは混ざらない
+  // 同じ ctx でも、別の slot とは混ざらない。
   assert.equal(slot<string>("account").find(ctx), undefined);
 });
 

@@ -27,7 +27,7 @@ jobs:
           deno-version: 2.9.7
 
       # 権限を本番と揃えるため、本番と同じイメージ（docker/db/）を使う。
-      # サービスコンテナはリポジトリの Dockerfile からビルドできないため、ここで起動し、初期化はテストの前に待つ
+      # サービスコンテナはリポジトリの Dockerfile からビルドできないので、ここで起動し、初期化はテストの前に待つ
       - name: テスト用の DB を起動する
         run: |
           docker build -t sugumi-db docker/db
@@ -40,7 +40,7 @@ jobs:
       - run: deno lint
       - run: deno check
       - name: e2e/ を確かめる
-        # ルートの deno.json は e2e/ を除外しているため、e2e/ の deno.json で別に確かめる
+        # ルートの deno.json は e2e/ を除外しているので、e2e/ の deno.json で別に確かめる
         working-directory: e2e
         run: |
           deno fmt --check
@@ -53,8 +53,8 @@ jobs:
       - run: deno task build
       - name: 本番のイメージをビルドする
         run: docker build -t sugumi-app -f docker/app/Dockerfile .
-      # 送り先の設定は、送り先がないため CI では確かめられない。設定ファイルを読み込めることだけを確かめる
-      - name: ログの送り出し口のイメージをビルドし、設定を確かめる
+      # CI には送り先がないので、実際に送れるかまでは確かめられない。設定ファイルを読み込めることだけを確かめる
+      - name: log-forwarder のイメージをビルドし、設定を確かめる
         run: |
           docker build -t sugumi-log-forwarder docker/log-forwarder
           for destination in cloudwatch internal; do
@@ -63,12 +63,12 @@ jobs:
           done
 
       - name: DB の初期化を待つ
-        # 初期化の途中は Unix ソケットだけで待ち受けるため、TCP で確かめる
+        # 初期化の途中は Unix ソケットだけで待ち受けるので、TCP で確かめる
         run: timeout 60 sh -c 'until docker exec db pg_isready -h 127.0.0.1 -U admin -d app_test; do sleep 1; done'
       - run: deno task test
 
       - name: ブラウザを入れる
-        # Playwright は自身のバージョンに合うブラウザしか起動しないため、e2e/deno.json の imports と同じものから入れる。
+        # Playwright は自身のバージョンに合うブラウザしか起動しないので、e2e/deno.json の imports と同じものから入れる。
         # e2e/ で実行し、ルートの deno.lock に Playwright を書き込ませない。
         # --with-deps は付けない。ランナーには Chrome が入っていて、起動に要るライブラリはそろっている。
         # --with-deps が足すのはスクリーンショット用のフォントで、apt のミラーが遅いとジョブの時間を使い切るため

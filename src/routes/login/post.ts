@@ -8,18 +8,24 @@ import type { RouteContext } from "../../web/router.ts";
 import { appPathOf, path, redirect } from "../../web/url.ts";
 import { loginForm } from "./view.tsx";
 
+/**
+ * ユーザー名とパスワードでログインし、セッションを作って to（なければ /home）へリダイレクトする。
+ * 失敗したときは、理由を伏せたメッセージでフォームを出し直し、理由は監査ログに残す。
+ */
 export default async function (req: Request, ctx: RouteContext): Promise<Response> {
   const form = await ctx.form();
   const username = form.get("username");
   const password = form.get("password");
-  if (typeof username !== "string" || typeof password !== "string") return errorPage(400);
+  if (typeof username !== "string" || typeof password !== "string") {
+    return errorPage(400);
+  }
   const toValue = form.get("to");
   const to = typeof toValue === "string" ? appPathOf(toValue) : undefined;
 
   const result = await authenticate(username, password, ctx.remoteAddress, readLoginDevice(req));
   if (result.status !== "ok") {
     const accountId = "account" in result ? result.account.id : undefined;
-    // 巨大な値でログを埋められないよう切り詰める
+    // 巨大な値を送られてもログがあふれないよう、切り詰める。
     audit("login_failed", ctx, {
       reason: result.status,
       username: username.slice(0, 64),
@@ -32,7 +38,7 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
     if (result.status === "address_blocked" && result.blocks) {
       audit("address_blocked", ctx, { blockedAddress: result.blockedAddress });
     }
-    // どの失敗かを区別して見せると、アカウントの有無やロックの状態、接続元の制限が分かってしまう
+    // どの失敗かを画面で区別すると、アカウントの有無やロックの状態、接続元の制限が分かってしまう。
     return await loginForm(ctx, {
       status: 401,
       username,
@@ -40,8 +46,10 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
       message: "ユーザー名またはパスワードが違うか、アカウントがロックされています。",
     });
   }
-  // ログイン前と同じトークンを使い続けるとセッション固定攻撃を受けるため、ログインのたびに作り直す
-  if (ctx.session) await destroySession(ctx.session);
+  // ログイン前と同じトークンを使い続けるとセッション固定攻撃を受けるので、ログインのたびに作り直す。
+  if (ctx.session) {
+    await destroySession(ctx.session);
+  }
   const session = await createSession(result.account);
   audit("login_succeeded", ctx, {
     accountId: result.account.id,

@@ -1,5 +1,6 @@
 /**
- * 接続元ごとのログインの失敗回数。アプリが複数のインスタンスで動いても同じ回数を見られ、再起動しても制限が残るよう、DB に置く。
+ * 接続元ごとに、ログインの失敗回数を数えて制限する。
+ * 回数は DB に置く。アプリが複数のインスタンスで動いても同じ回数を見られ、再起動しても制限が消えないようにするため。
  */
 import { db, transaction } from "../db.ts";
 import {
@@ -14,10 +15,10 @@ const WINDOW_MS = LOGIN_IP_WINDOW_MINUTES * 60 * 1000;
 const LOCKOUT_MS = LOGIN_IP_LOCKOUT_MINUTES * 60 * 1000;
 const SWEEP_INTERVAL_MS = 60 * 1000;
 
-/** refundAttempt() に渡す、数えた回を表す値。 */
+/** reserveAttempt() で数えた 1 回を表す。ログインに成功したら refundAttempt() に渡す。 */
 export type Attempt = { readonly key: string; readonly windowStartedAt: Date };
 
-/** blocks はこの回で制限を始めたとき true。key は制限した単位で、login_throttles の address。 */
+/** blocks は、この回で制限を始めたとき true。key は制限の単位で、login_throttles の address の値。 */
 export type ReserveResult =
   | { status: "allowed"; attempt: Attempt | undefined }
   | { status: "blocked"; blocks: boolean; key: string };
@@ -32,15 +33,15 @@ let nextSweepAt = 0;
 
 if (LOGIN_IP_MAX_FAILED_ATTEMPTS === 0) {
   logWarning(
-    "LOGIN_IP_MAX_FAILED_ATTEMPTS が 0 のため、接続元ごとのログインの試行回数を制限していません",
+    "LOGIN_IP_MAX_FAILED_ATTEMPTS が 0 なので、接続元ごとのログインの試行回数を制限していません",
   );
 }
 
 /**
- * 検証の前に失敗として 1 回数え、制限中なら blocked を返す。成功したら refundAttempt() で取り消すこと。
- * 検証の後で数えると、検証中に並行して送られたリクエストが上限を超えて試せてしまうため。
- * remoteAddress が undefined か解析できないとき、LOGIN_IP_MAX_FAILED_ATTEMPTS が 0 のときは数えない。
- * undefined をまとめて数えると、どこか 1 つの接続元の失敗で、接続元の分からない全員が制限されるため。
+ * パスワードの検証の前に失敗として 1 回数え、制限中なら blocked を返す。ログインに成功したら refundAttempt() で取り消すこと。
+ * 検証の後で数えると、検証している間に同時に送られたリクエストが、上限を超えて試せてしまう。
+ * remoteAddress が undefined かパースできないときと、LOGIN_IP_MAX_FAILED_ATTEMPTS が 0 のときは数えない。
+ * undefined をまとめて数えると、どれか 1 つの接続元が失敗しただけで、接続元が分からない全員が制限されてしまう。
  */
 export async function reserveAttempt(
   remoteAddress: string | undefined,
@@ -52,9 +53,9 @@ export async function reserveAttempt(
   }
   await sweep(now);
   return await transaction(async (client) => {
-    // 並行して送られたリクエストが同じ回数を読んで数え漏れないよう、行をロックして読む。
-    // DO NOTHING の後で SELECT ... FOR UPDATE すると、その間に sweep() が行を消すと読めないため、
-    // DO UPDATE で、作るか既存の行をロックするかを 1 つの文で行う
+    // 同時に送られたリクエストが同じ回数を読んで数え漏れないよう、行をロックして読む。
+    // DO NOTHING のあとで SELECT ... FOR UPDATE すると、その間に sweep() が行を消したときに読めない。
+    // そのため DO UPDATE を使い、行の作成と既存の行のロックを 1 つの文で行う。
     const { rows: [row] } = await client.query<ThrottleRow>(
       `INSERT INTO login_throttles (address, window_started_at, failed_attempts)
        VALUES ($1, $2, 0) ON CONFLICT (address) DO UPDATE SET address = EXCLUDED.address
@@ -81,8 +82,8 @@ export async function reserveAttempt(
 }
 
 /**
- * ログインに成功した回を、失敗の回数から取り消す。数え直した後の回は取り消さない。
- * 0 に戻さないのは、攻撃者が自分のアカウントで時々ログインして、回数を消せないようにするため。
+ * ログインに成功した回を、失敗の回数から取り消す。期間が切れて数え直したあとなら、取り消さない。
+ * 0 に戻さないのは、攻撃者が自分のアカウントでときどきログインするだけで、回数を消せないようにするため。
  */
 export async function refundAttempt(attempt: Attempt | undefined): Promise<void> {
   if (!attempt) return;
@@ -94,22 +95,24 @@ export async function refundAttempt(attempt: Attempt | undefined): Promise<void>
 }
 
 /**
- * IPv6 は /64 ごとに数える。1 つの回線に /64 以上が割り当てられることが多く、
- * アドレスごとに数えると、その中でアドレスを変えながら試せてしまうため。
+ * IPv6 は /64 ごとに数える。1 つの回線に /64 以上が割り当てられることが多いので、
+ * アドレスごとに数えると、その範囲の中でアドレスを変えながら試せてしまう。
  */
 function throttleKey(remoteAddress: string): string | undefined {
   const bytes = parseIp(remoteAddress);
   if (!bytes) return undefined;
-  if (bytes.length === 4) return formatIp(bytes);
+  if (bytes.length === 4) {
+    return formatIp(bytes);
+  }
   const prefix = bytes.slice();
   prefix.fill(0, 8);
   return `${formatIp(prefix)}/64`;
 }
 
-async function sweep(now: number): Promise<void> {
+async function sweep(now: number) {
   if (now < nextSweepAt) return;
   nextSweepAt = now + SWEEP_INTERVAL_MS;
-  // reserveAttempt() で数え直す条件と同じく、制限が切れたか、制限せずに期間が過ぎた行を消す
+  // reserveAttempt() で数え直す条件と同じく、制限が切れた行と、制限しないまま期間が過ぎた行を消す。
   await db.query(
     `DELETE FROM login_throttles
      WHERE (blocked_until IS NOT NULL AND blocked_until <= $1)

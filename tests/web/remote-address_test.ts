@@ -17,7 +17,7 @@ Deno.test("remote-address: 信頼するプロキシでない接続元からは�
   assert.equal(addressOf("2001:DB9:0::1"), "2001:db9::1");
   assert.equal(addressOf(undefined, "198.51.100.1"), undefined);
   assert.equal(addressOf("not an ip"), undefined);
-  // TRUSTED_PROXIES の既定（未設定）では、プロキシを信頼しない
+  // TRUSTED_PROXIES のデフォルト（未設定）では、プロキシを信頼しない。
   assert.equal(
     remoteAddressOf(
       new Request("http://localhost/", { headers: { "x-forwarded-for": "198.51.100.1" } }),
@@ -29,18 +29,18 @@ Deno.test("remote-address: 信頼するプロキシでない接続元からは�
 });
 
 Deno.test("remote-address: 信頼するプロキシからは、右から読んで最初の信頼しないアドレスを使う", () => {
-  // 左の値は利用者が書いたものなので読まない
+  // 左の値はユーザーが書いたものなので読まない。
   assert.equal(addressOf("10.0.0.1", "203.0.113.9, 198.51.100.1"), "198.51.100.1");
-  // プロキシを何段通しても、信頼するものは飛ばす
+  // プロキシを何段通しても、信頼するものは飛ばす。
   assert.equal(addressOf("10.0.0.1", "198.51.100.1, 10.0.1.5,10.0.1.6"), "198.51.100.1");
   assert.equal(addressOf("2001:db8::1", "2001:db9::5"), "2001:db9::5");
-  // ヘッダーがなければ、プロキシのアドレスのまま
+  // ヘッダーがなければ、プロキシのアドレスのまま。
   assert.equal(addressOf("10.0.0.1"), "10.0.0.1");
-  // すべて信頼するプロキシなら、いちばん左のもの
+  // すべて信頼するプロキシなら、いちばん左のもの。
   assert.equal(addressOf("10.0.0.1", "10.0.1.7"), "10.0.1.7");
 });
 
-Deno.test("remote-address: 解析できない値に当たったら、最後に確かめたプロキシのアドレスを使う", () => {
+Deno.test("remote-address: パースできない値に当たったら、最後に確かめたプロキシのアドレスを使う", () => {
   assert.equal(addressOf("10.0.0.1", "198.51.100.1, unknown"), "10.0.0.1");
   assert.equal(addressOf("10.0.0.1", "198.51.100.1, 10.0.1.5, "), "10.0.0.1");
   assert.equal(addressOf("10.0.0.1", "198.51.100.1, garbage, 10.0.1.5"), "10.0.1.5");

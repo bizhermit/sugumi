@@ -12,7 +12,7 @@ Deno.test("password: パラメータとソルトを含む形で保存し、同�
   assert.equal(await verifyPassword("", a), false);
 });
 
-Deno.test("password: Unicode の正規化（NFC）の違いは同じパスワードとして扱う", async () => {
+Deno.test("password: Unicode の正規化（NFC）だけが違うパスワードは、同じものとして扱う", async () => {
   const composed = "café";
   const decomposed = "café";
   const hash = await hashPassword(composed);
@@ -20,8 +20,8 @@ Deno.test("password: Unicode の正規化（NFC）の違いは同じパスワー
 });
 
 Deno.test("password: 保存したパラメータで検証する", async () => {
-  // 検証に PARAMS を使っていれば、保存したパラメータを書き換えても一致してしまう。
-  // 保存したものを使うため、PARAMS を強くしても既存のハッシュをそのまま検証できる
+  // 検証に PARAMS を使っていると、保存したパラメータを書き換えても一致してしまう。
+  // 保存したパラメータを使うので、PARAMS を強くしても既存のハッシュはそのまま検証できる。
   const weak = (await hashPassword("x")).replace(/^scrypt\$\d+\$8\$3\$/, "scrypt$1024$8$1$");
   assert.equal(await verifyPassword("x", weak), false);
 });

@@ -1,39 +1,44 @@
-// parseIp・formatIp・cidrContains はリクエストのたびに呼ぶため、コールバックや中間の配列を作らずにループで書いている
+// parseIp・formatIp・cidrContains はリクエストのたびに呼ぶので、コールバックや中間の配列を作らずにループで書いている。
 
 /** bytes は IPv4 なら 4 バイト、IPv6 なら 16 バイト。prefix より後ろのビット（ホスト部）は 0。 */
 export type Cidr = { bytes: Uint8Array; prefix: number };
 
 /**
- * IP アドレスをバイト列にする。解析できなければ undefined を返す。
- * IPv4 射影アドレス（::ffff:192.0.2.1）は IPv4 の 4 バイトにする。
+ * IP アドレスをバイト列に変換する。パースできなければ undefined を返す。
+ * IPv4 射影アドレス（::ffff:192.0.2.1）は、IPv4 の 4 バイトにする。
  * デュアルスタックで待ち受けると、IPv4 の接続元がこの形で届くため。
  */
 export function parseIp(text: string): Uint8Array | undefined {
-  if (!text.includes(":")) return parseIpv4(text);
+  if (!text.includes(":")) {
+    return parseIpv4(text);
+  }
   const bytes = parseIpv6(text);
   return bytes && isIpv4Mapped(bytes) ? bytes.slice(12) : bytes;
 }
 
-function isIpv4Mapped(bytes: Uint8Array): boolean {
+function isIpv4Mapped(bytes: Uint8Array) {
   for (let i = 0; i < 10; i++) {
     if (bytes[i] !== 0) return false;
   }
   return bytes[10] === 0xff && bytes[11] === 0xff;
 }
 
-/** `192.0.2.0/24` や `2001:db8::/32`、`/` のない単独のアドレスを解析する。解析できなければ undefined を返す。 */
+/** `192.0.2.0/24` や `2001:db8::/32`、`/` のない単独のアドレスをパースする。パースできなければ undefined を返す。 */
 export function parseCidr(text: string): Cidr | undefined {
   const [address, prefixText, ...rest] = text.split("/");
   if (rest.length > 0) return undefined;
   const bytes = parseIp(address);
   if (!bytes) return undefined;
-  if (prefixText === undefined) return { bytes, prefix: bytes.length * 8 };
-  // IPv4 射影アドレスは parseIp で 4 バイトになり、IPv6 のつもりのプレフィックス長と合わなくなるため、IPv4 で書かせる
+  if (prefixText === undefined) {
+    return { bytes, prefix: bytes.length * 8 };
+  }
+  // IPv4 射影アドレスは parseIp で 4 バイトになり、IPv6 のつもりで書いたプレフィックス長と合わなくなる。
+  // そのため受け付けず、IPv4 の形で書いてもらう。
   if (address.includes(":") && bytes.length === 4) return undefined;
   if (!/^(?:0|[1-9]\d*)$/.test(prefixText)) return undefined;
   const prefix = Number(prefixText);
   if (prefix > bytes.length * 8) return undefined;
-  // 範囲の書き方を 1 通りにし、10.0.0.5/8 のような書き間違いを見逃さないため、ホスト部が 0 でないものは受け付けない
+  // ホスト部が 0 でないものは受け付けない。範囲の書き方を 1 通りにし、10.0.0.5/8 のような書き間違いに気づけるようにするため。
   for (let bit = prefix; bit < bytes.length * 8; bit++) {
     if (bytes[bit >> 3] & (0x80 >> (bit & 7))) return undefined;
   }
@@ -41,12 +46,14 @@ export function parseCidr(text: string): Cidr | undefined {
 }
 
 /**
- * parseIp の戻り値を文字列にする。同じアドレスは常に同じ文字列になる。
- * IPv6 は RFC 5952 の表記（小文字、先頭の 0 を省く、最も長い 0 の連続を :: にする）。
+ * parseIp の戻り値を文字列に戻す。同じアドレスは常に同じ文字列になるので、ログや DB のキーに使える。
+ * IPv6 は RFC 5952 の表記にする（小文字、先頭の 0 を省く、いちばん長い 0 の連続を :: にする）。
  */
 export function formatIp(bytes: Uint8Array): string {
-  if (bytes.length === 4) return `${bytes[0]}.${bytes[1]}.${bytes[2]}.${bytes[3]}`;
-  // RFC 5952 4.2.2・4.2.3：0 が 1 つだけなら :: にしない。同じ長さの連続が複数あれば前を :: にする
+  if (bytes.length === 4) {
+    return `${bytes[0]}.${bytes[1]}.${bytes[2]}.${bytes[3]}`;
+  }
+  // RFC 5952 4.2.2・4.2.3：0 のグループが 1 つだけなら :: にしない。同じ長さの連続が複数あれば、前のほうを :: にする。
   let zerosStart = -1;
   let zerosLength = 0;
   for (let i = 0; i < 8;) {
@@ -65,18 +72,20 @@ export function formatIp(bytes: Uint8Array): string {
       i += zerosLength - 1;
       continue;
     }
-    // :: の直後と先頭には : を付けない
-    if (i > 0 && i !== zerosStart + zerosLength) text += ":";
+    // :: の直後と先頭には : を付けない。
+    if (i > 0 && i !== zerosStart + zerosLength) {
+      text += ":";
+    }
     text += wordAt(bytes, i).toString(16);
   }
   return text;
 }
 
-function wordAt(bytes: Uint8Array, i: number): number {
+function wordAt(bytes: Uint8Array, i: number) {
   return (bytes[i * 2] << 8) | bytes[i * 2 + 1];
 }
 
-/** address は parseIp の戻り値。IPv4 と IPv6 は互いに含まない。 */
+/** address が cidr の範囲に入っていれば true を返す。address には parseIp の戻り値を渡す。IPv4 と IPv6 は、互いの範囲に入らない。 */
 export function cidrContains(cidr: Cidr, address: Uint8Array): boolean {
   if (cidr.bytes.length !== address.length) return false;
   const full = Math.floor(cidr.prefix / 8);
@@ -94,7 +103,7 @@ function parseIpv4(text: string): Uint8Array | undefined {
   if (parts.length !== 4) return undefined;
   const bytes = new Uint8Array(4);
   for (let i = 0; i < 4; i++) {
-    // 先頭の 0 は 8 進数と解釈する実装があり、同じ文字列が別のアドレスを指しうるため受け付けない
+    // 先頭に 0 があると 8 進数と解釈する実装があり、同じ文字列が別のアドレスを指しうるので受け付けない。
     if (!IPV4_PART.test(parts[i])) return undefined;
     const value = Number(parts[i]);
     if (value > 255) return undefined;
@@ -109,13 +118,13 @@ const IPV6_GROUP = /^[0-9A-Fa-f]{1,4}$/;
 function parseIpv6(text: string): Uint8Array | undefined {
   const halves = text.split("::");
   if (halves.length > 2) return undefined;
-  // 末尾の 2 グループは IPv4 の書き方でも書ける
+  // 末尾の 2 グループは IPv4 の書き方でも書ける。
   const head = parseGroups(halves[0], halves.length === 1);
   const tail = halves.length === 1 ? [] : parseGroups(halves[1], true);
   if (!head || !tail) return undefined;
   const zeros = 8 - head.length - tail.length;
   if (halves.length === 1 ? zeros !== 0 : zeros < 1) return undefined;
-  // 省略した 0 のグループは、Uint8Array の初期値の 0 のままにする
+  // 省略した 0 のグループは、Uint8Array の初期値の 0 のままにする。
   const bytes = new Uint8Array(16);
   for (let i = 0; i < head.length; i++) setWord(bytes, i, head[i]);
   for (let i = 0; i < tail.length; i++) setWord(bytes, 8 - tail.length + i, tail[i]);
@@ -123,8 +132,8 @@ function parseIpv6(text: string): Uint8Array | undefined {
 }
 
 /** `:` で区切ったグループを 16 ビットの値の配列にする。v4Last なら、最後のグループを IPv4 の書き方でも受け付ける。 */
-function parseGroups(half: string, v4Last: boolean): number[] | undefined {
-  const words: number[] = [];
+function parseGroups(half: string, v4Last: boolean): Array<number> | undefined {
+  const words: Array<number> = [];
   if (half === "") return words;
   const groups = half.split(":");
   for (let g = 0; g < groups.length; g++) {
@@ -142,7 +151,7 @@ function parseGroups(half: string, v4Last: boolean): number[] | undefined {
   return words;
 }
 
-function setWord(bytes: Uint8Array, i: number, word: number): void {
+function setWord(bytes: Uint8Array, i: number, word: number) {
   bytes[i * 2] = word >> 8;
   bytes[i * 2 + 1] = word & 0xff;
 }

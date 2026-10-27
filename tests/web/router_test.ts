@@ -30,12 +30,12 @@ Deno.test("router: メソッドのファイルに振り分け、パラメータ�
     assert.equal(await call(match, "/", "GET"), "GET /");
     assert.equal(await call(match, "/", "POST"), "POST /");
     assert.equal(await call(match, "/foo", "GET"), "GET /foo");
-    // 静的なルートを動的なルートより優先する
+    // 静的なルートを動的なルートより優先する。
     assert.equal(await call(match, "/user/new", "GET"), "GET /user/new");
     const user = match("/user/a%2Fb", "GET");
     assert.equal(user?.route, "/user/[id]");
     assert.deepEqual(user?.params, { id: "a/b" });
-    // `/%61dmin` のようなエンコードも、デコードしてから照合する
+    // `/%61dmin` のようなエンコードも、デコードしてからマッチさせる。
     assert.equal(match("/%66oo", "GET")?.route, "/foo");
     assert.equal(match("/bar", "GET"), undefined);
     assert.equal(match("/user/", "GET"), undefined);
@@ -43,7 +43,7 @@ Deno.test("router: メソッドのファイルに振り分け、パラメータ�
   });
 });
 
-Deno.test("router: %2F を区切りとして扱わず、制御文字や不正なエンコードを含むものには照合しない", async () => {
+Deno.test("router: %2F をセグメントの区切りとして扱わず、制御文字や不正なエンコードを含むパスにはマッチしない", async () => {
   await withFixture({
     "get.ts": handler("GET /"),
     "foo/bar/get.ts": handler("GET /foo/bar"),
@@ -59,11 +59,11 @@ Deno.test("router: %2F を区切りとして扱わず、制御文字や不正な
     ) {
       assert.equal(match(pathname, "GET"), undefined, pathname);
     }
-    // 表のキーは区切りを \0 でつなぐため、\0 を含む区切りを通すと /foo/bar と同じキーになる
+    // 表のキーはセグメントを \0 でつなぐので、\0 を含むセグメントを通すと /foo/bar と同じキーになってしまう。
     assert.equal(match("/foo%00bar", "GET"), undefined);
     assert.equal(match("/a/%00/c", "GET"), undefined);
     assert.equal(match("/a/b/%0A", "GET"), undefined);
-    // 区切りの数が同じ動的なルートでは、前の区切りが固定のものを優先する
+    // セグメントの数が同じ動的なルートでは、前のセグメントが固定のものを優先する。
     assert.deepEqual(match("/a/b/c", "GET")?.route, "/a/b/[y]");
     assert.deepEqual(match("/a/z/c", "GET")?.params, { x: "z" });
     assert.equal(match("/a/z", "GET"), undefined);
@@ -84,7 +84,7 @@ Deno.test("router: ファイルのないメソッドは handler がなく、Allo
     const form405 = match("/form", "GET");
     assert.equal(form405?.handler, undefined);
     assert.deepEqual(form405?.allow, ["POST"]);
-    // 405 のときは before も呼ばない
+    // 405 のときは before も呼ばない。
     assert.deepEqual(calls, []);
   });
 });
@@ -101,7 +101,7 @@ Deno.test("router: before.tree.ts を routes/ に近いものから順に呼び�
     "before.tree.ts": before("tree /"),
     "before.ts": before("before /"),
     "get.ts": handler("GET /"),
-    // a/ はルートでないディレクトリ
+    // a/ はルートでないディレクトリ。
     "a/before.tree.ts": before("tree /a"),
     "a/b/before.tree.ts": before("tree /a/b"),
     "a/b/before.ts": before("before /a/b"),
@@ -112,7 +112,7 @@ Deno.test("router: before.tree.ts を routes/ に近いものから順に呼び�
     await call(match, "/a/b", "GET");
     assert.deepEqual(calls, ["tree /", "tree /a", "tree /a/b", "before /a/b", "GET /a/b"]);
     calls.length = 0;
-    // before.ts は置いたディレクトリだけに適用する
+    // before.ts は置いたディレクトリだけに適用する。
     await call(match, "/a/b/c", "GET");
     assert.deepEqual(calls, ["tree /", "tree /a", "tree /a/b", "GET /a/b/c"]);
     calls.length = 0;
@@ -121,10 +121,10 @@ Deno.test("router: before.tree.ts を routes/ に近いものから順に呼び�
   });
 });
 
-Deno.test("router: before が Response を返すと、それを応答にして後の処理を呼ばない", async () => {
+Deno.test("router: before が Response を返すと、それをレスポンスにして後の処理を呼ばない", async () => {
   await withFixture({
     "before.tree.ts": `export default (req: Request) => {
-      (globalThis as unknown as { calls: string[] }).calls.push("tree");
+      (globalThis as unknown as { calls: Array<string> }).calls.push("tree");
       return req.headers.has("x-stop") ? new Response("stopped") : undefined;
     };`,
     "before.ts": before("before"),
@@ -151,12 +151,12 @@ Deno.test("router: mock のときだけ *.mock.* を使う", async () => {
     const mock = await loadRouter({ mock: true, root });
     assert.equal(await call(mock, "/", "GET"), "GET.mock");
     assert.deepEqual(calls, ["before.mock", "GET.mock"]);
-    // .mock のないファイルはそのまま使う
+    // .mock のないファイルはそのまま使う。
     assert.equal(await call(mock, "/", "POST"), "POST");
   });
 });
 
-Deno.test("router: 付けないファイルのない *.mock.* は、mock の指定によらず例外になる", async () => {
+Deno.test("router: .mock なしのファイルがない *.mock.* は、mock の指定によらず例外になる", async () => {
   await withFixture({
     "get.ts": handler("GET"),
     "post.mock.ts": handler("POST.mock"),
@@ -171,7 +171,7 @@ Deno.test("router: 付けないファイルのない *.mock.* は、mock の指�
 });
 
 Deno.test("router: 不正なファイル名・ディレクトリ名は例外になる", async (t) => {
-  const cases: [string, Record<string, string>, RegExp][] = [
+  const cases: Array<[string, Record<string, string>, RegExp]> = [
     [
       "大文字の名前",
       { "get.ts": handler("GET"), "Before.ts": before("b") },

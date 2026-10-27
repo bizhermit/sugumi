@@ -23,11 +23,11 @@ Deno.test("audit: リクエスト ID と接続元を付けて 1 行の JSON で�
 });
 
 Deno.test("audit: 付ける項目を data で上書きしようとすると型エラーになる", () => {
-  // 実行はせず、型チェックだけを確かめる
-  const _check = () => {
-    // @ts-expect-error: type は audit() が付ける
+  // 実行はせず、型チェックだけを確かめる。
+  function _check() {
+    // @ts-expect-error: type は audit() が付ける。
     audit("logged_out", SOURCE, { type: "access" });
-    // @ts-expect-error: requestId は audit() が付ける
+    // @ts-expect-error: requestId は audit() が付ける。
     audit("logged_out", SOURCE, { requestId: "forged" });
-  };
+  }
 });

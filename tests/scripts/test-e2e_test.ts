@@ -21,7 +21,7 @@ Deno.test("test-e2e: waitUntilReady() は、200 を返すまで待つ", async ()
   }
 });
 
-Deno.test("test-e2e: waitUntilReady() は、応答がないまま時間を過ぎたら例外を投げる", async () => {
+Deno.test("test-e2e: waitUntilReady() は、レスポンスがないまま時間を過ぎたら例外を投げる", async () => {
   const url = new URL(`http://127.0.0.1:${freePort()}/healthz`);
   await assert.rejects(waitUntilReady(url, 300), /300 ms で応答しません/);
 });
@@ -47,16 +47,16 @@ Deno.test("test-e2e: parseBaseUrl() は、このマシンの http・https の UR
 
 Deno.test("test-e2e: e2e/ の依存は、ルートの deno.lock に入っていない", async () => {
   // ルートの deno.lock にあるパッケージは、使っていなくても本番のイメージの deno cache が取得する。
-  // 直接の依存だけでなく、推移的な依存（playwright-core など）と jsr: のパッケージも確かめる
+  // 直接の依存だけでなく、推移的な依存（playwright-core など）と jsr: のパッケージも確かめる。
   const root = new URL("../../", import.meta.url);
-  const packages = async (path: string) => {
+  async function packages(path: string) {
     const lock = JSON.parse(await Deno.readTextFile(new URL(path, root)));
-    // キーは「名前@バージョン」。スコープ付きの名前は @ で始まるため、最後の @ で分ける
+    // キーは「名前@バージョン」。スコープ付きの名前は @ で始まるので、最後の @ で分ける。
     return new Set(
       [...Object.keys(lock.npm ?? {}), ...Object.keys(lock.jsr ?? {})]
         .map((key) => key.slice(0, key.lastIndexOf("@"))),
     );
-  };
+  }
   const e2e = await packages("e2e/deno.lock");
   const app = await packages("deno.lock");
   assert.ok(e2e.has("playwright"));

@@ -1,5 +1,5 @@
 /**
- * 監査ログ。出し方は src/lib/log.ts を参照。
+ * 監査ログを出す。出し方は src/lib/log.ts を参照。
  * パスワード・トークン・セッション ID は渡さないこと。
  */
 import { writeLog } from "./log.ts";
@@ -12,7 +12,7 @@ export type AuditEvent =
   | "logged_out";
 
 /**
- * 監査ログを出すリクエスト。ページの ctx（RouteContext）をそのまま渡せる。
+ * 監査ログの元になったリクエスト。ページの ctx（RouteContext）をそのまま渡せる。
  * requestId は、アクセスログ・エラーログと突き合わせるために出す。
  */
 export type AuditSource = {
@@ -20,13 +20,17 @@ export type AuditSource = {
   readonly remoteAddress: string | undefined;
 };
 
-/** audit() が付ける項目は、data で上書きできないようにする。 */
+/** audit() が付ける項目は、data で上書きできないようにしている。 */
 export type AuditData =
   & Record<string, unknown>
   & {
     [K in "type" | "time" | "requestId" | "event" | "remoteAddress"]?: never;
   };
 
+/**
+ * 監査ログを 1 行出す。data には、event ごとに調べるときに要る値（ユーザー名など）を入れる。
+ * 時刻・requestId・接続元は audit() が付ける。
+ */
 export function audit(
   event: AuditEvent,
   { requestId, remoteAddress }: AuditSource,

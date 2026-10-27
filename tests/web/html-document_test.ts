@@ -7,13 +7,13 @@ import { handler, layout, withFixture } from "../_support/routes.ts";
 const ctx = {} as RouteContext;
 const main = jsxTemplate(["page"]);
 
-/** root の relative のディレクトリにあるページを、title で組み立てる。 */
+/** root の中の relative のディレクトリにあるページとして title を渡して組み立て、決まったタイトルと main の HTML を返す。 */
 async function compose(
   root: URL,
   relative: string,
   title?: Title,
   options: { aside?: boolean; layout?: false } = {},
-): Promise<{ title: string; main: string }> {
+) {
   const page = new URL(`${relative}view.tsx`, root).href;
   const slots = options.aside ? { main, aside: jsxTemplate(["aside"]) } : { main };
   const result = await composePage(ctx, { title, slots, page, layout: options.layout });
@@ -24,7 +24,7 @@ Deno.test("layout: layout.tree.ts は配下に、layout.ts は置いたディレ
   await withFixture({
     "layout.tree.ts": layout("tree /", `"サイト"`),
     "get.ts": handler("GET /"),
-    // a/ はルートでないディレクトリ
+    // a/ はルートでないディレクトリ。
     "a/layout.tree.ts": layout("tree /a"),
     "a/b/layout.ts": layout("layout /a/b"),
     "a/b/get.ts": handler("GET /a/b"),
@@ -35,7 +35,7 @@ Deno.test("layout: layout.tree.ts は配下に、layout.ts は置いたディレ
     assert.equal((await compose(root, "a/b/")).main, "[tree / [tree /a [layout /a/b page]]]");
     assert.equal((await compose(root, "a/b/c/")).main, "[tree / [tree /a page]]");
     assert.equal((await compose(root, "")).main, "[tree / page]");
-    // layout: false なら包まない。タイトルも layout から受け取らない
+    // layout: false なら包まない。タイトルも layout から受け取らない。
     assert.deepEqual(await compose(root, "a/b/", "単独", { layout: false }), {
       title: "単独",
       main: "page",
@@ -72,7 +72,7 @@ Deno.test("layout: タイトルは外側の layout から順に決め、最後�
       (await compose(root, "admin/users/", (t) => `ユーザー | ${t}`)).title,
       "ユーザー | サイト - 管理",
     );
-    // 文字列は外側のタイトルを置き換える
+    // 文字列は外側のタイトルを置き換える。
     assert.equal((await compose(root, "admin/users/", "ユーザー")).title, "ユーザー");
   });
 });

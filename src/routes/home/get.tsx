@@ -4,6 +4,7 @@ import type { RouteContext } from "../../web/router.ts";
 import { path } from "../../web/url.ts";
 import { loginAccount } from "../login-account.ts";
 
+/** ログイン中のアカウントの表示名と、ログアウトのフォームを出す。 */
 export default async function (_req: Request, ctx: RouteContext): Promise<Response> {
   const account = loginAccount.get(ctx);
   const html = await htmlDocument(ctx, {
