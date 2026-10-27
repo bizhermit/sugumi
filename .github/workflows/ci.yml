@@ -53,6 +53,14 @@ jobs:
       - run: deno task build
       - name: 本番のイメージをビルドする
         run: docker build -t sugumi-app -f docker/app/Dockerfile .
+      # 送り先の設定は、送り先がないため CI では確かめられない。設定ファイルを読み込めることだけを確かめる
+      - name: ログの送り出し口のイメージをビルドし、設定を確かめる
+        run: |
+          docker build -t sugumi-log-forwarder docker/log-forwarder
+          for destination in cloudwatch internal; do
+            docker run --rm -e SERVER_NAME=ci -e LOG_BUFFER_MAX_SIZE=1G sugumi-log-forwarder \
+              /fluent-bit/bin/fluent-bit -c /fluent-bit/etc/sugumi/$destination.yaml --dry-run
+          done
 
       - name: DB の初期化を待つ
         # 初期化の途中は Unix ソケットだけで待ち受けるため、TCP で確かめる

@@ -7,7 +7,8 @@ import { DB_POOL_MAX, PRE_LOGIN_CSRF_TIMEOUT_MINUTES } from "../../src/lib/env.t
 import { createApp } from "../../src/web/app.ts";
 import { asset } from "../../src/web/assets.ts";
 import { cookiePair } from "../_support/cookie.ts";
-import { addAccount, resetDb } from "../_support/db.ts";
+import { addAccount, resetDb, TEST_PASSWORD } from "../_support/db.ts";
+import { captureLogs } from "../_support/logs.ts";
 
 const handler = await createApp({ mock: false });
 
@@ -141,6 +142,64 @@ Deno.test("app: 静的ファイルと /assets/ は、ログインなしで取得
   const js = await head(asset("web/_assets/index.js"));
   assert.equal(js.status, 200);
   assert.equal(js.headers.get("cache-control"), "public, max-age=31536000, immutable");
+});
+
+Deno.test("app: ログにパスワード・トークン・セッション ID・クエリ文字列を出さず、リクエスト ID で突き合わせられる", async () => {
+  await resetDb();
+  const account = await addAccount();
+  const secrets: string[] = [TEST_PASSWORD, "secret-query"];
+  const logs = await captureLogs(async () => {
+    const page = await handler(new Request("http://localhost/login?to=%2Fhome%3Fq%3Dsecret-query"));
+    const preLogin = cookiePair(page.headers.get("set-cookie")!);
+    const csrf = (await page.text()).match(/name="_csrf" value="([^"]+)"/)![1];
+    secrets.push(preLogin.split("=")[1], csrf);
+    const login = await head("/login", {
+      method: "POST",
+      headers: { cookie: preLogin },
+      body: new URLSearchParams({
+        _csrf: csrf,
+        username: account.username,
+        password: TEST_PASSWORD,
+        to: "/home?q=secret-query",
+      }),
+    });
+    const session = cookiePair(
+      login.headers.getSetCookie().find((c) => c.startsWith("__Host-sid="))!,
+    );
+    secrets.push(session.split("=")[1]);
+    const home = await handler(
+      new Request("http://localhost/home", { headers: { cookie: session } }),
+    );
+    const logoutToken = (await home.text()).match(/name="_csrf" value="([^"]+)"/)![1];
+    secrets.push(logoutToken);
+    await head("/logout", {
+      method: "POST",
+      headers: { cookie: session },
+      body: new URLSearchParams({ _csrf: logoutToken }),
+    });
+  });
+  const text = JSON.stringify(logs);
+  for (const secret of secrets) assert.ok(!text.includes(secret), secret);
+
+  const accesses = logs.filter((log) => log.type === "access");
+  assert.deepEqual(
+    accesses.map((log) => [log.method, log.path, log.status, log.accountId]),
+    [
+      ["GET", "/login", 200, undefined],
+      ["POST", "/login", 303, undefined],
+      ["GET", "/home", 200, account.id],
+      ["POST", "/logout", 303, account.id],
+    ],
+  );
+  const audits = logs.filter((log) => log.type === "audit");
+  assert.deepEqual(audits.map((log) => log.event), ["login_succeeded", "logged_out"]);
+  assert.equal(audits[0].requestId, accesses[1].requestId);
+  assert.equal(audits[1].requestId, accesses[3].requestId);
+  // ログインの後のリクエストを、どのログインによるものか突き合わせられる
+  assert.equal(typeof audits[0].sessionLogId, "string");
+  assert.equal(accesses[2].sessionLogId, audits[0].sessionLogId);
+  assert.equal(accesses[3].sessionLogId, audits[0].sessionLogId);
+  assert.equal(audits[1].sessionLogId, audits[0].sessionLogId);
 });
 
 Deno.test("app: ページは CSS を JS より先に、共通のものをページのものより先に読み込む", async () => {

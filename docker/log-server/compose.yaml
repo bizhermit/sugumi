@@ -1,0 +1,45 @@
+# 社内のログ用のサーバー。アプリのサーバー（リポジトリ直下の compose.yaml）とは別のサーバーで起動する。
+# 値と証明書を用意してから（docker/README.md を参照）、このディレクトリで起動する。
+#
+#   docker compose --env-file .env up -d --build
+
+services:
+  receiver:
+    build: .
+    restart: unless-stopped
+    environment:
+      LOG_SERVER_NAME: ${LOG_SERVER_NAME:?.env に LOG_SERVER_NAME を書いてください}
+      LOG_SERVER_SHARED_KEY: ${LOG_SERVER_SHARED_KEY:?.env に LOG_SERVER_SHARED_KEY を書いてください}
+      LOG_FILE_MAX_SIZE: ${LOG_FILE_MAX_SIZE:-100M}
+    ports:
+      # アプリのサーバーからだけ届くよう、Docker の外（DOCKER-USER チェーンやクラウドのセキュリティグループ）で絞る。
+      # Docker が公開するポートは、ufw などの INPUT の規則を通らない（docker/README.md）
+      - ${LOG_SERVER_LISTEN_ADDRESS:-0.0.0.0}:${LOG_SERVER_PORT:-24224}:24224
+    volumes:
+      - logs:/logs
+      - buffer:/fluent-bit/buffer
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  # 保存日数を過ぎたファイルと、アクセスログなどの合計の上限を超えた分を消す（log-cleaner.sh）
+  log-cleaner:
+    build:
+      context: .
+      dockerfile: log-cleaner.Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_DAYS: ${LOG_APP_RETENTION_DAYS:-90}
+      AUDIT_DAYS: ${LOG_AUDIT_RETENTION_DAYS:-90}
+      APP_MAX_TOTAL_SIZE_MB: ${LOG_APP_MAX_TOTAL_SIZE_MB:-51200}
+      AUDIT_WARN_TOTAL_SIZE_MB: ${LOG_AUDIT_WARN_TOTAL_SIZE_MB:-5120}
+    volumes:
+      - logs:/logs
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    network_mode: none
+
+volumes:
+  logs:
+  buffer:

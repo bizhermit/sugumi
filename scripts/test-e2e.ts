@@ -80,7 +80,7 @@ async function runE2e(args: string[], externalUrl: string | undefined): Promise<
       cwd: ROOT,
       // テストの間だけ、LAN からテスト用の DB のアプリに届かないようにする
       env: { APP_MODE: "PROD", PORT: String(port), LISTEN_HOST: "127.0.0.1" },
-      // 監査のログでテストの結果が読みにくくならないよう、標準出力だけ捨てる
+      // アクセスログ・監査ログでテストの結果が読みにくくならないよう、標準出力だけ捨てる
       stdout: "null",
     }).spawn();
     // 起動に失敗したり、テストの途中で終わったりしたら、待たずに失敗にする。

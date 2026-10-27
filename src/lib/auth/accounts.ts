@@ -1,6 +1,7 @@
 import { randomToken } from "../crypto.ts";
 import { db, transaction } from "../db.ts";
 import { LOGIN_LOCKOUT_MINUTES, LOGIN_MAX_FAILED_ATTEMPTS } from "../env.ts";
+import { logWarning } from "../log.ts";
 import * as loginDevices from "./login-devices.ts";
 import * as loginThrottle from "./login-throttle.ts";
 import {
@@ -48,7 +49,7 @@ export const ACCOUNT_COLUMNS = "accounts.id, accounts.username, accounts.display
 export type AccountColumns = Pick<AccountRow, "id" | "username" | "display_name">;
 
 if (LOGIN_MAX_FAILED_ATTEMPTS === 0) {
-  console.warn("LOGIN_MAX_FAILED_ATTEMPTS が 0 のため、ログインの試行回数を制限していません");
+  logWarning("LOGIN_MAX_FAILED_ATTEMPTS が 0 のため、ログインの試行回数を制限していません");
 }
 
 const DUMMY_HASH = await hashPassword(randomToken());

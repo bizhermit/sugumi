@@ -6,8 +6,12 @@ import { asset } from "../../src/web/assets.ts";
 import { cookiePair } from "../../tests/_support/cookie.ts";
 import { addAccount, resetDb, TEST_PASSWORD } from "../../tests/_support/db.ts";
 
-// ログインのたびに出る監査ログで結果が読めなくなるため、捨てる（JSON にする処理は計測に含める）
-console.log = () => {};
+// アクセスログ・監査ログを書き出す時間で結果がぶれ、出力で結果も読めなくなるため、捨てる（JSON にする処理は計測に含める）。
+// deno bench はベンチごとに console を差し替えるため、モジュールの先頭ではなくベンチの中で捨てる
+function discardLogs(): void {
+  console.log = noop;
+}
+function noop(): void {}
 
 const handler = await createApp({ mock: false });
 
@@ -30,6 +34,7 @@ function postLogin(username: string, password: string): Request {
 
 // 本文を送り出すまでを含めて比べるため、本文も読み切る
 async function run(req: Request): Promise<void> {
+  discardLogs();
   const res = await handler(req);
   await res.bytes();
 }
@@ -78,13 +83,16 @@ server.unref();
 const origin = `http://127.0.0.1:${server.addr.port}`;
 
 Deno.bench("HTTP GET /login（未ログイン）", { group: "http", baseline: true }, async () => {
+  discardLogs();
   await (await fetch(`${origin}/login`)).bytes();
 });
 
 Deno.bench("HTTP GET /home（ログイン中）", { group: "http" }, async () => {
+  discardLogs();
   await (await fetch(`${origin}/home`, { headers: loggedIn })).bytes();
 });
 
 Deno.bench("HTTP GET /healthz", { group: "http" }, async () => {
+  discardLogs();
   await (await fetch(`${origin}/healthz`)).bytes();
 });

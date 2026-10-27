@@ -41,3 +41,14 @@ __pycache__/
 
 # Data
 /data/
+
+# 証明書の秘密鍵・署名の要求・通し番号（docker/README.md の手順で作る）。手順を誤ってリポジトリの中で作っても、コミットしない
+*.key
+*.csr
+*.srl
+
+# ログ用のサーバーの証明書・鍵と設定（docker/README.md の手順で作る）
+/docker/log-forwarder/certs/*
+!/docker/log-forwarder/certs/.gitkeep
+/docker/log-server/certs/*
+!/docker/log-server/certs/.gitkeep

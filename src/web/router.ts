@@ -60,6 +60,11 @@ export type RouteContext = {
    * リバースプロキシの裏では、環境変数 TRUSTED_PROXIES を設定しないとプロキシのアドレスになる。
    */
   readonly remoteAddress: string | undefined;
+  /**
+   * リクエストごとに振る ID。app.ts のアクセスログ・エラーログと、src/lib/audit.ts の監査ログに出し、突き合わせに使う。
+   * ページが独自にログを出すときも、これを入れる。
+   */
+  readonly requestId: string;
 };
 export type RouteHandler = (req: Request, ctx: RouteContext) => Response | Promise<Response>;
 /** Response を返すとそれを応答にする。undefined を返すとメソッドのハンドラに進む。 */

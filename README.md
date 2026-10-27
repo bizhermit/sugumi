@@ -32,5 +32,25 @@ deno task test   # テストを実行（TEST_DATABASE_URL の DB を使う。先
 
 ## 本番
 
-`compose.yaml` で、アプリ（`docker/app/`）と DB（`docker/db/`）のコンテナを起動する。手順は
+`compose.yaml` で、アプリ（`docker/app/`）・DB（`docker/db/`）・ログの送り出し口（`docker/log-forwarder/`）のコンテナを起動する。
+ログは、送り出し口が CloudWatch Logs か、別のサーバーに置く社内のログ用のサーバー（`docker/log-server/`）へ送る。手順は
 [docker/README.md](docker/README.md) を参照。
+
+```mermaid
+flowchart LR
+  user(["利用者"]) -->|"HTTPS"| proxy
+
+  subgraph appserver["アプリのサーバー（compose.yaml）"]
+    proxy["リバースプロキシ<br>（compose の外）"] -->|"127.0.0.1:3000"| app["app"]
+    app -->|"ネットワーク db<br>（外部と通信できない）"| db[("db<br>ボリューム db-data")]
+    app -.->|"標準出力・標準エラー<br>（Docker の fluentd ログドライバー）"| fwd["log-forwarder<br>ボリューム log-buffer"]
+  end
+
+  fwd -->|"LOG_DESTINATION=cloudwatch"| cw[("CloudWatch Logs")]
+  fwd -->|"LOG_DESTINATION=internal<br>TLS・共有の鍵"| receiver
+
+  subgraph logserver["社内のログ用のサーバー（docker/log-server/compose.yaml）"]
+    receiver["receiver"] -->|"日付ごとのファイル"| logs[("ボリューム logs")]
+    cleaner["log-cleaner"] -->|"日数・合計の上限で消す"| logs
+  end
+```

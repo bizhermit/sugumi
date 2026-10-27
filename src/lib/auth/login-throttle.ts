@@ -8,6 +8,7 @@ import {
   LOGIN_IP_WINDOW_MINUTES,
 } from "../env.ts";
 import { formatIp, parseIp } from "../ip.ts";
+import { logWarning } from "../log.ts";
 
 const WINDOW_MS = LOGIN_IP_WINDOW_MINUTES * 60 * 1000;
 const LOCKOUT_MS = LOGIN_IP_LOCKOUT_MINUTES * 60 * 1000;
@@ -30,7 +31,7 @@ type ThrottleRow = {
 let nextSweepAt = 0;
 
 if (LOGIN_IP_MAX_FAILED_ATTEMPTS === 0) {
-  console.warn(
+  logWarning(
     "LOGIN_IP_MAX_FAILED_ATTEMPTS が 0 のため、接続元ごとのログインの試行回数を制限していません",
   );
 }

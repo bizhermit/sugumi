@@ -13,17 +13,20 @@
    chmod 600 docker/.env
    ```
 
-2. 起動する。初回は DB にアプリ用のユーザーとスキーマが作られ、アプリの起動時にテーブルが作られる。
+2. ログの送り先（CloudWatch か社内のログ用のサーバー）を用意する。「[ログ](#ログ)」を参照。
+
+3. 起動する。初回は DB にアプリ用のユーザーとスキーマが作られ、アプリの起動時にテーブルが作られる。
 
    ```sh
    docker compose --env-file docker/.env up -d --build
    ```
 
-3. HTTPS を受けるリバースプロキシを同じサーバーに置き、`127.0.0.1:3000` へ転送する。
+4. HTTPS を受けるリバースプロキシを同じサーバーに置き、`127.0.0.1:3000` へ転送する。
    - Cookie に Secure を付けているため、HTTP のままではログインできない。
    - 「[接続元の IP アドレス](#接続元の-ip-アドレス)」の設定をする。
      しないと、接続元ごとのログインの制限が全員にまとめてかかる。
    - 「[時間制限](#時間制限)」の設定をする。
+   - 「[大量のリクエスト](#大量のリクエスト)」の設定をする。
 
 - パスワードは、コンテナには環境変数ではなく `/run/secrets/` のファイルとして渡る。
 - DB の初期化は、データのボリュームが空のときにだけ行われる。
@@ -44,6 +47,7 @@
 | `TRUSTED_PROXIES`            |      | 信頼するプロキシの IP アドレス。「[接続元の IP アドレス](#接続元の-ip-アドレス)」を参照 |
 | `DB_POOL_MAX` ほか           |      | DB の接続数と時間制限。「[時間制限](#時間制限)」を参照                                  |
 | `LOGIN_LOCKOUT_MINUTES` ほか |      | アプリの設定。書かなければ既定値を使う。意味と既定値は `src/lib/env.ts` を参照          |
+| `LOG_DESTINATION` ほか       | ○    | ログの送り先。「[ログ](#ログ)」を参照                                                   |
 
 ### APP_NETWORK_SUBNET・APP_NETWORK_GATEWAY
 
@@ -178,3 +182,234 @@ docker compose --env-file docker/.env exec db \
 - `compose.yaml` の ports を `127.0.0.1`
   以外にも公開したとき：外からの接続もゲートウェイから届く場合があり、偽れる。 公開するなら
   `TRUSTED_PROXIES` を外す。
+
+## ログ
+
+アプリは、1 行に 1 つの JSON でログを出す。`type` で種類を見分ける。
+
+- `access`：1 リクエストにつき 1 行。静的ファイルも含む。標準出力に出す。
+  - `durationMs` は応答を返し始めるまでの時間で、本文を送り終えるまでは含まない。
+  - `accountId`・`sessionLogId` はログイン中のときだけ出す。
+- `audit`：ログイン・ログアウトなどの監査ログ。標準出力に出す。
+- `error`：500・503 にした例外など。`error` にスタックトレースが入る。標準エラーに出す。
+- `warning`：設定の不備など。標準エラーに出す。
+
+クエリ文字列・Cookie・本文は出さない。ログイン後の戻り先やトークンが入るため。
+
+`login_failed` の `username`（64 文字まで）には、利用者が誤ってパスワードを入れた値が入りうる。ログを読める人を絞る。
+
+### 送り先
+
+アプリはファイルに書かない。同じサーバーの `log-forwarder`（Fluent Bit）がアプリのログを受け取り、`LOG_DESTINATION` の送り先へ送る。
+
+- `cloudwatch`：CloudWatch Logs へ送る。
+- `internal`：社内のログ用のサーバー（`docker/log-server/`）へ送る。
+
+どちらでも、次のことは同じ。
+
+- 送り先に届くまでは、`log-forwarder` がディスク（ボリューム `log-buffer`）にためて送り直す。
+  - 送り先が止まっても捨てない。ためる量の上限は `LOG_BUFFER_MAX_SIZE`（既定 `5G`）で、超えると古いものから捨てる。
+- ログはすぐにアプリのサーバーの外へ出る。アプリのサーバーを乗っ取られても、送った監査ログは消せない。
+  - 乗っ取られたサーバーからは、偽のログを送れる。共有の鍵や IAM ロールは全サーバーで同じため、ほかのサーバーの名前（`server`）でも送れる。
+    乗っ取りに気づいたら、乗っ取られた時点より後の、全サーバーのログを信用しない。
+  - `internal` では、アクセスログなどは合計の上限で古いものから消すため、量を送られると押し出される（「[古いファイルの削除](#古いファイルの削除)」）。
+- 各行に、`server`（`SERVER_NAME`）と、`container_name`・`source`（`stdout`・`stderr`）が付く。
+  - アプリのサーバーが複数台になっても、どのサーバーのログか分かる。`SERVER_NAME` はサーバーごとに違う値にする。
+  - JSON でない行（Deno が起動時に出す表示など）は、`log` に文字列のまま入る。
+- `docker compose --env-file docker/.env logs app` でも、そのサーバーの直近のログを読める。
+- `log-forwarder` はホストのネットワークで動き、`127.0.0.1:24224` だけで待ち受ける（Docker がホストから接続するため）。
+  - アプリのコンテナからは届かない。
+  - 同じサーバーのほかのプロセスからは送れるため、信頼しない利用者やサービスを同じサーバーに置かない。
+
+| 名前                    | 必須 | 内容                                                         |
+| ----------------------- | ---- | ------------------------------------------------------------ |
+| `LOG_DESTINATION`       | ○    | `cloudwatch` か `internal`                                   |
+| `SERVER_NAME`           | ○    | このサーバーの名前（例：`app-1`）。ログの `server` に入る    |
+| `LOG_BUFFER_MAX_SIZE`   |      | 送れない間にためる量の上限（`5G`）                           |
+| `AWS_REGION`            |      | `cloudwatch`：送り先のリージョン（例：`ap-northeast-1`）     |
+| `CLOUDWATCH_LOG_GROUP`  |      | `cloudwatch`：ロググループの名前。先に作っておく             |
+| `LOG_SERVER_HOST`       |      | `internal`：ログ用のサーバーのホスト名。証明書の名前と揃える |
+| `LOG_SERVER_PORT`       |      | `internal`：ログ用のサーバーのポート（`24224`）              |
+| `LOG_SERVER_SHARED_KEY` |      | `internal`：ログ用のサーバーと揃える共有の鍵                 |
+
+### CloudWatch
+
+アプリのサーバーを乗っ取られたときに、送ったログを消させないよう、サーバーに与える権限を書き込むことだけに絞る。
+
+1. 管理者が、ロググループを作り、保存日数を決める。アプリのサーバーには作らせない。
+
+   ```sh
+   aws logs create-log-group --log-group-name <ロググループ>
+   aws logs put-retention-policy --log-group-name <ロググループ> --retention-in-days 90
+   ```
+
+2. アプリのサーバー（EC2）に IAM ロールを付け、次の権限だけを与える。アクセスキーを `docker/.env` に書かない。
+   - `logs:CreateLogStream`・`logs:PutLogEvents`
+   - 対象は、そのロググループだけにする（`arn:aws:logs:<リージョン>:<アカウント>:log-group:<ロググループ>:*`）。
+   - `logs:PutRetentionPolicy`・`logs:Delete*`・`logs:CreateLogGroup` は与えない。保存日数を縮めたり消したりして、送ったログを消させないため。
+   - サーバーごとに IAM ロールを分け、対象をそのサーバーのストリーム（`…:log-group:<ロググループ>:log-stream:<SERVER_NAME>`）に絞ると、
+     乗っ取られたサーバーがほかのサーバーのストリームに書けなくなる。
+3. インスタンスのメタデータを、IMDSv2 だけにし（`HttpTokens=required`）、応答のホップ数（`HttpPutResponseHopLimit`）を 1 にする。
+   - Amazon Linux 2023 の AMI などは、既定のホップ数が 2 のため、必ず設定して確かめる。
+
+     ```sh
+     aws ec2 modify-instance-metadata-options --instance-id <インスタンス> --http-tokens required --http-put-response-hop-limit 1
+     aws ec2 describe-instances --instance-ids <インスタンス> --query 'Reservations[].Instances[].MetadataOptions'
+     ```
+
+   - `log-forwarder` はホストのネットワークで動くため、ホップ数 1 で届く。
+   - アプリのコンテナからは届かない。ホップ数が 2 以上だと、アプリのコンテナを乗っ取られたときに IAM ロールの権限を使われる。
+   - サーバーの root を取られると権限は使われるが、与えているのは書き込むことだけのため、送ったログは消せない。
+4. `docker/.env` に `LOG_DESTINATION='cloudwatch'` と `AWS_REGION`・`CLOUDWATCH_LOG_GROUP` を書く。
+
+ログは Logs Insights で、JSON の項目のまま絞り込める。
+
+```
+fields @timestamp, server, type, event, method, path, status
+| filter requestId = "<requestId>"
+```
+
+監視には、メトリクスフィルターと警報を使う。例：`{ $.type = "audit" && $.event = "login_failed" }` の件数、`{ $.type = "error" }` の件数、ロググループの `IncomingLogEvents` が 0 になったこと。
+
+### 社内のログ用のサーバー
+
+アプリのサーバーとは別のサーバーに置く。`docker/log-server/` に、受け口（`receiver`）と、古いファイルを消す `log-cleaner`（「[古いファイルの削除](#古いファイルの削除)」）がある。
+
+アプリのサーバーの `log-forwarder` は、TLS で暗号化し、共有の鍵で認証してログを送るだけで、ログ用のサーバーのファイルを読んだり、指定して消したりできない。
+
+#### 証明書を作る
+
+アプリのサーバーとログ用のサーバー以外の、管理者の端末の作業用のディレクトリ（リポジトリの外）で作る。
+`log.example.internal` は、アプリのサーバーから接続するホスト名（`LOG_SERVER_HOST`）にする。IP アドレスで接続するなら `DNS:` を `IP:` にする。
+
+```sh
+mkdir -p ~/sugumi-log-ca && cd ~/sugumi-log-ca
+umask 077
+openssl req -x509 -newkey rsa:3072 -nodes -days 3650 -subj "/CN=sugumi-log-ca" -keyout ca.key -out ca.crt
+openssl req -newkey rsa:3072 -nodes -subj "/CN=log.example.internal" -keyout server.key -out server.csr
+openssl x509 -req -days 825 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+  -extfile <(printf "subjectAltName=DNS:log.example.internal") -out server.crt
+```
+
+- `server.crt`・`server.key` を、ログ用のサーバーの `docker/log-server/certs/` に置く。置いたら、端末の `server.key` は消す。
+- `ca.crt` を、アプリのサーバーの `docker/log-forwarder/certs/log-server-ca.crt` に置く。
+- `ca.key` は、どのサーバーにも置かず、端末の外（オフラインの保管場所など）で保管する。漏れると、偽のログ用のサーバーを作れる。
+- 証明書はイメージに入れるため、差し替えたら `--build` を付けて起動し直す。
+  ログ用のサーバーのイメージには秘密鍵が入るため、レジストリへ push しない。
+- `.gitignore` は `*.key`・`*.csr`・`*.srl` を除外しているが、リポジトリの中では作らない。
+
+#### ログ用のサーバーを用意する
+
+1. サーバーを外部から隔離する。
+   - 公開 IP を持たせない。
+   - 受け口のポート（`LOG_SERVER_PORT`）は、アプリのサーバーのアドレスからだけ受け付ける。
+     - Docker が公開したポートは、ufw・firewalld などの INPUT の規則を通らないため、それでは絞れない。
+     - クラウドのセキュリティグループ・ネットワーク ACL か、ホストの `DOCKER-USER` チェーンで絞る。
+
+       ```sh
+       sudo iptables -I DOCKER-USER -p tcp -m conntrack --ctdir ORIGINAL --ctorigdstport <LOG_SERVER_PORT> ! -s <アプリのサーバーの範囲> -j DROP
+       ```
+
+       `--ctdir ORIGINAL` を付けないと、受け口からの応答も止めてしまい、アプリのサーバーからもつながらない。
+
+       iptables の規則は再起動で消えるため、`iptables-persistent` などで残す。
+     - サーバーに複数のネットワークがあるなら、`LOG_SERVER_LISTEN_ADDRESS` でアプリのサーバー側のアドレスだけで待ち受ける。
+   - SSH などの管理は、社内のネットワークか VPN からだけ受け付ける。
+   - アプリのサーバーがクラウドにあるなら、拠点間の VPN などで社内とつなぐ。
+   - 入れる人を、アプリのサーバーを管理する人と分けられるとよい。両方を管理できる人のアカウントを取られると、痕跡ごと消せるため。
+2. 「[証明書を作る](#証明書を作る)」で作った `server.crt`・`server.key` を、`docker/log-server/certs/` に置く。
+3. `.env` を作り、値を書く。
+   - `LOG_SERVER_SHARED_KEY` は、`openssl rand -hex 32` などで作った長いランダムな値にする。アプリのサーバーと同じ値を使う。
+
+   ```sh
+   cd docker/log-server
+   cp .env.example .env
+   chmod 600 .env
+   ```
+
+4. 起動する。
+
+   ```sh
+   docker compose --env-file .env up -d --build
+   ```
+
+| 名前                           | 必須 | 内容                                                                           |
+| ------------------------------ | ---- | ------------------------------------------------------------------------------ |
+| `LOG_SERVER_NAME`              | ○    | ログ用のサーバーの名前。共有の鍵での認証に使う                                 |
+| `LOG_SERVER_SHARED_KEY`        | ○    | アプリのサーバーと揃える共有の鍵                                               |
+| `LOG_SERVER_LISTEN_ADDRESS`    |      | 受け口が待ち受けるアドレス（`0.0.0.0`）                                        |
+| `LOG_SERVER_PORT`              |      | 受け口のポート（`24224`）                                                      |
+| `LOG_FILE_MAX_SIZE`            |      | `app-*` のファイル 1 つの大きさの上限。超えると分ける（`100M`）                |
+| `LOG_APP_RETENTION_DAYS`       |      | `app-*` のファイルを残す日数（`90`）                                           |
+| `LOG_AUDIT_RETENTION_DAYS`     |      | `audit-*` のファイルを残す日数（`90`）                                         |
+| `LOG_APP_MAX_TOTAL_SIZE_MB`    |      | `app-*` のファイルの合計の上限（MB）。超えたら古いものから消す（`51200`）      |
+| `LOG_AUDIT_WARN_TOTAL_SIZE_MB` |      | `audit-*` のファイルの合計がこれを超えたら警告を出す（MB）。消さない（`5120`） |
+
+#### アプリのサーバーを設定する
+
+1. 「[証明書を作る](#証明書を作る)」で作った `ca.crt` を、`docker/log-forwarder/certs/log-server-ca.crt` に置く（コミットしない）。
+2. `docker/.env` に `LOG_DESTINATION='internal'` と `LOG_SERVER_HOST`・`LOG_SERVER_SHARED_KEY` を書く。
+3. `--build` を付けて起動する（証明書はイメージに入れる）。
+
+#### ログを読む
+
+ログは、ボリューム `log-server_logs` に、UTC の日付ごとのファイルで書かれる。読めるのは root（と `docker` グループの利用者）だけ。
+
+- `app-<日付>.jsonl`：`access`・`error`・`warning` など
+- `audit-<日付>.jsonl`：`audit`
+- 日付は、受け口が受け取った時刻で決まる（アプリが出した時刻は各行の `time`）。送り手に、過去の日付のファイルへ書かせないため。
+- `app-*` は、書いているファイルが `LOG_FILE_MAX_SIZE` を超えると、gzip で圧縮して `<元の名前>.<分けた時刻>_<ランダムな文字>.gz` に移し、元の名前で書き直す。
+  - 例：`app-2026-10-26.jsonl.20261026_113154_ba22e1c0.gz`。名前順に並べると古い順になる。
+  - 名前の付け方は Fluent Bit が決めていて、変えられない。
+
+`zgrep` は、圧縮したファイルとしていないファイルの両方を読める。
+
+```sh
+LOGS=$(docker volume inspect log-server_logs --format '{{ .Mountpoint }}')
+sudo ls -l "$LOGS"
+sudo zgrep -h '"requestId":"<requestId>"' "$LOGS"/app-2026-10-26.jsonl*
+sudo zgrep -h '"sessionLogId":"<sessionLogId>"' "$LOGS"/audit-*
+```
+
+#### 古いファイルの削除
+
+`log-cleaner` が 1 分ごとに確かめる。
+
+- 保存日数（`LOG_APP_RETENTION_DAYS`・`LOG_AUDIT_RETENTION_DAYS`）を過ぎたファイルを消す。
+- `app-*` は、合計が `LOG_APP_MAX_TOTAL_SIZE_MB` を超えた分を、最終更新が古いファイルから消す。
+  - 受け口が書いている今日のファイルは消さない。
+  - 上限で消すと、保存日数より前にログが消える。そのときは `log-cleaner` のログに `warning` が出る（`docker compose --env-file .env logs log-cleaner`）。
+  - 1 分ごとに確かめるため、その間に流れ込んだ分だけ一時的に上限を超える。
+- `audit-*` は、合計が `LOG_AUDIT_WARN_TOTAL_SIZE_MB` を超えても消さず、1 時間ごとに `warning` を出す。
+  - 共有の鍵を持つ送り手（乗っ取られたアプリのサーバーを含む）が、量を送るだけで過去の監査ログを消させられないようにするため。
+  - 警告が出たら、ディスクの空きを確かめ、必要ならディスクを増やすか、保存日数を見直す。
+
+ディスクの空きは、`LOG_APP_MAX_TOTAL_SIZE_MB` と監査ログの量の合計より十分大きくする。受け口が書けない間にためる分（ボリューム `log-server_buffer`）の余裕も残す。
+ディスクの使用量を見張り、埋まる前に気づけるようにする。ディスクが埋まると、新しいログを書けなくなる。
+
+### 突き合わせ
+
+リクエストの処理中に出たログには `requestId` が入る。エラーや監査ログのリクエストは、同じ `requestId` のアクセスログで探す。
+
+`sessionLogId` は、1 回のログインごとに振る ID。アクセスログの `sessionLogId` と同じ値の `login_succeeded`
+を探すと、そのリクエストがいつ・どの接続元からのログインによるものかが分かる。
+
+## 大量のリクエスト
+
+アクセスログは、ログインなしで送れるリクエスト（静的ファイル・404 を含む）にも 1 行ずつ出る。
+大量に送られると、アプリや DB の負荷に加えて、次のことが起きる。
+
+- `log-forwarder` がためる量の上限（`LOG_BUFFER_MAX_SIZE`）を超え、送り先が止まっている間のログが捨てられる。
+- CloudWatch の取り込みの費用が増える。社内のログ用のサーバーでは、ディスクが埋まる。
+
+そのため、リバースプロキシで、接続元ごとにすべてのリクエストの頻度を制限する。nginx の例：
+
+```nginx
+# http に書く
+limit_req_zone $binary_remote_addr zone=per_ip:10m rate=20r/s;
+# proxy_pass を書くすべての location に書く
+limit_req zone=per_ip burst=100 nodelay;
+```
+
+- 値は、画面を開いたときに読み込むファイルの数や利用者の数に合わせて決める。
+- NAT の裏の利用者は同じ接続元として数えるため、利用者の数に合わせて余裕を持たせる。
