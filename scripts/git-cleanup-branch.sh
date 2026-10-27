@@ -92,7 +92,7 @@ else
     if [ -n "$branch" ]; then
       echo "  - $branch"
       if ! is_safe_branch_name "$branch"; then
-        echo "    処理できないブランチ名なので、スキップします。" >&2
+        echo "    ブランチ名に未対応の文字が含まれているため、処理をスキップします。" >&2
         has_delete_error=1
         continue
       fi
@@ -101,7 +101,7 @@ else
       # 対象のブランチへマージしてもツリーが変わらなければ、変更はすべて取り込み済みとみなす。
       if ! merged_tree=$(git merge-tree --write-tree "$target_branch" "$branch" 2>/dev/null) \
         || [ "$merged_tree" != "$(git rev-parse "$target_branch^{tree}")" ]; then
-        echo "    取り込まれていない変更があるので、スキップします。" >&2
+        echo "    取り込まれていない変更があるため、処理をスキップします。" >&2
         continue
       fi
 
