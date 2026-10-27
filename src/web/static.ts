@@ -28,7 +28,7 @@ type StaticFile = { body: Uint8Array<ArrayBuffer>; contentType: string; etag: st
 
 export type StaticFiles = {
   /** 配信するファイルの pathname の一覧。ルートとの重複を確かめるのに使う。 */
-  paths(): string[];
+  paths(): Array<string>;
   /** pathname が static/ のファイルに当たれば応答を返し、当たらなければ undefined を返す。 */
   serve(req: Request, url: URL): Response | undefined;
 };
@@ -49,7 +49,7 @@ function serveFile(
   files: Map<string, StaticFile>,
   req: Request,
   url: URL,
-): Response | undefined {
+) {
   const found = files.get(url.pathname);
   if (!found) return undefined;
   if (req.method !== "GET" && req.method !== "HEAD") return methodNotAllowed(["GET", "HEAD"]);
@@ -66,7 +66,7 @@ function serveFile(
 }
 
 // キーはリクエストの pathname と同じく、区切りごとにエンコードしたもの
-async function loadFiles(dir: URL): Promise<Map<string, StaticFile>> {
+async function loadFiles(dir: URL) {
   const files = new Map<string, StaticFile>();
   try {
     await Deno.stat(dir);
@@ -94,7 +94,7 @@ async function loadFiles(dir: URL): Promise<Map<string, StaticFile>> {
   return files;
 }
 
-async function* walk(dir: URL, names: string[]): AsyncGenerator<string[]> {
+async function* walk(dir: URL, names: Array<string>): AsyncGenerator<Array<string>> {
   for await (const entry of Deno.readDir(dir)) {
     if (entry.name.startsWith(".") && !DOT_NAMES.has(entry.name)) continue;
     const path = [...names, entry.name];

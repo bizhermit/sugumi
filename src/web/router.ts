@@ -76,7 +76,7 @@ export type BeforeHandler = (
 export type RouteMatch = {
   route: RoutePath;
   handler: RouteHandler | undefined;
-  allow: string[];
+  allow: Array<string>;
   params: Record<string, string>;
 };
 
@@ -88,13 +88,13 @@ export type Segment = { literal: string } | { param: string };
  */
 export type RouteDir = {
   relative: string;
-  segments: Segment[];
-  methods: string[];
-  befores: string[];
-  layouts: string[];
+  segments: Array<Segment>;
+  methods: Array<string>;
+  befores: Array<string>;
+  layouts: Array<string>;
 };
-type Route = { pattern: RoutePath; methods: Map<string, RouteHandler>; allow: string[] };
-type DynamicRoute = { segments: Segment[]; route: Route };
+type Route = { pattern: RoutePath; methods: Map<string, RouteHandler>; allow: Array<string> };
+type DynamicRoute = { segments: Array<Segment>; route: Route };
 
 const ROUTES_DIR = new URL("../routes/", import.meta.url);
 
@@ -121,10 +121,10 @@ const SPECIAL_FILES = [
 ].flatMap((name) => [name, name + MOCK_SUFFIX]);
 
 // キーはディレクトリのデコード済みの pathname。loadRouter で設定する
-const layoutChains = new Map<string, Layout[]>();
+const layoutChains = new Map<string, Array<Layout>>();
 // ページを出すたびに layoutsOf() を呼ぶため、URL の解析をしないよう moduleUrl ごとに覚えておく。
 // moduleUrl は import.meta.url なので、ファイルの数より増えない
-const layoutsByModule = new Map<string, Layout[]>();
+const layoutsByModule = new Map<string, Array<Layout>>();
 
 /**
  * ディレクトリ名が不正な場合や、同じ URL に対応するページが複数ある場合、
@@ -136,8 +136,8 @@ const layoutsByModule = new Map<string, Layout[]>();
  */
 export async function scanRoutes(
   { mock = false, root = ROUTES_DIR }: { mock?: boolean; root?: URL } = {},
-): Promise<RouteDir[]> {
-  const routes: RouteDir[] = [];
+): Promise<Array<RouteDir>> {
+  const routes: Array<RouteDir> = [];
   const sources = new Map<string, string>();
   for await (const dir of walk(root, "", { befores: [], layouts: [] }, mock)) {
     const { relative } = dir;
@@ -167,7 +167,7 @@ export async function loadRouter(
 ): Promise<(pathname: string, method: string) => RouteMatch | undefined> {
   const statics = new Map<string, Route>();
   // ルートの数に比例して照合が遅くならないよう、区切りの数ごとに分けて、同じ数のものだけを調べる
-  const dynamics = new Map<number, DynamicRoute[]>();
+  const dynamics = new Map<number, Array<DynamicRoute>>();
   layoutChains.clear();
   layoutsByModule.clear();
   for (const dir of await scanRoutes({ mock, root })) {
@@ -214,7 +214,7 @@ export async function loadRouter(
  * moduleUrl のディレクトリに適用する layout を、外側から順に返す。moduleUrl には呼び出し側の import.meta.url を渡す。
  * ルートのディレクトリでない場合や、loadRouter の前に呼んだ場合は例外を投げる。
  */
-export function layoutsOf(moduleUrl: string): Layout[] {
+export function layoutsOf(moduleUrl: string): Array<Layout> {
   const cached = layoutsByModule.get(moduleUrl);
   if (cached) return cached;
   const layouts = layoutChains.get(decodeURIComponent(new URL(".", moduleUrl).pathname));
@@ -223,12 +223,12 @@ export function layoutsOf(moduleUrl: string): Layout[] {
   return layouts;
 }
 
-function urlOf(root: URL, relative: string): URL {
+function urlOf(root: URL, relative: string) {
   return new URL(relative.split("/").map(encodeURIComponent).join("/"), root);
 }
 
-async function loadLayouts(root: URL, dir: RouteDir): Promise<Layout[]> {
-  const layouts: Layout[] = [];
+async function loadLayouts(root: URL, dir: RouteDir) {
+  const layouts: Array<Layout> = [];
   for (const relative of dir.layouts) {
     const layout = (await import(urlOf(root, relative).href)).default;
     const title = layout?.title;
@@ -243,7 +243,7 @@ async function loadLayouts(root: URL, dir: RouteDir): Promise<Layout[]> {
   return layouts;
 }
 
-async function loadRoute(root: URL, dir: RouteDir): Promise<Route> {
+async function loadRoute(root: URL, dir: RouteDir) {
   const load = async (relative: string) => {
     const mod = await import(urlOf(root, relative).href);
     if (typeof mod.default !== "function") {
@@ -251,7 +251,7 @@ async function loadRoute(root: URL, dir: RouteDir): Promise<Route> {
     }
     return mod.default;
   };
-  const befores: BeforeHandler[] = [];
+  const befores: Array<BeforeHandler> = [];
   for (const relative of dir.befores) befores.push(await load(relative));
   const methods = new Map<string, RouteHandler>();
   for (const name of dir.methods) {
@@ -273,11 +273,11 @@ async function loadRoute(root: URL, dir: RouteDir): Promise<Route> {
 }
 
 /** ルートのパターン（例："/user/[id]"）を返す。routes.gen.ts の RoutePath の各値になる。 */
-export function patternOf(segments: Segment[]): string {
+export function patternOf(segments: Array<Segment>): string {
   return "/" + segments.map((s) => "param" in s ? `[${s.param}]` : s.literal).join("/");
 }
 
-function parseSegments(relative: string): Segment[] {
+function parseSegments(relative: string): Array<Segment> {
   const names = relative.split("/").slice(0, -1);
   const seen = new Set<string>();
   return names.map((name) => {
@@ -296,14 +296,14 @@ function parseSegments(relative: string): Segment[] {
  * デコード済みの区切りを、静的なルートの表のキーにする。
  * 区切りは `%2F` をデコードした `/` を含みうるため、splitPath() が断る制御文字の \0 でつなぐ。
  */
-function staticKey(parts: string[]): string {
+function staticKey(parts: Array<string>) {
   return parts.join("\0");
 }
 
 const CONTROL_CHAR = /\p{Cc}/u;
 
 /** 不正なパーセントエンコーディングや、デコード後に制御文字を含む場合は undefined を返す。 */
-function splitPath(pathname: string): string[] | undefined {
+function splitPath(pathname: string) {
   if (pathname === "/") return [];
   const parts = pathname.slice(1).split("/");
   // リクエストのたびに通るため、コールバックを作らずにループで書く
@@ -321,7 +321,7 @@ function splitPath(pathname: string): string[] | undefined {
 }
 
 /** segments と parts の長さは同じであること。 */
-function matchSegments(segments: Segment[], parts: string[]): Record<string, string> | undefined {
+function matchSegments(segments: Array<Segment>, parts: Array<string>) {
   const params: Record<string, string> = {};
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
@@ -335,7 +335,7 @@ function matchSegments(segments: Segment[], parts: string[]): Record<string, str
   return params;
 }
 
-function compareSpecificity(a: Segment[], b: Segment[]): number {
+function compareSpecificity(a: Array<Segment>, b: Array<Segment>) {
   for (let i = 0; i < Math.min(a.length, b.length); i++) {
     const diff = Number("param" in a[i]) - Number("param" in b[i]);
     if (diff !== 0) return diff;
@@ -350,11 +350,13 @@ function compareSpecificity(a: Segment[], b: Segment[]): number {
 async function* walk(
   dir: URL,
   relative: string,
-  inherited: { befores: string[]; layouts: string[] },
+  inherited: { befores: Array<string>; layouts: Array<string> },
   mock: boolean,
-): AsyncGenerator<{ relative: string; methods: string[]; befores: string[]; layouts: string[] }> {
-  const files: string[] = [];
-  const subdirs: string[] = [];
+): AsyncGenerator<
+  { relative: string; methods: Array<string>; befores: Array<string>; layouts: Array<string> }
+> {
+  const files: Array<string> = [];
+  const subdirs: Array<string> = [];
   for await (const entry of Deno.readDir(dir)) {
     // readDir はリンクを isFile・isDirectory のどちらにもしないため、before.tree.ts などがリンクだと
     // 黙って無視され、アクセス制御が外れる
@@ -386,7 +388,7 @@ async function* walk(
     }
     return mock && mocked ? mocked : real;
   };
-  const append = (chain: string[], base: string) => {
+  const append = (chain: Array<string>, base: string) => {
     const name = find(base);
     return name ? [...chain, relative + name] : chain;
   };
@@ -416,7 +418,7 @@ async function* walk(
 }
 
 // before.jsx や Before.ts のような名前は黙って無視され、アクセス制御が外れる
-function checkSpecialName(relative: string, name: string): void {
+function checkSpecialName(relative: string, name: string) {
   const dot = name.lastIndexOf(".");
   if (dot <= 0) return;
   const [stem, ext] = [name.slice(0, dot), name.slice(dot)];

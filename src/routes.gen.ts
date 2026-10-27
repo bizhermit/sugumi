@@ -7,7 +7,7 @@ export type RoutePath =
   | "/logout";
 
 /** GET で開けるルート。e2e/ のテストが、すべての画面を開いて確かめるのに使う。 */
-export const GET_ROUTES: readonly RoutePath[] = [
+export const GET_ROUTES: ReadonlyArray<RoutePath> = [
   "/",
   "/healthz",
   "/home",

@@ -11,7 +11,7 @@ const FORM_URL = "http://localhost/form";
 function post(
   token: string | undefined,
   { cookie, header = false }: { cookie?: string; header?: boolean } = {},
-): Request {
+) {
   const headers = new Headers(cookie ? { cookie } : {});
   if (header && token !== undefined) {
     headers.set("x-csrf-token", token);
@@ -22,7 +22,7 @@ function post(
 }
 
 /** ログイン前のトークンを発行し、そのトークンと、ブラウザが次に送る Cookie を返す。 */
-async function issuePreLogin(): Promise<{ token: string; cookie: string }> {
+async function issuePreLogin() {
   const csrf = csrfFor(new Request(FORM_URL), undefined);
   const token = await csrf.token();
   const setCookie = csrf.apply(new Response()).headers.get("set-cookie");
@@ -30,7 +30,7 @@ async function issuePreLogin(): Promise<{ token: string; cookie: string }> {
   return { token, cookie: cookiePair(setCookie) };
 }
 
-function preLoginCookie(issuedAt: number): string {
+function preLoginCookie(issuedAt: number) {
   return `__Host-csrf=${issuedAt}.${randomToken()}`;
 }
 

@@ -20,8 +20,10 @@ import { addAccount, resetDb, TEST_PASSWORD } from "../../_support/db.ts";
 
 const MAX = LOGIN_MAX_FAILED_ATTEMPTS;
 
-async function accountRow(): Promise<{ failed_attempts: number; locked_until: Date | null }> {
-  const { rows } = await db.query("SELECT failed_attempts, locked_until FROM accounts");
+async function accountRow() {
+  const { rows } = await db.query<{ failed_attempts: number; locked_until: Date | null }>(
+    "SELECT failed_attempts, locked_until FROM accounts",
+  );
   return rows[0];
 }
 
@@ -151,7 +153,7 @@ Deno.test({
 Deno.test("accounts: createAccount は入力を確かめ、使われているユーザー名を断る", async () => {
   await resetDb();
   const ok = "valid password";
-  const invalid: [string, string, string, RegExp][] = [
+  const invalid: Array<[string, string, string, RegExp]> = [
     ["", "表示名", ok, /ユーザー名は空白を含まない 64 文字以内/],
     ["a b", "表示名", ok, /ユーザー名は空白を含まない/],
     ["a\tb", "表示名", ok, /ユーザー名は空白を含まない/],
@@ -173,7 +175,7 @@ Deno.test("accounts: createAccount は入力を確かめ、使われているユ
 });
 
 /** 失敗を重ねて alice をロックする。 */
-async function lockAlice(): Promise<void> {
+async function lockAlice() {
   for (let i = 0; i < MAX; i++) {
     await authenticate("alice", "wrong password", undefined, undefined);
   }
@@ -181,14 +183,14 @@ async function lockAlice(): Promise<void> {
 }
 
 /** alice でログインに成功し、その端末のトークンを返す。 */
-async function aliceDevice(): Promise<string> {
+async function aliceDevice() {
   const result = await authenticate("alice", TEST_PASSWORD, undefined, undefined);
   assert.ok(result.status === "ok" && result.deviceToken !== undefined);
   return result.deviceToken;
 }
 
-async function deviceRows(): Promise<{ account_id: number; failed_attempts: number }[]> {
-  const { rows } = await db.query(
+async function deviceRows() {
+  const { rows } = await db.query<{ account_id: number; failed_attempts: number }>(
     "SELECT account_id, failed_attempts FROM login_devices ORDER BY account_id",
   );
   return rows;

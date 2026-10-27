@@ -14,7 +14,7 @@ export function parseIp(text: string): Uint8Array | undefined {
   return bytes && isIpv4Mapped(bytes) ? bytes.slice(12) : bytes;
 }
 
-function isIpv4Mapped(bytes: Uint8Array): boolean {
+function isIpv4Mapped(bytes: Uint8Array) {
   for (let i = 0; i < 10; i++) {
     if (bytes[i] !== 0) return false;
   }
@@ -72,7 +72,7 @@ export function formatIp(bytes: Uint8Array): string {
   return text;
 }
 
-function wordAt(bytes: Uint8Array, i: number): number {
+function wordAt(bytes: Uint8Array, i: number) {
   return (bytes[i * 2] << 8) | bytes[i * 2 + 1];
 }
 
@@ -89,7 +89,7 @@ export function cidrContains(cidr: Cidr, address: Uint8Array): boolean {
   return (cidr.bytes[full] & mask) === (address[full] & mask);
 }
 
-function parseIpv4(text: string): Uint8Array | undefined {
+function parseIpv4(text: string) {
   const parts = text.split(".");
   if (parts.length !== 4) return undefined;
   const bytes = new Uint8Array(4);
@@ -106,7 +106,7 @@ function parseIpv4(text: string): Uint8Array | undefined {
 const IPV4_PART = /^(?:0|[1-9]\d{0,2})$/;
 const IPV6_GROUP = /^[0-9A-Fa-f]{1,4}$/;
 
-function parseIpv6(text: string): Uint8Array | undefined {
+function parseIpv6(text: string) {
   const halves = text.split("::");
   if (halves.length > 2) return undefined;
   // 末尾の 2 グループは IPv4 の書き方でも書ける
@@ -123,8 +123,8 @@ function parseIpv6(text: string): Uint8Array | undefined {
 }
 
 /** `:` で区切ったグループを 16 ビットの値の配列にする。v4Last なら、最後のグループを IPv4 の書き方でも受け付ける。 */
-function parseGroups(half: string, v4Last: boolean): number[] | undefined {
-  const words: number[] = [];
+function parseGroups(half: string, v4Last: boolean) {
+  const words: Array<number> = [];
   if (half === "") return words;
   const groups = half.split(":");
   for (let g = 0; g < groups.length; g++) {
@@ -142,7 +142,7 @@ function parseGroups(half: string, v4Last: boolean): number[] | undefined {
   return words;
 }
 
-function setWord(bytes: Uint8Array, i: number, word: number): void {
+function setWord(bytes: Uint8Array, i: number, word: number) {
   bytes[i * 2] = word >> 8;
   bytes[i * 2 + 1] = word & 0xff;
 }

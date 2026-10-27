@@ -12,7 +12,7 @@ export function errorPage(status: number): Response {
   return new Response(html, { status, headers: HEADERS });
 }
 
-function render(status: number): string {
+function render(status: number) {
   const html = (
     <html lang="ja">
       <head>
@@ -28,7 +28,7 @@ function render(status: number): string {
   return `<!doctype html>\n${html.value}\n`;
 }
 
-export function methodNotAllowed(allow: string[]): Response {
+export function methodNotAllowed(allow: Array<string>): Response {
   const res = errorPage(405);
   res.headers.set("allow", allow.join(", "));
   return res;

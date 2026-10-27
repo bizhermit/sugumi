@@ -3,8 +3,8 @@ import { checkImports } from "../../scripts/check-imports.ts";
 import { withTempDir } from "../_support/fixture.ts";
 
 /** files に、空の scripts/ を足してリポジトリの形にし、違反の一覧を返す。 */
-async function violationsOf(files: Record<string, string>): Promise<string[]> {
-  let result: string[] = [];
+async function violationsOf(files: Record<string, string>) {
+  let result: Array<string> = [];
   await withTempDir({ "scripts/.keep": "", ...files }, async (root) => {
     result = await checkImports(root);
   });

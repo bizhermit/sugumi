@@ -41,7 +41,7 @@ if (import.meta.main) {
   Deno.exit(await runE2e(Deno.args, external ? parseBaseUrl(external) : undefined));
 }
 
-async function runE2e(args: string[], externalUrl: string | undefined): Promise<number> {
+async function runE2e(args: Array<string>, externalUrl: string | undefined) {
   await resetDb();
   const account = await addAccount();
   await db.end();
@@ -123,7 +123,7 @@ export function parseBaseUrl(raw: string): string {
   return url.origin;
 }
 
-function passedEnv(): Record<string, string> {
+function passedEnv() {
   const env: Record<string, string> = {};
   for (const name of PASSED_ENV) {
     const value = Deno.env.get(name);
@@ -133,7 +133,7 @@ function passedEnv(): Record<string, string> {
 }
 
 /** すでに終わったプロセスに kill() すると例外になり、元の例外を上書きするため、終わっていれば何もしない。 */
-function kill(process: Deno.ChildProcess): void {
+function kill(process: Deno.ChildProcess) {
   try {
     process.kill("SIGTERM");
   } catch (e) {

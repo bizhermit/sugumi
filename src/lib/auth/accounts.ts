@@ -120,7 +120,7 @@ export async function authenticate(
  * 上限に達する回で先にロックするのは、検証中にプロセスが落ちてもロックが残るようにするため。
  * 並行して送られたリクエストが同じ回数を読んで数え漏れないよう、行をロックして読む。
  */
-async function reserveAttempt(id: number, now: number): Promise<{ locks: boolean } | undefined> {
+async function reserveAttempt(id: number, now: number) {
   if (LOGIN_MAX_FAILED_ATTEMPTS === 0) return { locks: false };
   return await transaction(async (client) => {
     const { rows: [{ failed_attempts, locked_until }] } = await client.query<

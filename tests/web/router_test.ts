@@ -7,7 +7,7 @@ async function call(
   pathname: string,
   method: string,
   init?: RequestInit,
-): Promise<string | undefined> {
+) {
   const found = match(pathname, method);
   if (!found?.handler) return undefined;
   const ctx = { route: found.route, params: found.params } as RouteContext;
@@ -124,7 +124,7 @@ Deno.test("router: before.tree.ts を routes/ に近いものから順に呼び�
 Deno.test("router: before が Response を返すと、それを応答にして後の処理を呼ばない", async () => {
   await withFixture({
     "before.tree.ts": `export default (req: Request) => {
-      (globalThis as unknown as { calls: string[] }).calls.push("tree");
+      (globalThis as unknown as { calls: Array<string> }).calls.push("tree");
       return req.headers.has("x-stop") ? new Response("stopped") : undefined;
     };`,
     "before.ts": before("before"),
@@ -171,7 +171,7 @@ Deno.test("router: 付けないファイルのない *.mock.* は、mock の指�
 });
 
 Deno.test("router: 不正なファイル名・ディレクトリ名は例外になる", async (t) => {
-  const cases: [string, Record<string, string>, RegExp][] = [
+  const cases: Array<[string, Record<string, string>, RegExp]> = [
     [
       "大文字の名前",
       { "get.ts": handler("GET"), "Before.ts": before("b") },

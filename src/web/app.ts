@@ -150,7 +150,7 @@ async function handle(
   req: Request,
   log: AccessLog,
   bodyTimeoutMs: number,
-): Promise<Response> {
+) {
   const host = req.headers.get("host");
   if (host !== null && !VALID_HOST.test(host)) return errorPage(400);
   let url: URL;
@@ -233,13 +233,13 @@ async function bufferBody(
   req: Request,
   limit: number,
   timeoutMs: number,
-): Promise<Request | 408 | 413> {
+) {
   if (req.body === null) return req;
   if (Number(req.headers.get("content-length")) > limit) return 413;
   const reader = req.body.getReader();
   // 締め切りは塊ごとではなく本文全体に付ける。塊ごとだと、1 バイトずつ送り続ける接続を止められない
   const timer = setTimeout(expireBody, timeoutMs, reader);
-  const chunks: Uint8Array[] = [];
+  const chunks: Array<Uint8Array> = [];
   let size = 0;
   try {
     for (;;) {
@@ -270,7 +270,7 @@ async function bufferBody(
 }
 
 /** 読み込み中の read() を done で終わらせ、bufferBody() に 408 を返させる。 */
-function expireBody(reader: ReadableStreamDefaultReader<Uint8Array>): void {
+function expireBody(reader: ReadableStreamDefaultReader<Uint8Array>) {
   expiredBodies.add(reader);
   // 取り消しの失敗は応答に関わらないが、捨てずにログに残す
   reader.cancel().catch(logError);
@@ -315,7 +315,7 @@ class Context implements RouteContext {
   }
 }
 
-async function formOf(req: Request): Promise<FormData> {
+async function formOf(req: Request) {
   const form = await parseForm(req);
   if (!form) throw new InvalidFormError();
   return form;

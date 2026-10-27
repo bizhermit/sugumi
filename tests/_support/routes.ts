@@ -7,9 +7,9 @@ import { withTempDir } from "./fixture.ts";
 const JSX_RUNTIME = new URL("../../src/lib/jsx-runtime.ts", import.meta.url).href;
 
 /** before・ハンドラ・layout が呼ばれた順に名前を記録する。withFixture() が空にする。 */
-export const calls: string[] = (globalThis as unknown as { calls: string[] }).calls = [];
+export const calls: Array<string> = (globalThis as unknown as { calls: Array<string> }).calls = [];
 
-const RECORD = "(globalThis as unknown as { calls: string[] }).calls.push";
+const RECORD = "(globalThis as unknown as { calls: Array<string> }).calls.push";
 
 /** 呼ばれたら name を記録して undefined を返す before。 */
 export function before(name: string): string {

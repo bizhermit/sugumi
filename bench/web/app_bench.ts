@@ -8,10 +8,10 @@ import { addAccount, resetDb, TEST_PASSWORD } from "../../tests/_support/db.ts";
 
 // アクセスログ・監査ログを書き出す時間で結果がぶれ、出力で結果も読めなくなるため、捨てる（JSON にする処理は計測に含める）。
 // deno bench はベンチごとに console を差し替えるため、モジュールの先頭ではなくベンチの中で捨てる
-function discardLogs(): void {
+function discardLogs() {
   console.log = noop;
 }
-function noop(): void {}
+function noop() {}
 
 const handler = await createApp({ mock: false });
 
@@ -24,7 +24,7 @@ const loginPage = await handler(new Request("http://localhost/login"));
 const preLogin = { cookie: cookiePair(loginPage.headers.get("set-cookie")!) };
 const csrfToken = (await loginPage.text()).match(/name="_csrf" value="([^"]+)"/)![1];
 
-function postLogin(username: string, password: string): Request {
+function postLogin(username: string, password: string) {
   return new Request("http://localhost/login", {
     method: "POST",
     headers: preLogin,
@@ -33,7 +33,7 @@ function postLogin(username: string, password: string): Request {
 }
 
 // 本文を送り出すまでを含めて比べるため、本文も読み切る
-async function run(req: Request): Promise<void> {
+async function run(req: Request) {
   discardLogs();
   const res = await handler(req);
   await res.bytes();

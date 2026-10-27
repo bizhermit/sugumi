@@ -9,7 +9,7 @@
 import { type Cidr, parseCidr, parseIp } from "./ip.ts";
 
 export type AppMode = "PROD" | "DEV" | "MOCK";
-const APP_MODES: readonly AppMode[] = ["PROD", "DEV", "MOCK"];
+const APP_MODES: ReadonlyArray<AppMode> = ["PROD", "DEV", "MOCK"];
 
 /**
  * 起動の仕方ではなく、アプリ自体のモード。既定は PROD。
@@ -33,7 +33,7 @@ export const LISTEN_HOST = parseListenHost(Deno.env.get("LISTEN_HOST"));
  * 範囲の中の端末は、X-Forwarded-For を書いて送れば、プロキシを通しても通さなくても接続元を偽れる。
  * そのため、プロキシのアドレスだけを最小の範囲で書く。
  */
-export const TRUSTED_PROXIES: readonly Cidr[] = parseTrustedProxies(
+export const TRUSTED_PROXIES: ReadonlyArray<Cidr> = parseTrustedProxies(
   Deno.env.get("TRUSTED_PROXIES"),
 );
 
@@ -109,7 +109,7 @@ export const DB_CONNECTION_TIMEOUT_SECONDS = integer("DB_CONNECTION_TIMEOUT_SECO
 export const DB_STATEMENT_TIMEOUT_SECONDS = integer("DB_STATEMENT_TIMEOUT_SECONDS", 10, 1);
 
 /** 不正な値や、範囲が広すぎる値があれば例外を投げる。 */
-export function parseTrustedProxies(raw: string | undefined): Cidr[] {
+export function parseTrustedProxies(raw: string | undefined): Array<Cidr> {
   if (raw === undefined || raw.trim() === "") return [];
   return raw.split(",").map((item) => {
     const cidr = parseCidr(item.trim());
@@ -154,7 +154,7 @@ export function parseDatabaseUrl(
   return url.href;
 }
 
-function integer(name: string, fallback: number, min: number): number {
+function integer(name: string, fallback: number, min: number) {
   return parseInteger(name, Deno.env.get(name), fallback, min);
 }
 

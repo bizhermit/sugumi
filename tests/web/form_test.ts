@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { parseForm } from "../../src/web/form.ts";
 
-function post(body: BodyInit, type?: string): Request {
+function post(body: BodyInit, type?: string) {
   return new Request("http://localhost/", {
     method: "POST",
     headers: type ? { "content-type": type } : {},

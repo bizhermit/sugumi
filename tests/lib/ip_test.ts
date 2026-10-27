@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { cidrContains, formatIp, parseCidr, parseIp } from "../../src/lib/ip.ts";
 
 /** 解析して表記を揃えた文字列。解析できなければ undefined。 */
-function normalize(text: string): string | undefined {
+function normalize(text: string) {
   const bytes = parseIp(text);
   return bytes && formatIp(bytes);
 }
@@ -30,7 +30,7 @@ Deno.test("ip: IPv4 を解析し、先頭の 0 や範囲外の値は受け付け
 });
 
 Deno.test("ip: IPv6 を解析し、RFC 5952 の表記に揃える", () => {
-  const cases: [string, string][] = [
+  const cases: Array<[string, string]> = [
     ["2001:DB8:0:0:0:0:0:1", "2001:db8::1"],
     ["2001:0db8::0001", "2001:db8::1"],
     ["::", "::"],

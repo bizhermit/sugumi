@@ -16,7 +16,7 @@ const handler = await createApp({ mock: false });
 const MAX_BODY_BYTES = 1024 * 1024;
 
 /** 本文を読み捨てて、ステータスとヘッダーだけを返す。 */
-async function head(path: string, init?: RequestInit): Promise<Response> {
+async function head(path: string, init?: RequestInit) {
   const res = await handler(new Request(`http://localhost${path}`, init));
   await res.body?.cancel();
   return res;
@@ -115,7 +115,7 @@ Deno.test("app: ログイン中に CSRF の検証に失敗したら 403 を返�
 
 Deno.test("app: どの応答にもセキュリティヘッダーを付ける", async () => {
   await resetDb();
-  const cases: [string, RequestInit | undefined, number][] = [
+  const cases: Array<[string, RequestInit | undefined, number]> = [
     ["/healthz", undefined, 200],
     ["/login", undefined, 200],
     ["/", undefined, 302],
@@ -147,7 +147,7 @@ Deno.test("app: 静的ファイルと /assets/ は、ログインなしで取得
 Deno.test("app: ログにパスワード・トークン・セッション ID・クエリ文字列を出さず、リクエスト ID で突き合わせられる", async () => {
   await resetDb();
   const account = await addAccount();
-  const secrets: string[] = [TEST_PASSWORD, "secret-query"];
+  const secrets: Array<string> = [TEST_PASSWORD, "secret-query"];
   const logs = await captureLogs(async () => {
     const page = await handler(new Request("http://localhost/login?to=%2Fhome%3Fq%3Dsecret-query"));
     const preLogin = cookiePair(page.headers.get("set-cookie")!);

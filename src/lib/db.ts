@@ -132,7 +132,7 @@ export async function secret(name: string, bytes: number): Promise<Uint8Array<Ar
   return new Uint8Array(rows[0].value);
 }
 
-async function migrate(): Promise<void> {
+async function migrate() {
   await transaction(async (client) => {
     // 大きなテーブルの変更や、ほかのインスタンスのマイグレーションの終わりを待つ時間は、リクエストの時間制限では測れない
     await client.query("SET LOCAL statement_timeout = 0");

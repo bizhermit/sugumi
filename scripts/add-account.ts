@@ -31,9 +31,9 @@ try {
   Deno.exit(1);
 }
 
-async function readHidden(label: string): Promise<string> {
+async function readHidden(label: string) {
   await Deno.stdout.write(new TextEncoder().encode(label));
-  const bytes: number[] = [];
+  const bytes: Array<number> = [];
   const buf = new Uint8Array(1);
   Deno.stdin.setRaw(true);
   try {

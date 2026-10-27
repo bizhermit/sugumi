@@ -4,7 +4,7 @@ import { asset, assetsOf, serveAsset } from "../../src/web/assets.ts";
 
 const COMMON_JS = "web/_assets/index.js";
 
-function serve(path: string, init?: RequestInit): Response {
+function serve(path: string, init?: RequestInit) {
   const url = new URL(`http://localhost${path}`);
   return serveAsset(new Request(url, init), url);
 }

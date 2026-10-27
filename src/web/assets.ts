@@ -77,7 +77,7 @@ export function serveAsset(req: Request, url: URL): Response {
   return new Response(req.method === "HEAD" ? null : found.body, { headers });
 }
 
-async function loadAssets(): Promise<Map<string, Asset>> {
+async function loadAssets() {
   const assets = new Map<string, Asset>();
   try {
     await Deno.stat(PUBLIC_DIR);

@@ -6,7 +6,7 @@ const ROBOTS = await Deno.readTextFile(new URL("../../static/robots.txt", import
 
 const statics = await loadStatic();
 
-function serve(path: string, init?: RequestInit): Response | undefined {
+function serve(path: string, init?: RequestInit) {
   const url = new URL(`http://localhost${path}`);
   return statics.serve(new Request(url, init), url);
 }

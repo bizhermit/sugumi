@@ -34,8 +34,8 @@ if (import.meta.main) {
 }
 
 /** root（リポジトリの直下）の src/ と scripts/ を確かめ、違反の一覧を返す。root はテストで別のディレクトリを渡す。 */
-export async function checkImports(root: URL): Promise<string[]> {
-  const violations: string[] = [];
+export async function checkImports(root: URL): Promise<Array<string>> {
+  const violations: Array<string> = [];
   const rootPath = decodeURIComponent(root.pathname);
   const relative = (url: URL) => decodeURIComponent(url.pathname).slice(rootPath.length);
   if (await exists(new URL("src/_shared/", root))) {
@@ -49,8 +49,8 @@ export async function checkImports(root: URL): Promise<string[]> {
   return violations;
 }
 
-async function checkFile(file: URL, relative: (url: URL) => string): Promise<string[]> {
-  const violations: string[] = [];
+async function checkFile(file: URL, relative: (url: URL) => string) {
+  const violations: Array<string> = [];
   const from = relative(file);
   const fromKind = kindOf(from);
   if (fromKind !== "server" && /x$/.test(file.pathname)) {
@@ -104,18 +104,18 @@ function check(
   }
 }
 
-function kindOf(path: string): Kind {
+function kindOf(path: string) {
   const segments = path.split("/");
   if (segments.includes("_assets")) return "client";
   if (segments.includes("_shared")) return "shared";
   return "server";
 }
 
-function assetsRoot(path: string): string {
+function assetsRoot(path: string) {
   return path.slice(0, path.indexOf("/_assets/"));
 }
 
-async function exists(url: URL): Promise<boolean> {
+async function exists(url: URL) {
   try {
     await Deno.stat(url);
     return true;
@@ -128,7 +128,7 @@ async function exists(url: URL): Promise<boolean> {
 async function* walk(
   dir: URL,
   relative: (url: URL) => string,
-  violations: string[],
+  violations: Array<string>,
 ): AsyncGenerator<URL> {
   for await (const entry of Deno.readDir(dir)) {
     const url = new URL(encodeURIComponent(entry.name), dir);

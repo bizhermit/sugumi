@@ -10,7 +10,7 @@ export default async function (_req: Request, ctx: RouteContext): Promise<Respon
   return await confirmPage(ctx);
 }
 
-async function confirmPage(ctx: RouteContext): Promise<Response> {
+async function confirmPage(ctx: RouteContext) {
   const html = await htmlDocument(ctx, {
     title: "ログアウト",
     page: import.meta.url,

@@ -3,14 +3,14 @@ import { checkBundle } from "../../scripts/check-bundle.ts";
 import { withTempDir } from "../_support/fixture.ts";
 
 /** dist/public/ に、sources を持つソースマップを置いて確かめる。キーは dist/public/ からのパス。 */
-async function violationsOf(maps: Record<string, string[]>): Promise<string[]> {
+async function violationsOf(maps: Record<string, Array<string>>) {
   const files = Object.fromEntries(
     Object.entries(maps).map(([path, sources]) => [
       `dist/public/${path}`,
       JSON.stringify({ version: 3, sources }),
     ]),
   );
-  let result: string[] = [];
+  let result: Array<string> = [];
   await withTempDir({ "dist/public/routes/a/_assets/index.js": "", ...files }, async (root) => {
     result = await checkBundle(root);
   });

@@ -16,15 +16,15 @@ if (import.meta.main) {
 }
 
 /** root（リポジトリの直下）の dist/public/ を確かめ、違反の一覧を返す。root はテストで別のディレクトリを渡す。 */
-export async function checkBundle(root: URL): Promise<string[]> {
+export async function checkBundle(root: URL): Promise<Array<string>> {
   const rootPath = decodeURIComponent(root.pathname);
   const relative = (url: URL) => decodeURIComponent(url.pathname).slice(rootPath.length);
-  const violations: string[] = [];
+  const violations: Array<string> = [];
   let maps = 0;
   for await (const file of walk(new URL("dist/public/", root))) {
     if (!file.pathname.endsWith(".map")) continue;
     maps++;
-    const { sources } = JSON.parse(await Deno.readTextFile(file)) as { sources: string[] };
+    const { sources } = JSON.parse(await Deno.readTextFile(file)) as { sources: Array<string> };
     for (const source of sources) {
       const path = relative(new URL(source, file));
       const segments = path.split("/");

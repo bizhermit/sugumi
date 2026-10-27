@@ -10,12 +10,12 @@ import { addAccount, resetDb, TEST_PASSWORD } from "../_support/db.ts";
 const handler = await createApp({ mock: false });
 const FAILED = "ユーザー名またはパスワードが違うか、アカウントがロックされています。";
 
-function request(path: string, init?: RequestInit): Promise<Response> {
+function request(path: string, init?: RequestInit) {
   return handler(new Request(`http://localhost${path}`, init));
 }
 
 /** path のページを開き、フォームの CSRF トークンと、次に送る Cookie を返す。 */
-async function openForm(path: string, cookie?: string): Promise<{ token: string; cookie: string }> {
+async function openForm(path: string, cookie?: string) {
   const page = await request(path, { headers: cookie ? { cookie } : {} });
   assert.equal(page.status, 200, path);
   const token = (await page.text()).match(/name="_csrf" value="([^"]+)"/)?.[1];
@@ -27,7 +27,7 @@ async function openForm(path: string, cookie?: string): Promise<{ token: string;
 function postLogin(
   form: Record<string, string>,
   { token, cookie }: { token: string; cookie: string },
-): Promise<Response> {
+) {
   return request("/login", {
     method: "POST",
     headers: { cookie },
@@ -35,7 +35,7 @@ function postLogin(
   });
 }
 
-async function sessionCount(): Promise<number> {
+async function sessionCount() {
   const { rows } = await db.query<{ count: string }>("SELECT count(*) FROM sessions");
   return Number(rows[0].count);
 }
@@ -66,7 +66,7 @@ Deno.test("login: 失敗の理由を区別せず、入力したユーザー名�
   await resetDb();
   await addAccount();
   const form = await openForm("/login");
-  const bodies: string[] = [];
+  const bodies: Array<string> = [];
   for (const username of ["alice", "<b>bob</b>"]) {
     const res = await postLogin({ username, password: "wrong password", to: "/home" }, form);
     assert.equal(res.status, 401, username);

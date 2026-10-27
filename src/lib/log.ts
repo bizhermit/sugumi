@@ -34,12 +34,12 @@ export function logWarning(message: string): void {
   writeLog({ type: "warning", time: new Date().toISOString(), message }, true);
 }
 
-function errorText(e: unknown): string {
+function errorText(e: unknown) {
   return e instanceof Error ? e.stack ?? String(e) : String(e);
 }
 
 // 例外のときにしか通らないため、読みやすさを優先して、収まるまで縮める
-function truncateError(text: string): string {
+function truncateError(text: string) {
   while (encoder.encode(JSON.stringify(text)).byteLength > MAX_ERROR_BYTES) {
     text = text.slice(0, Math.floor(text.length * 0.9));
   }

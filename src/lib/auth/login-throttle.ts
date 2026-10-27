@@ -97,7 +97,7 @@ export async function refundAttempt(attempt: Attempt | undefined): Promise<void>
  * IPv6 は /64 ごとに数える。1 つの回線に /64 以上が割り当てられることが多く、
  * アドレスごとに数えると、その中でアドレスを変えながら試せてしまうため。
  */
-function throttleKey(remoteAddress: string): string | undefined {
+function throttleKey(remoteAddress: string) {
   const bytes = parseIp(remoteAddress);
   if (!bytes) return undefined;
   if (bytes.length === 4) return formatIp(bytes);
@@ -106,7 +106,7 @@ function throttleKey(remoteAddress: string): string | undefined {
   return `${formatIp(prefix)}/64`;
 }
 
-async function sweep(now: number): Promise<void> {
+async function sweep(now: number) {
   if (now < nextSweepAt) return;
   nextSweepAt = now + SWEEP_INTERVAL_MS;
   // reserveAttempt() で数え直す条件と同じく、制限が切れたか、制限せずに期間が過ぎた行を消す

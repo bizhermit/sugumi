@@ -5,14 +5,14 @@ type ParamNames<P extends string> = P extends `${string}[${infer Name}]${infer R
   : never;
 
 type QueryValue = string | number | boolean;
-export type Query = Record<string, QueryValue | readonly QueryValue[] | null | undefined>;
+export type Query = Record<string, QueryValue | ReadonlyArray<QueryValue> | null | undefined>;
 
 export type PathOptions<P extends RoutePath> = [ParamNames<P>] extends [never]
   ? [options?: { query?: Query }]
   : [options: { params: Record<ParamNames<P>, string | number>; query?: Query }];
 
 /** エンコード済みの区切りか、パラメータの名前。 */
-type CompiledRoute = (string | { param: string })[];
+type CompiledRoute = Array<string | { param: string }>;
 
 // リンクの数に比例して呼ばれるため、パターンの分解とエンコードはルートごとに 1 回だけ行う。
 // キーは RoutePath なので、ルートの数より増えない。パラメータのないルートはパスそのものを持つ
@@ -74,7 +74,7 @@ export function path<P extends RoutePath>(route: P, ...[options]: PathOptions<P>
   return (qs === "" ? pathname : `${pathname}?${qs}`) as AppPath;
 }
 
-function compileRoute(route: string): string | CompiledRoute {
+function compileRoute(route: string) {
   if (route === "/") return "/";
   const parts: CompiledRoute = route.slice(1).split("/").map((segment) => {
     const name = segment.match(/^\[(\w+)\]$/)?.[1];

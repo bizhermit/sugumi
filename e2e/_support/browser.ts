@@ -25,7 +25,7 @@ export async function withPage(fn: (page: Page) => Promise<void>): Promise<void>
   const context = await (await browser).newContext({ baseURL: BASE_URL });
   try {
     const page = await context.newPage();
-    const errors: string[] = [];
+    const errors: Array<string> = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(`${page.url()}: ${message.text()}`);
     });
@@ -46,7 +46,7 @@ export async function login(page: Page): Promise<void> {
   await page.waitForURL(path("/home"));
 }
 
-function required(name: string): string {
+function required(name: string) {
   const value = Deno.env.get(name);
   if (!value) {
     throw new Error(

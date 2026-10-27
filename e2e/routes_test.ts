@@ -11,7 +11,7 @@ const SAMPLE_URLS: Partial<Record<RoutePath, string>> = {};
  * CSP が緩むと違反が起きなくなり、withPage() では気づけないため、値も確かめる。
  * ページで CSP を緩めるときは、ここで認める範囲も見直す（外部のスクリプトは CLAUDE.md の「ライブラリ」を参照）。
  */
-async function open(page: Page, route: RoutePath): Promise<void> {
+async function open(page: Page, route: RoutePath) {
   const url = route.includes("[") ? SAMPLE_URLS[route] : route;
   assert.ok(url !== undefined, `${route}: SAMPLE_URLS に開く URL を書いてください`);
   const res = await page.goto(url);

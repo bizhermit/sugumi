@@ -24,7 +24,7 @@ export function parseForm(req: Request): Promise<FormData | undefined> {
   return form;
 }
 
-async function readForm(req: Request): Promise<FormData | undefined> {
+async function readForm(req: Request) {
   if (!FORM_TYPE.test(req.headers.get("content-type") ?? "")) return undefined;
   try {
     return await req.clone().formData();

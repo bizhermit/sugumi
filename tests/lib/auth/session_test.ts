@@ -11,13 +11,13 @@ import { addAccount, resetDb } from "../../_support/db.ts";
 
 const MINUTE_MS = 60 * 1000;
 
-function requestWith(session: Session): Request {
+function requestWith(session: Session) {
   return new Request("http://localhost/", {
     headers: { cookie: cookiePair(sessionCookie(session)) },
   });
 }
 
-async function newSession(): Promise<Session> {
+async function newSession() {
   await resetDb();
   return await createSession(await addAccount());
 }
@@ -26,11 +26,11 @@ async function newSession(): Promise<Session> {
 async function age(
   column: "created_at" | "last_access_at",
   ago: number,
-): Promise<void> {
+) {
   await db.query(`UPDATE sessions SET ${column} = $1`, [new Date(Date.now() - ago)]);
 }
 
-async function count(): Promise<number> {
+async function count() {
   const { rows } = await db.query<{ count: string }>("SELECT count(*) FROM sessions");
   return Number(rows[0].count);
 }
@@ -97,7 +97,7 @@ Deno.test("session: randomToken の形式でない Cookie では DB を引かな
   let queries = 0;
   const query = db.query;
   // deno-lint-ignore no-explicit-any
-  db.query = ((...args: any[]) => {
+  db.query = ((...args: Array<any>) => {
     queries++;
     // deno-lint-ignore no-explicit-any
     return (query as any).apply(db, args);

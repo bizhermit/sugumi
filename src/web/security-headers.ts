@@ -5,7 +5,7 @@ import { editHeaders } from "./response.ts";
  * 緩めたいページは、そのページのレスポンスで同じ名前のヘッダーを設定する。
  */
 
-export type CspDirectives = Record<string, readonly string[]>;
+export type CspDirectives = Record<string, ReadonlyArray<string>>;
 
 const DEFAULT_CSP: CspDirectives = {
   "default-src": ["'none'"],
@@ -36,7 +36,7 @@ export function contentSecurityPolicy(overrides: CspDirectives = {}): string {
     .join("; ");
 }
 
-const DEFAULT_HEADERS: [string, string][] = [
+const DEFAULT_HEADERS: Array<[string, string]> = [
   ["content-security-policy", contentSecurityPolicy()],
   ["x-content-type-options", "nosniff"],
   // ログイン後のページを共有 PC のブラウザやプロキシに残さないよう、キャッシュさせてよい応答のほうで設定させる
@@ -82,7 +82,7 @@ export function withSecurityHeaders(res: Response): Response {
   return editHeaders(res, setDefaults, undefined);
 }
 
-function setDefaults(headers: Headers): void {
+function setDefaults(headers: Headers) {
   for (const [name, value] of DEFAULT_HEADERS) {
     if (!headers.has(name)) headers.set(name, value);
   }

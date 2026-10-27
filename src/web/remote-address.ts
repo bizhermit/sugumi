@@ -12,7 +12,7 @@ import { TRUSTED_PROXIES } from "../lib/env.ts";
 export function remoteAddressOf(
   req: Request,
   tcpAddress: string | undefined,
-  trustedProxies: readonly Cidr[] = TRUSTED_PROXIES,
+  trustedProxies: ReadonlyArray<Cidr> = TRUSTED_PROXIES,
 ): string | undefined {
   if (tcpAddress === undefined) return undefined;
   let ip = parseIp(tcpAddress);
@@ -35,7 +35,7 @@ export function remoteAddressOf(
 }
 
 // リクエストごとに呼ぶため、some() のようにコールバックの関数を作らずにループで調べる
-function isTrustedProxy(ip: Uint8Array, trustedProxies: readonly Cidr[]): boolean {
+function isTrustedProxy(ip: Uint8Array, trustedProxies: ReadonlyArray<Cidr>) {
   for (const cidr of trustedProxies) {
     if (cidrContains(cidr, ip)) return true;
   }
@@ -43,7 +43,7 @@ function isTrustedProxy(ip: Uint8Array, trustedProxies: readonly Cidr[]): boolea
 }
 
 // Azure Application Gateway など、ポートを付けて追記するプロキシがあるため
-function withoutPort(entry: string): string {
+function withoutPort(entry: string) {
   const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(entry);
   if (bracketed) return bracketed[1];
   const v4WithPort = /^([\d.]+):\d+$/.exec(entry);

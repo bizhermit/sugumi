@@ -85,7 +85,7 @@ Deno.test("createApp: 1 リクエストにつき 1 行のアクセスログを�
     const info = {
       remoteAddr: { transport: "tcp", hostname: "192.0.2.1", port: 1 },
     } as Deno.ServeHandlerInfo;
-    const bodies: string[] = [];
+    const bodies: Array<string> = [];
     const logs = await captureLogs(async () => {
       for (const path of ["/user/1?to=%2Fsecret", "/user/2", "/missing?q=secret"]) {
         bodies.push(await (await app(new Request(`http://localhost${path}`), info)).text());

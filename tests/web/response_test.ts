@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { editHeaders } from "../../src/web/response.ts";
 
-function setX(headers: Headers, value: string): void {
+function setX(headers: Headers, value: string) {
   headers.set("x-test", value);
 }
 

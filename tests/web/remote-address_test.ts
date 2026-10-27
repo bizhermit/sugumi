@@ -4,7 +4,7 @@ import { remoteAddressOf } from "../../src/web/remote-address.ts";
 
 const PROXIES = parseTrustedProxies("10.0.0.1,10.0.1.0/24,2001:db8::/32");
 
-function addressOf(tcp: string | undefined, forwarded?: string): string | undefined {
+function addressOf(tcp: string | undefined, forwarded?: string) {
   const headers: Record<string, string> = forwarded === undefined
     ? {}
     : { "x-forwarded-for": forwarded };

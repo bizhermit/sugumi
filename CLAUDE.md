@@ -176,6 +176,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 - 配列の型は `Array<T>`、読み取り専用は `ReadonlyArray<T>` で書く。`T[]` は使わない。
   - `string | number[]` のように、括弧の付け忘れで別の型になるのを防ぐため。
 - `export` する関数には、戻り値の型を書く（`deno lint` の `explicit-module-boundary-types` で検出する）。ファイルの中だけで使う関数は、推論に任せる。
+  - ただし、推論では意図した型にならないとき（再帰する関数、`any` や広すぎる型になるとき）は書く。
 - 想定内の失敗（パスワードの誤り、ロックなど）は、例外にせず `status` で判別する union で返す。結果が 2 通りでも `status` にする。
   - 例：`{ status: "ok"; account: Account } | { status: "locked" }`
   - 例外は想定外のことだけに使う。

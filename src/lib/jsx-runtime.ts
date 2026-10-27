@@ -51,7 +51,7 @@ export declare namespace JSX {
  * exprs は jsxEscape・jsxAttr の戻り値か、precompile が出力した文字列か、jsx の戻り値。
  * `{null}` と書くと、precompile は jsxEscape を通さずに null を渡す。
  */
-export function jsxTemplate(templates: string[], ...exprs: unknown[]): Html {
+export function jsxTemplate(templates: Array<string>, ...exprs: Array<unknown>): Html {
   let html = templates[0];
   for (let i = 0; i < exprs.length; i++) {
     const expr = exprs[i];
@@ -79,7 +79,7 @@ export function jsxEscape(value: unknown): string {
       return "";
   }
   if (value === null) return "";
-  throw new TypeError(`JSX に埋め込めない値です：${Object.prototype.toString.call(value)}`);
+  throw new TypeError(`JSX に埋め込めない値です: ${Object.prototype.toString.call(value)}`);
 }
 
 /**
@@ -87,7 +87,7 @@ export function jsxEscape(value: unknown): string {
  * aria-* は値のない形を true と扱わないため、true・false を文字列で出力する。
  */
 export function jsxAttr(name: string, value: unknown): string {
-  if (INVALID_ATTR_NAME.test(name)) throw new TypeError(`属性名に使えません：${name}`);
+  if (INVALID_ATTR_NAME.test(name)) throw new TypeError(`属性名に使えません: ${name}`);
   switch (typeof value) {
     case "string":
     case "number":
@@ -100,7 +100,7 @@ export function jsxAttr(name: string, value: unknown): string {
       return "";
   }
   if (value === null) return "";
-  throw new TypeError(`属性 ${name} に使えない値です：${Object.prototype.toString.call(value)}`);
+  throw new TypeError(`属性 ${name} に使えない値です: ${Object.prototype.toString.call(value)}`);
 }
 
 export function jsx(
@@ -127,7 +127,7 @@ export function Fragment({ children }: { children?: unknown }): Html {
 }
 
 // エスケープする文字のない値（ほとんどの値）は、新しい文字列を作らずにそのまま返す
-function escapeHtml(value: string): string {
+function escapeHtml(value: string) {
   let html = "";
   let last = 0;
   for (let i = 0; i < value.length; i++) {

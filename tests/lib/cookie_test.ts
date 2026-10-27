@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { clearHostCookie, hostCookie, readCookie } from "../../src/lib/cookie.ts";
 
-function withCookie(cookie: string): Request {
+function withCookie(cookie: string) {
   return new Request("http://localhost/", { headers: { cookie } });
 }
 

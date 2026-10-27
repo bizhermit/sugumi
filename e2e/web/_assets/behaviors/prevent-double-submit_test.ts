@@ -13,7 +13,7 @@ import { withPage } from "../../../_support/browser.ts";
 async function submitTwice(
   page: Page,
   { cancelOnForm = false } = {},
-): Promise<{ prevented: boolean[]; busy: string | null }> {
+) {
   await page.goto(path("/login"));
   // 必須の欄が空だと、ブラウザが送信の前に止める
   await page.getByLabel("ユーザー名").fill("alice");
@@ -22,7 +22,7 @@ async function submitTwice(
   // 送信の結果ではなく、submit イベントが取り消されたかをページの中で確かめる
   return await page.evaluate((cancelOnForm) => {
     const form = document.querySelector("form")!;
-    const prevented: boolean[] = [];
+    const prevented: Array<boolean> = [];
     if (cancelOnForm) {
       form.addEventListener("submit", (e) => e.preventDefault(), { once: true });
     }

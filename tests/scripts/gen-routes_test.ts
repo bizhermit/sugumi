@@ -21,7 +21,7 @@ export type RoutePath =
   | "/user/[id]";
 
 /** GET で開けるルート。e2e/ のテストが、すべての画面を開いて確かめるのに使う。 */
-export const GET_ROUTES: readonly RoutePath[] = [
+export const GET_ROUTES: ReadonlyArray<RoutePath> = [
   "/",
   "/user/[id]",
 ];
@@ -36,7 +36,7 @@ Deno.test("gen-routes: ルートがなければ never にする", async () => {
     await generateRoutes(new URL("routes/", dir), out);
     assert.match(
       await Deno.readTextFile(out),
-      /export type RoutePath = never;\n\n.*\nexport const GET_ROUTES: readonly RoutePath\[\] = \[\];\n$/,
+      /export type RoutePath = never;\n\n.*\nexport const GET_ROUTES: ReadonlyArray<RoutePath> = \[\];\n$/,
     );
   });
 });

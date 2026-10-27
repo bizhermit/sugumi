@@ -4,8 +4,8 @@
  */
 export async function captureLogs(
   fn: () => void | Promise<void>,
-): Promise<Record<string, unknown>[]> {
-  const lines: string[] = [];
+): Promise<Array<Record<string, unknown>>> {
+  const lines: Array<string> = [];
   const { log, error } = console;
   console.log = console.error = (line: string) => {
     lines.push(line);

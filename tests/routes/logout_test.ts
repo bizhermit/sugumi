@@ -8,17 +8,17 @@ import { addAccount, resetDb } from "../_support/db.ts";
 
 const handler = await createApp({ mock: false });
 
-function request(path: string, init?: RequestInit): Promise<Response> {
+function request(path: string, init?: RequestInit) {
   return handler(new Request(`http://localhost${path}`, init));
 }
 
-async function login(): Promise<string> {
+async function login() {
   await resetDb();
   const account = await addAccount();
   return cookiePair(sessionCookie(await createSession(account)));
 }
 
-async function sessionCount(): Promise<number> {
+async function sessionCount() {
   const { rows } = await db.query<{ count: string }>("SELECT count(*) FROM sessions");
   return Number(rows[0].count);
 }

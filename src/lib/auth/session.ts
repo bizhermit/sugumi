@@ -109,7 +109,7 @@ export function clearSessionCookie(): string {
   return clearHostCookie(COOKIE_NAME);
 }
 
-function isExpired(row: SessionRow, now: number): boolean {
+function isExpired(row: SessionRow, now: number) {
   return (IDLE_TIMEOUT_MS > 0 && now - row.last_access_at.getTime() >= IDLE_TIMEOUT_MS) ||
     (ABSOLUTE_TIMEOUT_MS > 0 && now - row.created_at.getTime() >= ABSOLUTE_TIMEOUT_MS);
 }

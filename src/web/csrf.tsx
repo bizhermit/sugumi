@@ -97,26 +97,26 @@ export function CsrfInput({ token }: { token: string }): Html {
 }
 
 /** issued は token() で発行したログイン前の Cookie の値。 */
-function stampUsed(headers: Headers, issued: string | undefined): void {
+function stampUsed(headers: Headers, issued: string | undefined) {
   // トークンはセッションに結び付いているため、共有キャッシュに残ると別の利用者にトークンが渡り、
   // ブラウザのキャッシュに残るとセッションが変わったあとの送信が失敗する
   headers.set("cache-control", "no-store");
   if (issued !== undefined) headers.append("set-cookie", hostCookie(PRE_LOGIN_COOKIE, issued));
 }
 
-function isFresh(value: string, now: number): boolean {
+function isFresh(value: string, now: number) {
   const issuedAt = Number(value.match(/^(\d{1,16})\.[A-Za-z0-9_-]{43}$/)?.[1]);
   return now - issuedAt >= 0 && (PRE_LOGIN_TTL_MS === 0 || now - issuedAt < PRE_LOGIN_TTL_MS);
 }
 
 const encoder = new TextEncoder();
 
-async function sign(binding: string): Promise<string> {
+async function sign(binding: string) {
   const mac = await crypto.subtle.sign("HMAC", KEY, encoder.encode(binding));
   return new Uint8Array(mac).toBase64({ alphabet: "base64url", omitPadding: true });
 }
 
-async function readFormToken(req: Request): Promise<string | undefined> {
+async function readFormToken(req: Request) {
   const value = (await parseForm(req))?.get(FIELD_NAME);
   return typeof value === "string" ? value : undefined;
 }

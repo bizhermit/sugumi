@@ -13,7 +13,7 @@ async function compose(
   relative: string,
   title?: Title,
   options: { aside?: boolean; layout?: false } = {},
-): Promise<{ title: string; main: string }> {
+) {
   const page = new URL(`${relative}view.tsx`, root).href;
   const slots = options.aside ? { main, aside: jsxTemplate(["aside"]) } : { main };
   const result = await composePage(ctx, { title, slots, page, layout: options.layout });

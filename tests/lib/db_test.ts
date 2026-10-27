@@ -7,7 +7,7 @@ import {
 } from "../../src/lib/env.ts";
 import { resetDb } from "../_support/db.ts";
 
-async function usernames(): Promise<string[]> {
+async function usernames() {
   const { rows } = await db.query<{ username: string }>("SELECT username FROM accounts");
   return rows.map((r) => r.username);
 }

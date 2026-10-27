@@ -37,8 +37,8 @@ function derive(
   password: string,
   salt: Uint8Array,
   { N, r, p }: { N: number; r: number; p: number },
-): Promise<Uint8Array> {
-  return new Promise((resolve, reject) => {
+) {
+  return new Promise<Uint8Array>((resolve, reject) => {
     scrypt(
       password.normalize("NFC"),
       salt,
@@ -52,6 +52,6 @@ function derive(
   });
 }
 
-function base64url(bytes: Uint8Array): string {
+function base64url(bytes: Uint8Array) {
   return bytes.toBase64({ alphabet: "base64url", omitPadding: true });
 }

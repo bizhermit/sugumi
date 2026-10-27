@@ -4,7 +4,7 @@ import { path } from "../../../../src/web/url.ts";
 import { login, withPage } from "../../../_support/browser.ts";
 
 /** ホームのログアウトのボタンを押し、確認のダイアログに accept で答える。ダイアログの文言を返す。 */
-async function logout(page: Page, accept: boolean): Promise<string> {
+async function logout(page: Page, accept: boolean) {
   const dialog = page.waitForEvent("dialog");
   // ダイアログに答えるまで click() が終わらないため、待たずにダイアログに答える
   const clicked = page.getByRole("button", { name: "ログアウト" }).click();

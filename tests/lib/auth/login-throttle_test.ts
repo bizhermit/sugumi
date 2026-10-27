@@ -20,12 +20,12 @@ async function reserveTimes(address: string | undefined, count: number, now: num
   return result;
 }
 
-async function failedAttempts(key: string): Promise<number | undefined> {
+async function failedAttempts(key: string) {
   const { rows } = await db.query<{ failed_attempts: number }>(
     "SELECT failed_attempts FROM login_throttles WHERE address = $1",
     [key],
   );
-  return rows[0]?.failed_attempts;
+  return rows.at(0)?.failed_attempts;
 }
 
 Deno.test({

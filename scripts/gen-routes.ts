@@ -36,7 +36,7 @@ export async function generateRoutes(routes: URL, out: URL): Promise<void> {
 export type RoutePath =${union};
 
 /** GET で開けるルート。e2e/ のテストが、すべての画面を開いて確かめるのに使う。 */
-export const GET_ROUTES: readonly RoutePath[] = [${gets}${gets ? "\n" : ""}];
+export const GET_ROUTES: ReadonlyArray<RoutePath> = [${gets}${gets ? "\n" : ""}];
 `;
   const current = await Deno.readTextFile(out).catch(() => undefined);
   // 内容が同じなら書き込まない（監視しているツールを無駄に反応させないため）
