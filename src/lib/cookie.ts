@@ -26,7 +26,9 @@ export function readCookie(req: Request, name: string): string | undefined {
   let start = 0;
   while (start <= header.length) {
     let end = header.indexOf(";", start);
-    if (end === -1) end = header.length;
+    if (end === -1) {
+      end = header.length;
+    }
     const pair = header.slice(start, end).trim();
     if (pair.startsWith(name) && pair.charCodeAt(name.length) === 0x3d) {
       const valueEnd = pair.indexOf("=", name.length + 1);

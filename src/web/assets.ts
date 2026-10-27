@@ -38,7 +38,9 @@ const pageAssets = new Map<string, PageAssets>();
  */
 export function asset(name: string): string {
   const found = assets.get(name);
-  if (!found) throw new Error(`${name} は dist/public/ にありません`);
+  if (!found) {
+    throw new Error(`${name} は dist/public/ にありません`);
+  }
   return `${ASSETS_PREFIX}${name}?v=${found.hash}`;
 }
 
@@ -51,7 +53,9 @@ export function assetsOf(moduleUrl: string): PageAssets {
   if (cached) return cached;
   const dir = decodeURIComponent(new URL("_assets/", moduleUrl).pathname);
   const src = decodeURIComponent(SRC_DIR.pathname);
-  if (!dir.startsWith(src)) throw new Error(`${moduleUrl} は src/ の外にあります`);
+  if (!dir.startsWith(src)) {
+    throw new Error(`${moduleUrl} は src/ の外にあります`);
+  }
   const prefix = dir.slice(src.length);
   function urlOf(name: string): string | undefined {
     return assets.has(prefix + name) ? asset(prefix + name) : undefined;
@@ -64,8 +68,12 @@ export function assetsOf(moduleUrl: string): PageAssets {
 /** pathname が ASSETS_PREFIX で始まるリクエストに、バンドルしたファイルを返す。app.ts から呼ぶ。 */
 export function serveAsset(req: Request, url: URL): Response {
   const found = assets.get(url.pathname.slice(ASSETS_PREFIX.length));
-  if (!found) return errorPage(404);
-  if (req.method !== "GET" && req.method !== "HEAD") return methodNotAllowed(["GET", "HEAD"]);
+  if (!found) {
+    return errorPage(404);
+  }
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return methodNotAllowed(["GET", "HEAD"]);
+  }
   const headers = new Headers({ "content-type": found.contentType, etag: `"${found.hash}"` });
   // asset() の URL は内容が変わると v も変わるので、ずっとキャッシュさせてよい。
   // チャンクのように v を付けずに読み込まれるファイルは、毎回 ETag で確かめさせる。

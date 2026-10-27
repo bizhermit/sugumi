@@ -20,7 +20,9 @@ const PUBLIC_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>([
  */
 export default function (req: Request, ctx: RouteContext): Response | undefined {
   if (!PUBLIC_ROUTES.has(ctx.route)) {
-    if (!ctx.session) return loginRedirect(req);
+    if (!ctx.session) {
+      return loginRedirect(req);
+    }
     loginAccount.set(ctx, ctx.session.account);
   }
   return undefined;

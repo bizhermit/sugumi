@@ -27,7 +27,9 @@ export async function withPage(fn: (page: Page) => Promise<void>): Promise<void>
     const page = await context.newPage();
     const errors: Array<string> = [];
     page.on("console", (message) => {
-      if (message.type() === "error") errors.push(`${page.url()}: ${message.text()}`);
+      if (message.type() === "error") {
+        errors.push(`${page.url()}: ${message.text()}`);
+      }
     });
     page.on("pageerror", (error) => errors.push(`${page.url()}: ${error.message}`));
     await fn(page);

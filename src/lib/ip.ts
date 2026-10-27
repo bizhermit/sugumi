@@ -9,7 +9,9 @@ export type Cidr = { bytes: Uint8Array; prefix: number };
  * デュアルスタックで待ち受けると、IPv4 の接続元がこの形で届くため。
  */
 export function parseIp(text: string): Uint8Array | undefined {
-  if (!text.includes(":")) return parseIpv4(text);
+  if (!text.includes(":")) {
+    return parseIpv4(text);
+  }
   const bytes = parseIpv6(text);
   return bytes && isIpv4Mapped(bytes) ? bytes.slice(12) : bytes;
 }
@@ -27,7 +29,9 @@ export function parseCidr(text: string): Cidr | undefined {
   if (rest.length > 0) return undefined;
   const bytes = parseIp(address);
   if (!bytes) return undefined;
-  if (prefixText === undefined) return { bytes, prefix: bytes.length * 8 };
+  if (prefixText === undefined) {
+    return { bytes, prefix: bytes.length * 8 };
+  }
   // IPv4 射影アドレスは parseIp で 4 バイトになり、IPv6 のつもりで書いたプレフィックス長と合わなくなる。
   // そのため受け付けず、IPv4 の形で書いてもらう。
   if (address.includes(":") && bytes.length === 4) return undefined;
@@ -46,7 +50,9 @@ export function parseCidr(text: string): Cidr | undefined {
  * IPv6 は RFC 5952 の表記にする（小文字、先頭の 0 を省く、いちばん長い 0 の連続を :: にする）。
  */
 export function formatIp(bytes: Uint8Array): string {
-  if (bytes.length === 4) return `${bytes[0]}.${bytes[1]}.${bytes[2]}.${bytes[3]}`;
+  if (bytes.length === 4) {
+    return `${bytes[0]}.${bytes[1]}.${bytes[2]}.${bytes[3]}`;
+  }
   // RFC 5952 4.2.2・4.2.3：0 のグループが 1 つだけなら :: にしない。同じ長さの連続が複数あれば、前のほうを :: にする。
   let zerosStart = -1;
   let zerosLength = 0;
@@ -67,7 +73,9 @@ export function formatIp(bytes: Uint8Array): string {
       continue;
     }
     // :: の直後と先頭には : を付けない。
-    if (i > 0 && i !== zerosStart + zerosLength) text += ":";
+    if (i > 0 && i !== zerosStart + zerosLength) {
+      text += ":";
+    }
     text += wordAt(bytes, i).toString(16);
   }
   return text;

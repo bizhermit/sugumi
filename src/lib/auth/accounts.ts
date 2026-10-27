@@ -11,7 +11,7 @@ import {
   verifyPassword,
 } from "./password.ts";
 
-const USERNAME_MAX_LENGTH = 64;
+export const USERNAME_MAX_LENGTH = 64;
 const PG_UNIQUE_VIOLATION = "23505";
 
 export type Account = { id: number; username: string; displayName: string };
@@ -78,7 +78,9 @@ export async function authenticate(
     const reserved = await loginThrottle.reserveAttempt(remoteAddress, now);
     if (reserved.status === "blocked") {
       // パスワードを確かめたときと同じだけ時間をかけ、レスポンスの時間から制限中だと見分けられないようにする。
-      if (checkable) await verifyPassword(password, DUMMY_HASH);
+      if (checkable) {
+        await verifyPassword(password, DUMMY_HASH);
+      }
       return { status: "address_blocked", blocks: reserved.blocks, blockedAddress: reserved.key };
     }
     throttled = reserved.attempt;
@@ -89,15 +91,21 @@ export async function authenticate(
   );
   if (!row) {
     // アカウントがあるときと同じだけ時間をかけ、レスポンスの時間からアカウントの有無を見分けられないようにする。
-    if (checkable) await verifyPassword(password, DUMMY_HASH);
+    if (checkable) {
+      await verifyPassword(password, DUMMY_HASH);
+    }
     return { status: "unknown_user" };
   }
   const account = toAccount(row);
   // 覚えている端末からの試行は、アカウントのロックを受けず、アカウントの失敗としても数えない。
   const attempt = trustedDevice ? { locks: false } : await reserveAttempt(row.id, now);
   const ok = checkable && await verifyPassword(password, row.password_hash);
-  if (!attempt) return { status: "locked", account };
-  if (!ok) return { status: "wrong_password", account, locked: attempt.locks, trustedDevice };
+  if (!attempt) {
+    return { status: "locked", account };
+  }
+  if (!ok) {
+    return { status: "wrong_password", account, locked: attempt.locks, trustedDevice };
+  }
   // 覚えている端末から成功しても、アカウントの失敗の回数とロックは残す。
   // 本人がログインするたびに消えると、攻撃者がほかの端末から試せる回数が増えてしまう。
   if (!trustedDevice) {
@@ -122,7 +130,9 @@ export async function authenticate(
  * 同時に送られたリクエストが同じ回数を読んで数え漏れないよう、行をロックして読む。
  */
 async function reserveAttempt(id: number, now: number): Promise<{ locks: boolean } | undefined> {
-  if (LOGIN_MAX_FAILED_ATTEMPTS === 0) return { locks: false };
+  if (LOGIN_MAX_FAILED_ATTEMPTS === 0) {
+    return { locks: false };
+  }
   return await transaction(async (client) => {
     const { rows: [{ failed_attempts, locked_until }] } = await client.query<
       Pick<AccountRow, "failed_attempts" | "locked_until">
@@ -162,22 +172,33 @@ export async function findAccount(id: number): Promise<Account | undefined> {
 }
 
 /**
- * アカウントを作り、そのアカウントを返す。
- * 入力が条件を満たさないときや、ユーザー名がすでに使われているときは、ユーザーに見せられるメッセージの例外を投げる。
+ * invalid_username は、ユーザー名が空か、空白・制御文字を含むか、USERNAME_MAX_LENGTH 文字を超えるとき。
+ * invalid_password は、パスワードが PASSWORD_MIN_LENGTH 文字未満か PASSWORD_MAX_LENGTH 文字を超えるとき。
+ */
+export type CreateAccountResult =
+  | { status: "ok"; account: Account }
+  | { status: "invalid_username" }
+  | { status: "invalid_display_name" }
+  | { status: "invalid_password" }
+  | { status: "username_taken" };
+
+/**
+ * アカウントを作る。入力が条件を満たさないときと、ユーザー名がすでに使われているときは、作らずに status で返す。
+ * 表示する文言は呼び出し側で決める。DB の想定外のエラーは例外を投げる。
  */
 export async function createAccount(
   username: string,
   displayName: string,
   password: string,
-): Promise<Account> {
+): Promise<CreateAccountResult> {
   if (username === "" || username.length > USERNAME_MAX_LENGTH || /[\p{Cc}\s]/u.test(username)) {
-    throw new Error(`ユーザー名は空白を含まない ${USERNAME_MAX_LENGTH} 文字以内にしてください`);
+    return { status: "invalid_username" };
   }
-  if (displayName.trim() === "") throw new Error("表示名を入力してください");
+  if (displayName.trim() === "") {
+    return { status: "invalid_display_name" };
+  }
   if (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) {
-    throw new Error(
-      `パスワードは ${PASSWORD_MIN_LENGTH} 文字以上 ${PASSWORD_MAX_LENGTH} 文字以内にしてください`,
-    );
+    return { status: "invalid_password" };
   }
   const hash = await hashPassword(password);
   try {
@@ -186,10 +207,10 @@ export async function createAccount(
        RETURNING ${ACCOUNT_COLUMNS}`,
       [username, displayName, hash],
     );
-    return toAccount(row);
+    return { status: "ok", account: toAccount(row) };
   } catch (e) {
     if ((e as { code?: string }).code === PG_UNIQUE_VIOLATION) {
-      throw new Error(`ユーザー名 ${username} はすでに使われています`);
+      return { status: "username_taken" };
     }
     throw e;
   }

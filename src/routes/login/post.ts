@@ -16,7 +16,9 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
   const form = await ctx.form();
   const username = form.get("username");
   const password = form.get("password");
-  if (typeof username !== "string" || typeof password !== "string") return errorPage(400);
+  if (typeof username !== "string" || typeof password !== "string") {
+    return errorPage(400);
+  }
   const toValue = form.get("to");
   const to = typeof toValue === "string" ? appPathOf(toValue) : undefined;
 
@@ -45,7 +47,9 @@ export default async function (req: Request, ctx: RouteContext): Promise<Respons
     });
   }
   // ログイン前と同じトークンを使い続けるとセッション固定攻撃を受けるので、ログインのたびに作り直す。
-  if (ctx.session) await destroySession(ctx.session);
+  if (ctx.session) {
+    await destroySession(ctx.session);
+  }
   const session = await createSession(result.account);
   audit("login_succeeded", ctx, {
     accountId: result.account.id,

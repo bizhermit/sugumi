@@ -7,7 +7,9 @@ import { path, redirect } from "../../web/url.ts";
  * ログインしていなくても、セッションの Cookie を消してリダイレクトする。
  */
 export default async function (_req: Request, ctx: RouteContext): Promise<Response> {
-  if (ctx.session) await logout(ctx.session, ctx);
+  if (ctx.session) {
+    await logout(ctx.session, ctx);
+  }
   const res = redirect(path("/login"), 303);
   res.headers.append("set-cookie", clearSessionCookie());
   return res;

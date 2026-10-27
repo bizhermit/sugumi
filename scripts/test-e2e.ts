@@ -50,7 +50,7 @@ async function runE2e(args: Array<string>, externalUrl: string | undefined) {
   await Deno.mkdir(TMP_PARENT, { recursive: true });
   const tmp = await Deno.makeTempDir({ dir: decodeURIComponent(TMP_PARENT.pathname) });
   // appExited は、起動したアプリが終了したら reject される。外部のアプリに対して実行するときは、resolve も reject もされない。
-  const runTests = async (baseUrl: string, appExited: Promise<never>) => {
+  async function runTests(baseUrl: string, appExited: Promise<never>) {
     await Promise.race([waitUntilReady(new URL("/healthz", baseUrl), READY_TIMEOUT_MS), appExited]);
     const tests = new Deno.Command("deno", {
       args: ["task", "test", ...args],
@@ -70,9 +70,11 @@ async function runE2e(args: Array<string>, externalUrl: string | undefined) {
       kill(tests);
       await tests.status;
     }
-  };
+  }
   try {
-    if (externalUrl) return await runTests(externalUrl, new Promise<never>(() => {}));
+    if (externalUrl) {
+      return await runTests(externalUrl, new Promise<never>(() => {}));
+    }
     const port = freePort();
     // 本番と同じ方法で起動する（権限も deno.json の permissions.default になる）。
     const app = new Deno.Command("deno", {
@@ -127,7 +129,9 @@ function passedEnv() {
   const env: Record<string, string> = {};
   for (const name of PASSED_ENV) {
     const value = Deno.env.get(name);
-    if (value !== undefined) env[name] = value;
+    if (value !== undefined) {
+      env[name] = value;
+    }
   }
   return env;
 }
@@ -160,7 +164,9 @@ export async function waitUntilReady(url: URL, timeoutMs: number): Promise<void>
     } catch {
       // 起動するまでは接続を拒否される。
     }
-    if (Date.now() > deadline) throw new Error(`${url} が ${timeoutMs} ms で応答しません`);
+    if (Date.now() > deadline) {
+      throw new Error(`${url} が ${timeoutMs} ms で応答しません`);
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }

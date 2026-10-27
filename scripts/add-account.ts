@@ -3,7 +3,9 @@
  *
  *   deno task account:add <ユーザー名> <表示名>
  */
-import { createAccount } from "../src/lib/auth/accounts.ts";
+import { createAccount, USERNAME_MAX_LENGTH } from "../src/lib/auth/accounts.ts";
+import type { CreateAccountResult } from "../src/lib/auth/accounts.ts";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from "../src/lib/auth/password.ts";
 import { db } from "../src/lib/db.ts";
 
 const [username, displayName] = Deno.args;
@@ -22,13 +24,30 @@ if (password !== await readHidden("パスワード（確認）: ")) {
   Deno.exit(1);
 }
 try {
-  const account = await createAccount(username, displayName, password);
-  console.log(`追加しました（id: ${account.id}）`);
+  const result = await createAccount(username, displayName, password);
+  if (result.status !== "ok") {
+    console.error(failureMessage(result.status, username));
+    Deno.exit(1);
+  }
+  console.log(`追加しました（id: ${result.account.id}）`);
   // 接続を閉じないと、Pool が接続を持ったままになり、プロセスが終わらない。
   await db.end();
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
   Deno.exit(1);
+}
+
+function failureMessage(status: Exclude<CreateAccountResult["status"], "ok">, username: string) {
+  switch (status) {
+    case "invalid_username":
+      return `ユーザー名は空白を含まない ${USERNAME_MAX_LENGTH} 文字以内にしてください`;
+    case "invalid_display_name":
+      return "表示名を入力してください";
+    case "invalid_password":
+      return `パスワードは ${PASSWORD_MIN_LENGTH} 文字以上 ${PASSWORD_MAX_LENGTH} 文字以内にしてください`;
+    case "username_taken":
+      return `ユーザー名 ${username} はすでに使われています`;
+  }
 }
 
 async function readHidden(label: string) {

@@ -37,7 +37,9 @@ if (import.meta.main) {
 export async function checkImports(root: URL): Promise<Array<string>> {
   const violations: Array<string> = [];
   const rootPath = decodeURIComponent(root.pathname);
-  const relative = (url: URL) => decodeURIComponent(url.pathname).slice(rootPath.length);
+  function relative(url: URL) {
+    return decodeURIComponent(url.pathname).slice(rootPath.length);
+  }
   if (await exists(new URL("src/_shared/", root))) {
     violations.push("src/_shared/: 作れません（src/lib/_shared/ に置いてください）");
   }
@@ -57,7 +59,9 @@ async function checkFile(file: URL, relative: (url: URL) => string) {
     violations.push(`${from}: JSX はサーバー専用です`);
   }
   const text = await Deno.readTextFile(file);
-  const lineOf = (index: number) => text.slice(0, index).split("\n").length;
+  function lineOf(index: number) {
+    return text.slice(0, index).split("\n").length;
+  }
   for (const { 2: specifier, index } of text.matchAll(SPECIFIER)) {
     const reason = check(from, fromKind, specifier, () => relative(new URL(specifier, file)));
     if (reason) {

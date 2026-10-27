@@ -17,9 +17,13 @@ export function remoteAddressOf(
   if (tcpAddress === undefined) return undefined;
   let ip = parseIp(tcpAddress);
   if (!ip) return undefined;
-  if (!isTrustedProxy(ip, trustedProxies)) return formatIp(ip);
+  if (!isTrustedProxy(ip, trustedProxies)) {
+    return formatIp(ip);
+  }
   const header = req.headers.get("x-forwarded-for");
-  if (header === null) return formatIp(ip);
+  if (header === null) {
+    return formatIp(ip);
+  }
   // リクエストごとに読むので、split() で配列を作らずに、右の , から順に探す。
   let end = header.length;
   for (;;) {
@@ -45,7 +49,9 @@ function isTrustedProxy(ip: Uint8Array, trustedProxies: ReadonlyArray<Cidr>) {
 // Azure Application Gateway など、ポートを付けて追記するプロキシもある。
 function withoutPort(entry: string) {
   const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(entry);
-  if (bracketed) return bracketed[1];
+  if (bracketed) {
+    return bracketed[1];
+  }
   const v4WithPort = /^([\d.]+):\d+$/.exec(entry);
   return v4WithPort ? v4WithPort[1] : entry;
 }

@@ -24,8 +24,8 @@ Deno.test("response: ヘッダーが変更不可の Response は、コピーし�
 });
 
 Deno.test("response: ヘッダーの変更不可以外の例外は、そのまま投げる", () => {
-  const fail = () => {
+  function fail() {
     throw new RangeError("テストで投げた例外");
-  };
+  }
   assert.throws(() => editHeaders(new Response("ok"), fail, undefined), RangeError);
 });

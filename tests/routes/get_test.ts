@@ -11,7 +11,9 @@ Deno.test("top: ログイン中ならホームへ、そうでなければログ�
   await resetDb();
   const account = await addAccount();
   const cookie = cookiePair(sessionCookie(await createSession(account)));
-  const request = (init?: RequestInit) => handler(new Request("http://localhost/", init));
+  function request(init?: RequestInit) {
+    return handler(new Request("http://localhost/", init));
+  }
   assert.equal((await request({ headers: { cookie } })).headers.get("location"), "/home");
   assert.equal((await request()).headers.get("location"), "/login");
 });

@@ -101,7 +101,9 @@ export async function refundAttempt(attempt: Attempt | undefined): Promise<void>
 function throttleKey(remoteAddress: string): string | undefined {
   const bytes = parseIp(remoteAddress);
   if (!bytes) return undefined;
-  if (bytes.length === 4) return formatIp(bytes);
+  if (bytes.length === 4) {
+    return formatIp(bytes);
+  }
   const prefix = bytes.slice();
   prefix.fill(0, 8);
   return `${formatIp(prefix)}/64`;

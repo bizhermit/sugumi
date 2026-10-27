@@ -66,7 +66,9 @@ for (const [name, child] of Object.entries(node)) {
 /** 安定版で対応したバージョンを返す。対応していなければ "no" を返し、一部だけの対応なら末尾に "(partial)" を付ける。 */
 function supportOf(compat: Compat, browser: string): string {
   const entry = compat.support[browser];
-  if (entry === "mirror") return supportOf(compat, MIRROR_OF[browser]);
+  if (entry === "mirror") {
+    return supportOf(compat, MIRROR_OF[browser]);
+  }
   const statements = entry === undefined ? [] : Array.isArray(entry) ? entry : [entry];
   // 接頭辞・別名・フラグが要る対応は、そのままの名前では使えないので数えない
   const s = statements.find((s) => !s.flags && !s.prefix && !s.alternative_name);

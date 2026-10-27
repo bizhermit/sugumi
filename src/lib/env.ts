@@ -140,7 +140,9 @@ export function parseDatabaseUrl(
   raw: string | undefined,
   passwordFile: string | undefined,
 ): string {
-  if (raw === undefined || raw === "") throw new Error("環境変数 DATABASE_URL を設定してください");
+  if (raw === undefined || raw === "") {
+    throw new Error("環境変数 DATABASE_URL を設定してください");
+  }
   if (passwordFile === undefined || passwordFile === "") return raw;
   // pg は connectionString を渡すと、別に渡した password を使わないので、URL に埋め込む。
   // URL の password に代入しても % はエンコードされないので、先に encodeURIComponent する。

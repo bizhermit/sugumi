@@ -32,7 +32,7 @@ const expiredBodies = new WeakSet<ReadableStreamDefaultReader<Uint8Array>>();
 // ここに入れたルートは ctx.session が常に undefined になるので、src/routes/before.tree.ts の PUBLIC_ROUTES にも入れること。
 const SESSIONLESS_ROUTES: ReadonlySet<RoutePath> = new Set<RoutePath>(["/healthz"]);
 
-// ページが返した Response のヘッダーには、その場で追加する（response.ts）。同じ Response を使い回すページがあると、
+// ページが返した Response には、基盤がその場でヘッダーを追加する（response.ts）。同じ Response を使い回すページがあると、
 // 前のリクエストで追加した Cookie などが次のユーザーに渡ってしまう。そこで 2 回目は、追加する前に例外にする。
 const claimed = new WeakSet<Response>();
 
@@ -152,32 +152,42 @@ async function handle(
   bodyTimeoutMs: number,
 ) {
   const host = req.headers.get("host");
-  if (host !== null && !VALID_HOST.test(host)) return errorPage(400);
+  if (host !== null && !VALID_HOST.test(host)) {
+    return errorPage(400);
+  }
   let url: URL;
   try {
     url = new URL(req.url);
   } catch {
     return errorPage(400);
   }
-  if (url.hash !== "") return errorPage(400);
+  if (url.hash !== "") {
+    return errorPage(400);
+  }
   // パスはそのままログに出すので、トークンなど秘密の値をパスに入れるルートを作らないこと。
   log.path = url.pathname.length > MAX_LOGGED_PATH_LENGTH
     ? url.pathname.slice(0, MAX_LOGGED_PATH_LENGTH)
     : url.pathname;
   // 静的ファイルはログインの有無で内容が変わらないので、セッションや CSRF を確かめない。
-  if (url.pathname.startsWith(ASSETS_PREFIX)) return serveAsset(req, url);
+  if (url.pathname.startsWith(ASSETS_PREFIX)) {
+    return serveAsset(req, url);
+  }
   const staticFile = statics.serve(req, url);
   if (staticFile) return staticFile;
 
   const route = match(url.pathname, req.method);
-  if (!route) return errorPage(404);
+  if (!route) {
+    return errorPage(404);
+  }
   log.route = route.route;
   const { handler: pageHandler } = route;
-  if (!pageHandler) return methodNotAllowed(route.allow);
-  const result = await bufferBody(req, MAX_BODY_BYTES, bodyTimeoutMs);
-  if (result.status === "too_large") return errorPage(413);
-  if (result.status === "timeout") return errorPage(408);
-  const buffered = result.req;
+  if (!pageHandler) {
+    return methodNotAllowed(route.allow);
+  }
+  const buffered = await bufferBody(req, MAX_BODY_BYTES, bodyTimeoutMs);
+  if (typeof buffered === "number") {
+    return errorPage(buffered);
+  }
 
   // ヘルスチェックは DB が止まっていてもレスポンスを返したいので、Cookie が付いていてもセッションを読まない。
   const session = SESSIONLESS_ROUTES.has(route.route) ? undefined : await getSession(buffered);
@@ -187,14 +197,18 @@ async function handle(
   }
   const csrf = csrfFor(buffered, session);
   if (!(await csrf.verify(buffered))) {
-    if (session) return errorPage(403);
+    if (session) {
+      return errorPage(403);
+    }
     // セッションがなければ、書き換えられて困る状態もない。期限が切れたあとの送信などは、ログインからやり直せるようにする。
     const staleSession = hasSessionCookie(buffered);
     const res = redirect(
       path("/login", { query: { expired: staleSession || csrf.stale ? 1 : null } }),
       303,
     );
-    if (staleSession) res.headers.append("set-cookie", clearSessionCookie());
+    if (staleSession) {
+      res.headers.append("set-cookie", clearSessionCookie());
+    }
     return res;
   }
 
@@ -214,7 +228,9 @@ async function handle(
       ),
     );
   } catch (e) {
-    if (e instanceof InvalidFormError) return errorPage(400);
+    if (e instanceof InvalidFormError) {
+      return errorPage(400);
+    }
     throw e;
   }
   if (claimed.has(res)) {
@@ -226,17 +242,13 @@ async function handle(
   return csrf.apply(res);
 }
 
-type BufferResult = { status: "ok"; req: Request } | { status: "too_large" } | {
-  status: "timeout";
-};
-
-// リクエストごとにオブジェクトを作らないよう、失敗の結果はモジュールに 1 つずつ置いて使い回す。
-const TOO_LARGE: BufferResult = { status: "too_large" };
-const TIMEOUT: BufferResult = { status: "timeout" };
+// 想定内の失敗は status で判別する union で返す規約の例外。ルートにマッチしたリクエストはすべて通るので、
+// 性能を優先し、成功のときにオブジェクトを作らないよう Request をそのまま返す。失敗はレスポンスのステータスで返す。
+type BufferResult = Request | 408 | 413;
 
 /**
  * リクエストボディを上限まで読み込み、何度でも読める Request にして返す。
- * 上限を超えたら too_large を、timeoutMs ミリ秒で読み終わらなければ timeout を返す。
+ * 上限を超えたら 413 を、timeoutMs ミリ秒で読み終わらなければ 408 を返す。
  * Content-Length は省略も偽装もできるので、実際に読んだ量でも判定する。
  */
 async function bufferBody(
@@ -244,8 +256,8 @@ async function bufferBody(
   limit: number,
   timeoutMs: number,
 ): Promise<BufferResult> {
-  if (req.body === null) return { status: "ok", req };
-  if (Number(req.headers.get("content-length")) > limit) return TOO_LARGE;
+  if (req.body === null) return req;
+  if (Number(req.headers.get("content-length")) > limit) return 413;
   const reader = req.body.getReader();
   // タイムアウトはチャンクごとではなく、リクエストボディ全体に設定する。チャンクごとだと、1 バイトずつ送り続ける接続を止められない。
   const timer = setTimeout(expireBody, timeoutMs, reader);
@@ -254,12 +266,12 @@ async function bufferBody(
   try {
     for (;;) {
       const { done, value } = await reader.read();
-      if (expiredBodies.has(reader)) return TIMEOUT;
+      if (expiredBodies.has(reader)) return 408;
       if (done) break;
       size += value.byteLength;
       if (size > limit) {
         await reader.cancel();
-        return TOO_LARGE;
+        return 413;
       }
       chunks.push(value);
     }
@@ -271,7 +283,9 @@ async function bufferBody(
   // そこで、届いた分だけを使う。
   // Deno のチャンクは ArrayBuffer の上にあるが、ストリームの型は SharedArrayBuffer も含むので、型を絞る。
   if (chunks.length === 1) {
-    return { status: "ok", req: new Request(req, { body: chunks[0] as Uint8Array<ArrayBuffer> }) };
+    return new Request(req, {
+      body: chunks[0] as Uint8Array<ArrayBuffer>,
+    });
   }
   const body = new Uint8Array(size);
   let offset = 0;
@@ -279,10 +293,10 @@ async function bufferBody(
     body.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return { status: "ok", req: new Request(req, { body }) };
+  return new Request(req, { body });
 }
 
-/** 読み込み中の read() を done で終わらせ、bufferBody() に timeout を返させる。 */
+/** 読み込み中の read() を done で終わらせ、bufferBody() に 408 を返させる。 */
 function expireBody(reader: ReadableStreamDefaultReader<Uint8Array>) {
   expiredBodies.add(reader);
   // 取り消しに失敗してもレスポンスには影響しないが、握りつぶさずにログに残す。
@@ -330,6 +344,8 @@ class Context implements RouteContext {
 
 async function formOf(req: Request) {
   const form = await parseForm(req);
-  if (!form) throw new InvalidFormError();
+  if (!form) {
+    throw new InvalidFormError();
+  }
   return form;
 }

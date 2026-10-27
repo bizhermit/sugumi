@@ -40,5 +40,7 @@ export const GET_ROUTES: ReadonlyArray<RoutePath> = [${gets}${gets ? "\n" : ""}]
 `;
   const current = await Deno.readTextFile(out).catch(() => undefined);
   // 監視しているツールが無駄に反応しないよう、内容が同じなら書き込まない。
-  if (content !== current) await Deno.writeTextFile(out, content);
+  if (content !== current) {
+    await Deno.writeTextFile(out, content);
+  }
 }

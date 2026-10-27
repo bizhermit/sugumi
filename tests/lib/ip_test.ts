@@ -98,7 +98,9 @@ Deno.test("ip: CIDR はホスト部が 0 のものだけを受け付ける", () 
 });
 
 Deno.test("ip: cidrContains はプレフィックスのビットだけを比べ、IPv4 と IPv6 は互いに含まない", () => {
-  const contains = (cidr: string, ip: string) => cidrContains(parseCidr(cidr)!, parseIp(ip)!);
+  function contains(cidr: string, ip: string) {
+    return cidrContains(parseCidr(cidr)!, parseIp(ip)!);
+  }
   assert.equal(contains("10.0.1.0/24", "10.0.1.255"), true);
   assert.equal(contains("10.0.1.0/24", "10.0.2.0"), false);
   assert.equal(contains("172.16.0.0/12", "172.31.255.255"), true);

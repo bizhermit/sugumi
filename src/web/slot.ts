@@ -30,7 +30,9 @@ export function slot<T>(name: string): Slot<T> {
     },
     get: (ctx) => {
       // undefined を set した場合と区別するので、値ではなく has で判定する。
-      if (!values.has(ctx)) throw new Error(`slot "${name}" に値が設定されていません`);
+      if (!values.has(ctx)) {
+        throw new Error(`slot "${name}" に値が設定されていません`);
+      }
       return values.get(ctx) as T;
     },
     find: (ctx) => values.get(ctx),

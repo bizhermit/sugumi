@@ -85,6 +85,8 @@ export function withSecurityHeaders(res: Response): Response {
 
 function setDefaults(headers: Headers) {
   for (const [name, value] of DEFAULT_HEADERS) {
-    if (!headers.has(name)) headers.set(name, value);
+    if (!headers.has(name)) {
+      headers.set(name, value);
+    }
   }
 }

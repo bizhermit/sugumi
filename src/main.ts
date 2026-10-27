@@ -19,7 +19,9 @@ let shuttingDown = false;
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   Deno.addSignalListener(signal, async () => {
     // 処理中のリクエストが終わらないときは、もう一度シグナルを送れば止められるようにする。
-    if (shuttingDown) Deno.exit(1);
+    if (shuttingDown) {
+      Deno.exit(1);
+    }
     shuttingDown = true;
     const timer = setTimeout(() => {
       logWarning(`終了処理が ${SHUTDOWN_TIMEOUT_MS} ms 以内に終わらないので、強制終了します`);

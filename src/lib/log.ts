@@ -15,8 +15,11 @@ const encoder = new TextEncoder();
 /** record を 1 行の JSON にして出す。toStderr なら標準エラーに出す。 */
 export function writeLog(record: object, toStderr = false): void {
   const line = JSON.stringify(record);
-  if (toStderr) console.error(line);
-  else console.log(line);
+  if (toStderr) {
+    console.error(line);
+  } else {
+    console.log(line);
+  }
 }
 
 /** 例外をエラーログに出す。リクエストの処理中なら requestId を渡す。 */

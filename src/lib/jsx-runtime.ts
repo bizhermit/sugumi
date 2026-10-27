@@ -67,7 +67,9 @@ export function jsxTemplate(templates: Array<string>, ...exprs: Array<unknown>):
  * true・false・null・undefined は空文字列にする。配列は要素ごとに変換して連結する。それ以外の値は例外を投げる。
  */
 export function jsxEscape(value: unknown): string {
-  if (value instanceof Html) return value.value;
+  if (value instanceof Html) {
+    return value.value;
+  }
   if (Array.isArray(value)) {
     let html = "";
     for (let i = 0; i < value.length; i++) html += jsxEscape(value[i]);
@@ -92,14 +94,18 @@ export function jsxEscape(value: unknown): string {
  * aria-* は値のない形を true として扱わないので、true・false を文字列にして出力する。
  */
 export function jsxAttr(name: string, value: unknown): string {
-  if (INVALID_ATTR_NAME.test(name)) throw new TypeError(`属性名に使えません: ${name}`);
+  if (INVALID_ATTR_NAME.test(name)) {
+    throw new TypeError(`属性名に使えません: ${name}`);
+  }
   switch (typeof value) {
     case "string":
     case "number":
     case "bigint":
       return `${name}="${escapeHtml(String(value))}"`;
     case "boolean":
-      if (name.startsWith("aria-")) return `${name}="${value}"`;
+      if (name.startsWith("aria-")) {
+        return `${name}="${value}"`;
+      }
       return value ? name : "";
     case "undefined":
       return "";
@@ -116,15 +122,21 @@ export function jsx(
 ): Html {
   props ??= {};
   // コンポーネントが文字列を返しても、HTML としては扱わずにエスケープする。
-  if (typeof type === "function") return new Html(jsxEscape(type(props)));
+  if (typeof type === "function") {
+    return new Html(jsxEscape(type(props)));
+  }
   // Object.entries と同じく、自身の列挙可能なプロパティだけを、同じ順番で読む。
   let open = "<" + type;
   for (const name in props) {
     if (name === "children" || !Object.hasOwn(props, name)) continue;
     const attr = jsxAttr(name, props[name]);
-    if (attr !== "") open += " " + attr;
+    if (attr !== "") {
+      open += " " + attr;
+    }
   }
-  if (VOID_ELEMENTS.has(type)) return new Html(open + ">");
+  if (VOID_ELEMENTS.has(type)) {
+    return new Html(open + ">");
+  }
   return new Html(`${open}>${jsxEscape(props.children)}</${type}>`);
 }
 

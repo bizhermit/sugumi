@@ -49,14 +49,14 @@ Deno.test("test-e2e: e2e/ の依存は、ルートの deno.lock に入ってい�
   // ルートの deno.lock にあるパッケージは、使っていなくても本番のイメージの deno cache が取得する。
   // 直接の依存だけでなく、推移的な依存（playwright-core など）と jsr: のパッケージも確かめる。
   const root = new URL("../../", import.meta.url);
-  const packages = async (path: string) => {
+  async function packages(path: string) {
     const lock = JSON.parse(await Deno.readTextFile(new URL(path, root)));
     // キーは「名前@バージョン」。スコープ付きの名前は @ で始まるので、最後の @ で分ける。
     return new Set(
       [...Object.keys(lock.npm ?? {}), ...Object.keys(lock.jsr ?? {})]
         .map((key) => key.slice(0, key.lastIndexOf("@"))),
     );
-  };
+  }
   const e2e = await packages("e2e/deno.lock");
   const app = await packages("deno.lock");
   assert.ok(e2e.has("playwright"));

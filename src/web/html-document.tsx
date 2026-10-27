@@ -74,9 +74,13 @@ export async function composePage(
   let resolved: string | undefined;
   for (const l of layouts) resolved = applyTitle(resolved, l.title, page);
   resolved = applyTitle(resolved, title, page);
-  if (resolved === undefined) throw new Error(`${page}: タイトルが決まっていません`);
+  if (resolved === undefined) {
+    throw new Error(`${page}: タイトルが決まっていません`);
+  }
 
-  if (layouts.length === 0) return { title: resolved, main: slots.main };
+  if (layouts.length === 0) {
+    return { title: resolved, main: slots.main };
+  }
   // 呼び出し側の slots を書き換えないよう 1 回だけコピーし、main を内側の layout の結果で置き換えていく。
   // 次の layout を呼ぶのは render が Html を返し終えてからなので、前の layout に渡した slots があとで変わっても影響しない。
   const current = { ...slots };
@@ -93,6 +97,8 @@ function applyTitle(
 ): string | undefined {
   if (typeof title === "string") return title;
   if (!title) return outer;
-  if (outer === undefined) throw new Error(`${page}: 外側の layout でタイトルが決まっていません`);
+  if (outer === undefined) {
+    throw new Error(`${page}: 外側の layout でタイトルが決まっていません`);
+  }
   return title(outer);
 }

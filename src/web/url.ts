@@ -118,7 +118,9 @@ export function appPathOf(value: string | null): AppPath | undefined {
  */
 export function safeUrl(value: string | null | undefined): string | undefined {
   if (value === null || value === undefined) return undefined;
-  if (value.startsWith("/")) return appPathOf(value);
+  if (value.startsWith("/")) {
+    return appPathOf(value);
+  }
   let url: URL;
   try {
     url = new URL(value);
@@ -133,7 +135,7 @@ export function safeUrl(value: string | null | undefined): string | undefined {
   return url.href;
 }
 
-// HTML の仕様が <input type="email"> の検証に使う形式。RFC 5322 より狭いが、そのぶん引用符やコメントを含むアドレスを扱わずに済む
+// HTML の仕様が <input type="email"> の検証に使う形式。RFC 5322 より狭いが、そのぶん引用符やコメントを含むアドレスを扱わずに済む。
 // https://html.spec.whatwg.org/multipage/input.html#valid-e-mail-address
 const EMAIL =
   /^([a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+)@([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*)$/;

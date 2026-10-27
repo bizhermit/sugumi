@@ -207,12 +207,16 @@ export async function loadRouter(
     const parts = splitPath(pathname);
     if (!parts) return undefined;
     const route = statics.get(staticKey(parts));
-    if (route) return found(route, {}, method);
+    if (route) {
+      return found(route, {}, method);
+    }
     const sameLength = dynamics.get(parts.length);
     if (!sameLength) return undefined;
     for (const { segments, route } of sameLength) {
       const params = matchSegments(segments, parts);
-      if (params) return found(route, params, method);
+      if (params) {
+        return found(route, params, method);
+      }
     }
     return undefined;
   };
@@ -226,7 +230,9 @@ export function layoutsOf(moduleUrl: string): Array<Layout> {
   const cached = layoutsByModule.get(moduleUrl);
   if (cached) return cached;
   const layouts = layoutChains.get(decodeURIComponent(new URL(".", moduleUrl).pathname));
-  if (!layouts) throw new Error(`${moduleUrl} はルートのディレクトリにありません`);
+  if (!layouts) {
+    throw new Error(`${moduleUrl} はルートのディレクトリにありません`);
+  }
   layoutsByModule.set(moduleUrl, layouts);
   return layouts;
 }
@@ -255,12 +261,13 @@ function isLayout(value: unknown): value is Layout {
 }
 
 async function loadRoute(root: URL, dir: RouteDir) {
-  async function load<T>(relative: string): Promise<T> {
-    const mod = await import(urlOf(root, relative).href);
+  async function load<T extends RouteHandler | BeforeHandler>(relative: string): Promise<T> {
+    const mod: { default?: unknown } = await import(urlOf(root, relative).href);
     if (typeof mod.default !== "function") {
       throw new Error(`routes/${relative}: default export にハンドラがありません`);
     }
-    return mod.default;
+    // 実行時に確かめられるのは、関数であることだけ。引数と戻り値は、ファイルが T の形で書かれている前提で変換する。
+    return mod.default as T;
   }
   const befores: Array<BeforeHandler> = [];
   for (const relative of dir.befores) befores.push(await load<BeforeHandler>(relative));
@@ -292,9 +299,13 @@ function parseSegments(relative: string): Array<Segment> {
   const names = relative.split("/").slice(0, -1);
   const seen = new Set<string>();
   return names.map((name) => {
-    if (!/[[\]]/.test(name)) return { literal: name };
+    if (!/[[\]]/.test(name)) {
+      return { literal: name };
+    }
     const param = name.match(/^\[(\w+)\]$/)?.[1];
-    if (!param) throw new Error(`routes/${relative}: "${name}" はパスの名前に使えません`);
+    if (!param) {
+      throw new Error(`routes/${relative}: "${name}" はパスの名前に使えません`);
+    }
     if (seen.has(param)) {
       throw new Error(`routes/${relative}: パラメータ "${param}" が重複しています`);
     }
@@ -377,8 +388,9 @@ async function* walk(
     if (entry.isSymlink) {
       throw new Error(`routes/${relative}${entry.name}: シンボリックリンクは置けません`);
     }
-    if (entry.isDirectory && !/^[_.]/.test(entry.name)) subdirs.push(entry.name);
-    else if (entry.isFile) {
+    if (entry.isDirectory && !/^[_.]/.test(entry.name)) {
+      subdirs.push(entry.name);
+    } else if (entry.isFile) {
       checkSpecialName(relative, entry.name);
       files.push(entry.name);
     }

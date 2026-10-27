@@ -66,10 +66,12 @@ Deno.test("createApp: TCP の接続元を ctx.remoteAddress に渡す", async ()
       new Response(String(ctx.remoteAddress));`,
   }, async (routes) => {
     const app = await createApp({ mock: false, routes });
-    const req = () =>
-      new Request("http://localhost/", { headers: { "x-forwarded-for": "192.0.2.99" } });
-    const info = (hostname: string) =>
-      ({ remoteAddr: { transport: "tcp", hostname, port: 1 } }) as Deno.ServeHandlerInfo;
+    function req() {
+      return new Request("http://localhost/", { headers: { "x-forwarded-for": "192.0.2.99" } });
+    }
+    function info(hostname: string) {
+      return ({ remoteAddr: { transport: "tcp", hostname, port: 1 } }) as Deno.ServeHandlerInfo;
+    }
     assert.equal(await (await app(req(), info("::ffff:192.0.2.1"))).text(), "192.0.2.1");
     assert.equal(await (await app(req())).text(), "undefined");
   });

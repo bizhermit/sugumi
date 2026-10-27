@@ -52,7 +52,9 @@ function serveFile(
 ): Response | undefined {
   const found = files.get(url.pathname);
   if (!found) return undefined;
-  if (req.method !== "GET" && req.method !== "HEAD") return methodNotAllowed(["GET", "HEAD"]);
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return methodNotAllowed(["GET", "HEAD"]);
+  }
   // URL にハッシュを付けられないので、内容を変えたときに古いものが使われないよう、毎回 ETag で確かめさせる。
   const headers = new Headers({
     "content-type": found.contentType,
@@ -71,7 +73,9 @@ async function loadFiles(dir: URL) {
   try {
     await Deno.stat(dir);
   } catch (e) {
-    if (e instanceof Deno.errors.NotFound) throw new Error("static/ がありません");
+    if (e instanceof Deno.errors.NotFound) {
+      throw new Error("static/ がありません");
+    }
     throw e;
   }
   for await (const names of walk(dir, [])) {

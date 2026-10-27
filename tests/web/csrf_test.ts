@@ -102,7 +102,9 @@ Deno.test("csrf: ログイン中はセッションに紐付いたトークンだ
 });
 
 Deno.test("csrf: token() を呼んだレスポンスは、ページの指定によらず no-store にする", async () => {
-  const page = () => new Response("ok", { headers: { "cache-control": "public, max-age=60" } });
+  function page() {
+    return new Response("ok", { headers: { "cache-control": "public, max-age=60" } });
+  }
 
   const unused = csrfFor(new Request(FORM_URL), undefined).apply(page());
   assert.equal(unused.headers.get("cache-control"), "public, max-age=60");

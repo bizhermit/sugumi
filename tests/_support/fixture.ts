@@ -17,8 +17,11 @@ export async function withTempDir(
   for (const [relative, content] of Object.entries(files)) {
     const file = new URL(relative.split("/").map(encodeURIComponent).join("/"), dir);
     await Deno.mkdir(new URL(".", file), { recursive: true });
-    if (typeof content === "string") await Deno.writeTextFile(file, content);
-    else await Deno.writeFile(file, content);
+    if (typeof content === "string") {
+      await Deno.writeTextFile(file, content);
+    } else {
+      await Deno.writeFile(file, content);
+    }
   }
   try {
     await fn(dir);

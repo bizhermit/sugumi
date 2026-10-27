@@ -18,7 +18,9 @@ if (import.meta.main) {
 /** root（リポジトリのルート）の dist/public/ を確かめ、違反の一覧を返す。テストでは root に別のディレクトリを渡す。 */
 export async function checkBundle(root: URL): Promise<Array<string>> {
   const rootPath = decodeURIComponent(root.pathname);
-  const relative = (url: URL) => decodeURIComponent(url.pathname).slice(rootPath.length);
+  function relative(url: URL) {
+    return decodeURIComponent(url.pathname).slice(rootPath.length);
+  }
   const violations: Array<string> = [];
   let maps = 0;
   for await (const file of walk(new URL("dist/public/", root))) {
@@ -30,11 +32,15 @@ export async function checkBundle(root: URL): Promise<Array<string>> {
       const segments = path.split("/");
       const allowed = segments[0] === "src" &&
         (segments.includes("_assets") || segments.includes("_shared"));
-      if (!allowed) violations.push(`${relative(file)}: ${path} がバンドルに含まれています`);
+      if (!allowed) {
+        violations.push(`${relative(file)}: ${path} がバンドルに含まれています`);
+      }
     }
   }
   // ソースマップがないと何も確かめられないので、出力の設定が変わったときに気づけるようにする。
-  if (maps === 0) violations.push("dist/public/ にソースマップがありません");
+  if (maps === 0) {
+    violations.push("dist/public/ にソースマップがありません");
+  }
   return violations;
 }
 

@@ -79,7 +79,9 @@ class Csrf {
   }
 
   #sign(): Promise<string> {
-    if (this.#binding !== undefined) return sign(this.#binding);
+    if (this.#binding !== undefined) {
+      return sign(this.#binding);
+    }
     this.#issued = `${Date.now()}.${randomToken()}`;
     return sign(`pre:${this.#issued}`);
   }
@@ -116,7 +118,9 @@ function stampUsed(headers: Headers, issued: string | undefined) {
   // トークンはセッションに紐付いている。共有キャッシュに残ると別のユーザーにトークンが渡り、
   // ブラウザのキャッシュに残ると、セッションが変わったあとの送信が失敗する。
   headers.set("cache-control", "no-store");
-  if (issued !== undefined) headers.append("set-cookie", hostCookie(PRE_LOGIN_COOKIE, issued));
+  if (issued !== undefined) {
+    headers.append("set-cookie", hostCookie(PRE_LOGIN_COOKIE, issued));
+  }
 }
 
 function isFresh(value: string, now: number) {

@@ -92,6 +92,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
   - 書き方は `tests/CLAUDE.md` に従う。
 - `_assets/` の JS と、画面が CSP の違反なく動くことは、`e2e/` のテストでブラウザを動かして確かめる。`deno task test:e2e` で実行する。
   - 書き方は `e2e/CLAUDE.md` に従う。
+  - 環境変数 `E2E_BASE_URL` で、動いているアプリに対して実行できる。受け付けるのはこのマシンのアプリだけで、`scripts/test-e2e.ts` が確かめている。この制限は外さない。本番やステージングに向けると、テストのログインでアカウントや接続元がロックされるため。
   - ルートの `deno fmt`・`deno lint`・`deno check` は `e2e/` を除外する。`e2e/` の中で実行する。
 - PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`（ルートと `e2e/`）・`routes.gen.ts` の差分・`deno task build`・本番のイメージのビルド・`deno task test`・本番のイメージに対する `deno task test:e2e` を確かめる。
 
@@ -114,6 +115,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
   - ライブラリが読む環境変数やファイルにも、`deno.json` の `permissions` での許可が要る。
     - 使わない環境変数は `env.ignore` に入れ、未設定として扱われるようにする（`pg` の `USER` など）。
     - 許可も `ignore` もしないと、端末から起動したときに確認が出る。端末のない本番では拒否される。
+- Playwright のバージョンを変えるときは、`e2e/CLAUDE.md` の手順に従う。`e2e/deno.json` のほかに、DevContainer のリビルドも要る。
 
 ## DB
 
@@ -161,7 +163,11 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 - 名前のある関数は `function` で宣言する。アロー関数は、引数に渡すその場の関数だけに使う。
 - 状態を持つ部品は、関数（関数を並べたオブジェクトを返すもの）で作る。
   - クラスにするのは、リクエストごとに作るもの（メソッドを毎回作らないため）・`instanceof` で判定するもの・文字列などと区別する型が要るものだけ。理由をコメントに書く。
-- `if` の中が `return`・`continue`・`break`・`throw` の 1 文だけなら、1 行で波括弧を付けない。それ以外は波括弧を付ける。
+- `if`・`else` は波括弧を付ける。次の 1 文だけで 1 行に収まるときは、波括弧を付けずに 1 行で書く。
+  - 値を返さない `return`、またはリテラル（数値・文字列・`true`・`false`・`null`・`undefined`・`[]`）か名前だけを返す `return`
+  - 名前だけを投げる `throw`（`throw e`）
+  - `continue`・`break`
+  - 関数の呼び出し・`new`・プロパティの読み出しを返す `return` や、名前以外を投げる `throw`（`throw new Error(...)` など）には波括弧を付ける。
 - 値がないことは `undefined` で表し、`=== undefined` で判定する。
   - 標準の API や DB が返す `null` は `=== null` で判定する。
   - `null` と `undefined` の両方が来る外部の値（JSON など）だけ `== null` を使う。
@@ -272,6 +278,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
   - `innerHTML` などへの文字列の代入：`createElement` と `textContent` を使う。
     - まとまった HTML は、サーバーが出力した `<template>` をクローンする。
   - インラインの `<style>` や `style` 属性：`_assets/` の CSS に書く。
+- CSP を緩めるときは、`e2e/routes_test.ts` が認める範囲も見直す。CSP が緩んでいないことを、そこで確かめているため。
 - サーバーからクライアントへ渡す値は `data-*` 属性に入れる。
 
 ## サーバーとクライアントの境界

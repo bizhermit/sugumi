@@ -65,7 +65,9 @@ Deno.test("env: DATABASE_URL は必須で、パスワードはファイルから
     password: "p@ss/w%rd:#\n\n",
     empty: "\n",
   }, (dir) => {
-    const file = (name: string) => decodeURIComponent(new URL(name, dir).pathname);
+    function file(name: string) {
+      return decodeURIComponent(new URL(name, dir).pathname);
+    }
     // 末尾の改行は取り除き、URL で意味を持つ文字はエンコードする。
     const url = new URL(parseDatabaseUrl(raw, file("password")));
     assert.equal(decodeURIComponent(url.password), "p@ss/w%rd:#");

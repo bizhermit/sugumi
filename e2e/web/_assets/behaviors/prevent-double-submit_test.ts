@@ -8,7 +8,7 @@ import { withPage } from "../../../_support/browser.ts";
 /**
  * ログイン画面で送信ボタンを 2 回続けて押す。
  * それぞれの送信を prevent-double-submit.ts が取り消したかどうかと、1 回目の後の aria-busy を返す。
- * 画面が移動しないよう、送信は最後にすべて取り消す。
+ * 画面が移動しないよう、送信はそのたびに取り消す。
  * cancelOnForm なら、ページ独自の処理を想定して、フォーム要素に付けたリスナーで 1 回目の送信を取り消す。
  */
 async function submitTwice(
@@ -27,7 +27,7 @@ async function submitTwice(
     if (cancelOnForm) {
       form.addEventListener("submit", (e) => e.preventDefault(), { once: true });
     }
-    // document に付けるので、読み込み時に登録された prevent-double-submit.ts のリスナーより後に呼ばれる。
+    // 同じ document に後から登録するので、読み込み時に登録された prevent-double-submit.ts のリスナーより後に呼ばれる。
     document.addEventListener("submit", (e) => {
       prevented.push(e.defaultPrevented);
       e.preventDefault();

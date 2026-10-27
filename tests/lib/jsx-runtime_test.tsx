@@ -53,14 +53,18 @@ Deno.test("jsx: 空要素は閉じタグを付けない", () => {
 });
 
 Deno.test("jsx: コンポーネントが文字列を返しても、HTML としては扱わない", () => {
-  const Raw = () => "<b>x</b>" as unknown as Html;
+  function Raw() {
+    return "<b>x</b>" as unknown as Html;
+  }
   assert.equal(
     (<p>
       <Raw />
     </p>).value,
     "<p>&#60;b&#62;x&#60;/b&#62;</p>",
   );
-  const Echo = ({ children }: { children?: unknown }) => <span>{children}</span>;
+  function Echo({ children }: { children?: unknown }) {
+    return <span>{children}</span>;
+  }
   assert.equal((<Echo>{"<y>"}</Echo>).value, "<span>&#60;y&#62;</span>");
 });
 

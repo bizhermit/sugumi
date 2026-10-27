@@ -23,7 +23,14 @@ export async function resetDb(): Promise<void> {
 
 export const TEST_PASSWORD = "correct horse battery staple";
 
-/** username のアカウントを、パスワード TEST_PASSWORD・表示名「<username> の表示名」で作って返す。 */
+/**
+ * username のアカウントを、パスワード TEST_PASSWORD・表示名「<username> の表示名」で作って返す。
+ * 作れなければ例外を投げる。
+ */
 export async function addAccount(username = "alice"): Promise<Account> {
-  return await createAccount(username, `${username} の表示名`, TEST_PASSWORD);
+  const result = await createAccount(username, `${username} の表示名`, TEST_PASSWORD);
+  if (result.status !== "ok") {
+    throw new Error(`アカウント ${username} を作れませんでした: ${result.status}`);
+  }
+  return result.account;
 }

@@ -46,8 +46,11 @@ function derive(
       KEY_LENGTH,
       { N, r, p, maxmem: 256 * N * r },
       (e, key) => {
-        if (e) reject(e);
-        else resolve(key);
+        if (e) {
+          reject(e);
+        } else {
+          resolve(key);
+        }
       },
     );
   });
