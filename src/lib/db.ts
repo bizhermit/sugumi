@@ -15,12 +15,7 @@ import {
   DB_STATEMENT_TIMEOUT_SECONDS,
 } from "./env.ts";
 import { logError } from "./log.ts";
-
-/**
- * アプリが前提にする DB スキーマのバージョン。docker/db/migrations/ の最後のファイルの番号と同じにする。
- * マイグレーションを足したら上げる。食い違うと tests/lib/db_test.ts が失敗する。
- */
-export const SCHEMA_VERSION = 4;
+import { SCHEMA_VERSION } from "./schema-version.ts";
 
 // query_timeout（クライアント側のタイムアウト）は使わない。タイムアウトしても、接続は送信済みの文のレスポンスを待ったまま Pool に戻り、
 // 次にその接続を使うクエリが後ろで待たされるため。statement_timeout なら DB が文を取り消すので、接続はそのまま使える。
@@ -101,7 +96,7 @@ async function checkSchemaVersion() {
     version = rows[0].version ?? 0;
   } catch (e) {
     // 42P01 は undefined_table。一度もマイグレーションを実行していない DB。
-    if ((e as { code?: unknown }).code !== "42P01") throw e;
+    if (!(e instanceof Error) || (e as { code?: unknown }).code !== "42P01") throw e;
     version = 0;
   }
   if (version !== SCHEMA_VERSION) {

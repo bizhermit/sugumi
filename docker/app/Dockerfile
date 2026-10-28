@@ -10,6 +10,8 @@ COPY deno.json deno.lock ./
 COPY src/ ./src/
 # build タスクがバンドルの前後で import とバンドルの中身を確かめる
 COPY scripts/ ./scripts/
+# build タスクが SCHEMA_VERSION と突き合わせる。runtime には入れない
+COPY docker/db/migrations/ ./docker/db/migrations/
 # 実行時に npm からダウンロードしないよう、DENO_DIR に取得しておく。deno.lock と食い違えば失敗する
 RUN deno task build && deno cache --frozen src/main.ts
 

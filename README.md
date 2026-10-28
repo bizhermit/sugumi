@@ -31,16 +31,17 @@ git grep -lz myapp | xargs -0 sed -i 's/myapp/<アプリの名前>/g'
     テストは、名前が `_test` で終わらない DB を空にしない。
 
 ```sh
-deno task dev       # マイグレーションを適用し、開発サーバーを起動（ファイル監視あり、APP_MODE=DEV）
+deno task dev       # 開発サーバーを起動（ファイル監視あり、APP_MODE=DEV。先に deno task migrate が必要）
 deno task dev:mock  # 開発サーバーを APP_MODE=MOCK で起動（routes の *.mock.* を使う）
 deno task dev:prod  # 開発サーバーを APP_MODE=PROD で起動
 deno task build  # クライアントコードをバンドル
-deno task migrate  # 開発用 DB にマイグレーション（docker/db/migrations/）を適用（MIGRATION_DATABASE_URL の DB を使う。psql が必要）
+deno task migrate  # 開発用 DB にマイグレーション（docker/db/migrations/）を適用し、SCHEMA_VERSION を揃える（MIGRATION_DATABASE_URL の DB を使う。psql が必要）
 deno task start  # サーバー起動（先に deno task build と deno task migrate が必要）
 deno task account:add <ユーザー名> <表示名>  # アカウントを追加（パスワードは入力を求める）
 deno task account:unlock <アカウントの id>  # ロックしたアカウントを解除
 deno task check:imports  # サーバー・クライアント間の import の取り決めを確認
 deno task check:bundle   # バンドルにサーバーのコードが入っていないかを確認（build でも実行される）
+deno task check:schema-version  # SCHEMA_VERSION とマイグレーションの番号の食い違いを確認（build でも実行される）
 deno task test   # テストを実行（TEST_DATABASE_URL の DB を使う。先に deno task build が必要）
 ```
 

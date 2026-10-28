@@ -10,7 +10,7 @@ DB スキーマの変更（マイグレーション）を本番の DB に適用�
 - 適用するのは DB ユーザー `migrator`。DB のコンテナの中からだけ接続でき、パスワードはない（「[DB サーバー](db-server.md)」）。
   アプリサーバーには、スキーマを変更できる資格情報を置かない。
 - どこまで適用したかは、DB の `schema_migrations` テーブルに記録される。
-- アプリが前提にするバージョンは、[src/lib/db.ts](../../src/lib/db.ts) の `SCHEMA_VERSION`。
+- アプリが前提にするバージョンは、[src/lib/schema-version.ts](../../src/lib/schema-version.ts) の `SCHEMA_VERSION`。
 
 ## マイグレーションの実行方法
 

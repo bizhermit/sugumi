@@ -16,7 +16,8 @@ src/
     _assets/      全ページで読み込む JS・CSS
   lib/            複数のディレクトリの画面で使う部品
     auth/         アカウント・パスワード・セッション
-    db.ts         DB の接続と、前提にするスキーマのバージョン
+    db.ts         DB の接続
+    schema-version.ts  前提にする DB スキーマのバージョン
     jsx-runtime.ts  JSX の変換先（deno.json の compilerOptions で指定）
     _shared/      サーバーとクライアントの両方で使う部品（必要になったら作る）
 static/           URL が外部の取り決めで決まるファイル（favicon.ico・robots.txt など）。同じパスで配信する
@@ -129,7 +130,9 @@ local/            手元だけで使うファイル（メモ・試作・調査�
 - スキーマの変更（マイグレーション）は、`docker/db/migrations/` に SQL ファイルで足す。
   - 書き方は `docker/db/migrations/CLAUDE.md` に従う。
   - アプリはマイグレーションに関わらない。DB のコンテナの `docker/db/bin/db-migrate` が適用する（開発・テストでは `deno task migrate`・`migrate:test`）。
-  - アプリは起動時に、`src/lib/db.ts` の `SCHEMA_VERSION` と DB のバージョンを突き合わせ、違えば起動しない。
+    - `deno task migrate` は、開発用 DB に適用したあと、`SCHEMA_VERSION` を最後のマイグレーションの番号に書き換える。
+  - アプリは起動時に、`src/lib/schema-version.ts` の `SCHEMA_VERSION` と DB のバージョンを突き合わせ、違えば起動しない。
+    - `SCHEMA_VERSION` と最後のマイグレーションの番号の食い違いは、`deno task build`（`check:schema-version`）が検出する。
 - DB ユーザーを、権限で分けている（`docker/db/init/`）。開発環境も同じ。
   - `app`：アプリが接続する。テーブルの読み書きだけができ、テーブル・関数などを作ったり消したりできない。アプリを乗っ取られたときの被害を、データの読み書きに留めるため。
   - `migrator`：スキーマとテーブルを持ち、マイグレーションとバックアップ・復元を行う。本番では DB のコンテナの中からだけ接続し、パスワードを持たない。

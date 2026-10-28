@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { db, isDbTimeout, SCHEMA_VERSION, secret, transaction } from "../../src/lib/db.ts";
+import { db, isDbTimeout, secret, transaction } from "../../src/lib/db.ts";
 import {
   DB_CONNECTION_TIMEOUT_SECONDS,
   DB_POOL_MAX,
@@ -111,14 +111,4 @@ Deno.test("db: アプリの DB ユーザーは、マイグレーションの記�
     db.query("DELETE FROM schema_migrations"),
     (e: { code?: string }) => e.code === "42501",
   );
-});
-
-Deno.test("db: SCHEMA_VERSION は、docker/db/migrations/ の最後のマイグレーションの番号と同じ", async () => {
-  let last = 0;
-  for await (const entry of Deno.readDir("docker/db/migrations")) {
-    if (entry.name.endsWith(".sql")) {
-      last = Math.max(last, Number(entry.name.slice(0, 4)));
-    }
-  }
-  assert.equal(last, SCHEMA_VERSION);
 });
