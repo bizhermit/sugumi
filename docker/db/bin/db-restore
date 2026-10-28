@@ -35,11 +35,16 @@ BEGIN
   IF EXISTS (SELECT FROM pg_stat_activity WHERE usename = 'migrator' AND pid <> pg_backend_pid()) THEN
     RAISE EXCEPTION 'ほかに migrator の接続があります。マイグレーションなどが終わってから実行してください';
   END IF;
+  -- 権限を戻す手順によって並び順が変わることがあるので、= ではなく、互いに含むか（集合として同じか）で比べる
   IF EXISTS (
-    SELECT FROM pg_default_acl
+    SELECT FROM pg_default_acl, LATERAL (
+      SELECT CASE defaclobjtype
+        WHEN 'r' THEN '{migrator=arwdDxtm/migrator,app=arwd/migrator}'::aclitem[]
+        WHEN 'S' THEN '{migrator=rwU/migrator,app=rU/migrator}'::aclitem[]
+      END AS expected
+    ) e
     WHERE defaclrole = 'migrator'::regrole AND defaclnamespace = 0
-      AND NOT (defaclobjtype = 'r' AND defaclacl = '{migrator=arwdDxtm/migrator,app=arwd/migrator}'::aclitem[])
-      AND NOT (defaclobjtype = 'S' AND defaclacl = '{migrator=rwU/migrator,app=rU/migrator}'::aclitem[])
+      AND NOT (e.expected IS NOT NULL AND defaclacl @> e.expected AND defaclacl <@ e.expected)
   ) THEN
     RAISE EXCEPTION 'migrator のデフォルトの権限が初期化のときと違います。docker/README/incident.md の手順で元に戻してください';
   END IF;
