@@ -2,14 +2,14 @@
 
 [目次](index.md)
 
-リポジトリのソースから本番イメージ（`app`・`log-forwarder`・`db`・`lb`）を作成し、レジストリに置く。
+リポジトリのソースから本番イメージ（`app`・`log-forwarder`・`db`・`db-proxy`・`lb`）を作成し、レジストリに置く。
 アプリサーバーとは別の、ビルドサーバー（CI など）で行う。
 
 ## 前提条件
 
 - Docker（`docker buildx` を含む）が入ったサーバーに、このリポジトリを置いてある。
 - レジストリに push できる。
-  - ECR なら、リポジトリ `myapp/app`・`myapp/log-forwarder`・`myapp/db`・`myapp/lb` を先に作成しておく。
+  - ECR なら、リポジトリ `myapp/app`・`myapp/log-forwarder`・`myapp/db`・`myapp/db-proxy`・`myapp/lb` を先に作成しておく。
     タグのイミュータビリティを有効にし、同じタグで違う中身を push できないようにする。
 
 ## 手順
@@ -53,7 +53,7 @@
 
 ## 確認方法
 
-4 つのイメージ（`app`・`log-forwarder`・`db`・`lb`）が、レジストリにそのタグで置かれている。
+5 つのイメージ（`app`・`log-forwarder`・`db`・`db-proxy`・`lb`）が、レジストリにそのタグで置かれている。
 
 ```sh
 docker buildx imagetools inspect <IMAGE_PREFIX>/app:<タグ>

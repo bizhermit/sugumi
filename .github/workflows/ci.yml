@@ -77,6 +77,11 @@ jobs:
             -v "$RUNNER_TEMP/lb/upstream:/etc/nginx/upstream:ro" -v "$RUNNER_TEMP/lb/certs:/etc/nginx/certs:ro" \
             ci/lb:ci nginx -t
 
+      - name: db-proxy のイメージをビルドし、設定を確かめる
+        run: |
+          docker buildx bake -f docker/bake.hcl --load db-proxy
+          docker run --rm ci/db-proxy:ci nginx -t
+
       - name: DB の初期化を待つ
         # 初期化の途中は Unix ソケットだけで待ち受けるので、TCP で確かめる
         run: timeout 60 sh -c 'until docker exec db pg_isready -h 127.0.0.1 -U admin -d app_test; do sleep 1; done'

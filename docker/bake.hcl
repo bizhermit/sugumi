@@ -1,4 +1,4 @@
-# 本番のイメージ（app・log-forwarder・db・lb）を作る。docker/scripts/build-images から使う（docker/README/build.md を参照）。
+# 本番のイメージ（app・log-forwarder・db・db-proxy・lb）を作る。docker/scripts/build-images から使う（docker/README/build.md を参照）。
 # context は実行したディレクトリからの相対パスなので、リポジトリのルートで -f docker/bake.hcl を付けて実行する。
 #
 # 各サーバーの compose.yaml は、ここで付けた名前とタグでイメージを取得する。
@@ -20,7 +20,7 @@ variable "IMAGE_TAG" {
 }
 
 group "default" {
-  targets = ["app", "db", "log-forwarder", "lb"]
+  targets = ["app", "db", "db-proxy", "log-forwarder", "lb"]
 }
 
 target "app" {
@@ -33,6 +33,11 @@ target "app" {
 target "db" {
   context = "docker/db"
   tags    = ["${IMAGE_PREFIX}/db:${IMAGE_TAG}"]
+}
+
+target "db-proxy" {
+  context = "docker/db-proxy"
+  tags    = ["${IMAGE_PREFIX}/db-proxy:${IMAGE_TAG}"]
 }
 
 target "log-forwarder" {

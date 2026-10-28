@@ -5,6 +5,11 @@
 PostgreSQL を動かすサーバー。1 つだけ置き、すべてのアプリサーバーから TLS で接続する。
 [docker/db/compose.yaml](../db/compose.yaml) で起動する。アプリサーバーと同じサーバーに置いてもよい。
 
+- アプリサーバーからの接続は、転送役の `db-proxy`（[docker/db-proxy/nginx.conf](../db-proxy/nginx.conf)）が受け、DB のコンテナへそのまま流す。TLS は DB まで素通しにする。
+  - DB のコンテナは、外へ通信できない Docker のネットワーク（`internal`）だけに置く。乗っ取られても、データを外へ送れない。
+  - Docker では、ポートを公開するコンテナは外へも通信できてしまう。そのため、データを持たない `db-proxy` にポートを受け持たせている。
+  - DB のログに出る接続元は、アプリサーバーではなく `db-proxy` のアドレスになる。
+
 - DB ユーザーは、権限で 3 つに分けている（[docker/db/init/10-app-role.sh](../db/init/10-app-role.sh)）。
 
   | DB ユーザー | 権限                                           | 使う場面                                                   |
@@ -14,7 +19,7 @@ PostgreSQL を動かすサーバー。1 つだけ置き、すべてのアプリ�
   | `app`       | テーブルの読み書きだけ                         | アプリ                                                     |
 
   アプリを乗っ取られても、テーブルや関数を作成・削除できず、被害はデータの読み書きに留まる。
-- コンテナの外からは、`app` だけが、TLS で、アプリの DB にだけ接続できる（[docker/db/conf/pg_hba.conf](../db/conf/pg_hba.conf)）。
+- `db-proxy` を通しては、`app` だけが、TLS で、アプリの DB にだけ接続できる（[docker/db/conf/pg_hba.conf](../db/conf/pg_hba.conf)）。
 - `migrator` と管理者は、コンテナの外から接続できない。マイグレーション・DB バックアップ・管理の作業は、DB サーバーで `docker compose exec` で行う。
   `migrator` にはパスワードがなく、アプリサーバーにはスキーマを変更できる資格情報を置かない。
 - RDS などのマネージドな DB を使うなら、このページは使わない。

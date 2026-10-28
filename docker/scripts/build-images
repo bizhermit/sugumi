@@ -40,7 +40,7 @@ fi
 if [ -t 0 ]; then
   echo
   echo "コミット: $commit"
-  echo "push 先: $prefix/{app,log-forwarder,db,lb}:$tag"
+  echo "push 先: $prefix/{app,log-forwarder,db,db-proxy,lb}:$tag"
   echo "CPU: ${platform:-このサーバーと同じ}"
   printf 'イメージを作って push しますか？ [y/N]: '
   read -r answer

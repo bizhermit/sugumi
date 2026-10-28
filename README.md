@@ -50,7 +50,7 @@ deno task test   # テストを実行（TEST_DATABASE_URL の DB を使う。先
 
 - ロードバランサー（[docker/lb/](docker/lb/)）：HTTPS を受け、アプリサーバーへ振り分ける。1 つ。
 - アプリサーバー（[compose.yaml](compose.yaml)）：アプリ（[docker/app/](docker/app/)）とログの転送役（[docker/log-forwarder/](docker/log-forwarder/)）。1 台以上。
-- DB サーバー（[docker/db/](docker/db/)）：アプリサーバーから TLS で接続する。1 つ。
+- DB サーバー（[docker/db/](docker/db/)）：アプリサーバーから TLS で接続する。接続は転送役（[docker/db-proxy/](docker/db-proxy/)）が受け、外へ通信できない DB に流す。1 つ。
 
 1 台にまとめてもよい。ログは転送役が、CloudWatch Logs か、別のサーバーに置いたログ用サーバー（[docker/log-server/](docker/log-server/)）へ送る。
 手順は [docker/README/index.md](docker/README/index.md) を参照。
@@ -70,11 +70,11 @@ flowchart TB
     app -.->|"標準出力・標準エラー<br>（Docker の fluentd ログドライバー）"| fwd["log-forwarder<br>ボリューム log-buffer"]
   end
 
-  app -->|"TLS"| db
-  fwd ~~~ db
+  app -->|"TLS"| dbproxy
+  fwd ~~~ dbproxy
 
   subgraph dbserver["DB サーバー"]
-    db[("db<br>docker/db/compose.yaml<br>ボリューム db-data")]
+    dbproxy["db-proxy（nginx）<br>docker/db/compose.yaml"] -->|"TLS（そのまま流す）"| db[("db<br>ボリューム db-data")]
   end
 
   fwd -->|"LOG_DESTINATION=cloudwatch"| cw[("CloudWatch Logs")]

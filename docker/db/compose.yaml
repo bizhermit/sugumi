@@ -29,9 +29,9 @@ services:
     secrets:
       - db_admin_password
       - db_app_password
-    ports:
-      # アプリサーバーから届くアドレスで待ち受ける。アプリサーバー以外からの接続は、ファイアウォールで止める
-      - ${DB_LISTEN_ADDRESS:?.env に DB_LISTEN_ADDRESS を書いてください}:5432:5432
+    # ポートは公開せず、db-proxy から受ける
+    networks:
+      - db
     volumes:
       # PostgreSQL 18 のイメージは /var/lib/postgresql の下にバージョンごとのディレクトリを作る
       - db-data:/var/lib/postgresql
@@ -42,6 +42,35 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # アプリサーバーからの接続を受け、DB へそのまま流す（docker/db-proxy/nginx.conf）。
+  # ポートを公開するには外へ通信できるネットワークが要るので、DB の代わりにこれが受け持つ。データを持たず、中身も解釈しない
+  db-proxy:
+    image: ${IMAGE_PREFIX:?.env に IMAGE_PREFIX を書いてください}/db-proxy:${IMAGE_TAG:?.env に IMAGE_TAG を書いてください}
+    restart: unless-stopped
+    ports:
+      # アプリサーバーから届くアドレスで待ち受ける。アプリサーバー以外からの接続は、ファイアウォールで止める
+      - ${DB_LISTEN_ADDRESS:?.env に DB_LISTEN_ADDRESS を書いてください}:5432:5432
+    networks:
+      - default
+      - db
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /run
+      - /var/cache/nginx
+    # ワーカーを nginx ユーザーに切り替えるのに要るものだけを残す
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID]
+    security_opt: [no-new-privileges:true]
+
+networks:
+  # DB はこのネットワークだけに置く。internal なので、外へ通信できず、Docker の DNS も外の名前を引かない。
+  # 外へ接続する機能（dblink・postgres_fdw・WAL のアーカイブの送信など）を足すときは、置き方を見直す
+  db:
+    internal: true
 
 volumes:
   db-data:

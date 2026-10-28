@@ -7,13 +7,13 @@
 
 ## サーバー構成
 
-| サーバー         | 数     | 起動するもの                                                 | 手順                                                  |
-| ---------------- | ------ | ------------------------------------------------------------ | ----------------------------------------------------- |
-| ビルド           | 1      | （イメージをビルドするだけ）                                 | [イメージのビルド方法](build.md)                      |
-| DB               | 1      | [docker/db/compose.yaml](../db/compose.yaml)（`db`）         | [DB サーバー](db-server.md)                           |
-| アプリ           | 1 以上 | [compose.yaml](../../compose.yaml)（`app`・`log-forwarder`） | [アプリサーバーの構築方法](#アプリサーバーの構築方法) |
-| ロードバランサー | 1      | [docker/lb/compose.yaml](../lb/compose.yaml)（`lb`）         | [ロードバランサー](load-balancer.md)                  |
-| ログ用           | 0 か 1 | [docker/log-server/compose.yaml](../log-server/compose.yaml) | [ログ用サーバー](log-server.md)                       |
+| サーバー         | 数     | 起動するもの                                                     | 手順                                                  |
+| ---------------- | ------ | ---------------------------------------------------------------- | ----------------------------------------------------- |
+| ビルド           | 1      | （イメージをビルドするだけ）                                     | [イメージのビルド方法](build.md)                      |
+| DB               | 1      | [docker/db/compose.yaml](../db/compose.yaml)（`db`・`db-proxy`） | [DB サーバー](db-server.md)                           |
+| アプリ           | 1 以上 | [compose.yaml](../../compose.yaml)（`app`・`log-forwarder`）     | [アプリサーバーの構築方法](#アプリサーバーの構築方法) |
+| ロードバランサー | 1      | [docker/lb/compose.yaml](../lb/compose.yaml)（`lb`）             | [ロードバランサー](load-balancer.md)                  |
+| ログ用           | 0 か 1 | [docker/log-server/compose.yaml](../log-server/compose.yaml)     | [ログ用サーバー](log-server.md)                       |
 
 - DB・アプリ・ロードバランサーを、1 つのサーバーにまとめてもよい（アプリサーバーが 1 台のときなど）。
   - DB の `DB_LISTEN_ADDRESS` は、`127.0.0.1` ではなく、そのサーバーのアドレスにする（「[DB サーバーの構築方法](db-server.md#db-サーバーの構築方法)」）。

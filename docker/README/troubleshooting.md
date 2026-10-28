@@ -42,7 +42,7 @@
 
 - 証明書のエラー（`unable to verify the first certificate` など）：`docker/certs/db-ca.crt` が、DB 証明書を発行した CA のものか確認する。
   証明書の名前のエラーなら、`DB_HOST` が DB 証明書の名前（`subjectAltName`）と同じか確認する（「[証明書の作成方法](db-server.md#証明書の作成方法)」）。
-- 接続できない・時間切れ：DB サーバーの `DB_LISTEN_ADDRESS` と、DB サーバーのファイアウォール（アプリサーバーから 5432 に届くか）を確認する。
+- 接続できない・時間切れ：DB サーバーで `db-proxy` が動いているか（`docker compose --env-file .env ps`）、`DB_LISTEN_ADDRESS` と、DB サーバーのファイアウォール（アプリサーバーから 5432 に届くか）を確認する。
 - パスワードのエラー：アプリサーバーの `DB_APP_PASSWORD` が、DB に設定したパスワードと同じか確認する（「[DB パスワードの変更方法](db-server.md#db-パスワードの変更方法)」）。
 - `DB のスキーマのバージョンがアプリと合いません` のエラー：
   - DB のほうが古い（`DB 4、アプリ 5` など）なら、マイグレーションを実行していない。「[マイグレーションの実行方法](migration.md#マイグレーションの実行方法)」を行う。
