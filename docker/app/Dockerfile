@@ -1,4 +1,4 @@
-# 本番用のアプリのイメージ。docker/bake.hcl で作り、compose.yaml から DB のイメージ（docker/db/）と一緒に起動する
+# 本番用のアプリのイメージ。docker/bake.hcl で作り、アプリサーバーで compose.yaml から起動する（DB は別のサーバーで docker/db/compose.yaml から起動する）
 # コンテキストはリポジトリのルート。除外するファイルは、隣の Dockerfile.dockerignore に書く
 # 更新時は `docker buildx imagetools inspect denoland/deno:<タグ>` で manifest list のダイジェストを取得して置き換える
 

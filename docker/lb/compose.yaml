@@ -1,5 +1,5 @@
 # ロードバランサー。HTTPS を受け、アプリサーバー（リポジトリ直下の compose.yaml）へ振り分ける。
-# ファイルを用意してから（docker/README/reverse-proxy.md を参照）、このディレクトリで起動する。
+# ファイルを用意してから（docker/README/load-balancer.md を参照）、このディレクトリで起動する。
 #
 #   docker compose --env-file .env up -d
 
