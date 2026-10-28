@@ -1,4 +1,4 @@
-# 社内のログ用のサーバー（docker/log-server/）へ送る
+# ログ用サーバー（docker/log-server/）へ送る
 includes:
   - pipeline.yaml
 
@@ -12,8 +12,8 @@ pipeline:
       tls: on
       tls.verify: on
       tls.verify_hostname: on
-      tls.ca_file: /fluent-bit/etc/sugumi/certs/log-server-ca.crt
-      # 鍵を知らない送り手からのログを、ログ用のサーバーが受け付けないようにする
+      tls.ca_file: /fluent-bit/etc/custom/certs/log-server-ca.crt
+      # 鍵を知らない送り手からのログを、ログ用サーバーが受け付けないようにする
       shared_key: ${LOG_SERVER_SHARED_KEY}
       self_hostname: ${SERVER_NAME}
       # 受け取ったと返されるまでは送れたことにしない。届く前に接続が切れても、ためた分を送り直す

@@ -21,8 +21,8 @@ src/
     _shared/      サーバーとクライアントの両方で使う部品（必要になったら作る）
 static/           URL が外部の取り決めで決まるファイル（favicon.ico・robots.txt など）。同じパスで配信する
 scripts/          deno task から実行するスクリプト
-docker/           コンテナのイメージ（app/・db/・log-forwarder/）と、本番の設定（.env。コミットしない）・手順（README.md）
-  log-server/     社内のログ用のサーバー（アプリのサーバーとは別のサーバーで起動する）
+docker/           コンテナのイメージと、サーバーごとの compose.yaml（db/・lb/・log-server/。アプリサーバーはリポジトリ直下）・本番の手順（README/）
+  log-server/     ログ用サーバー（アプリサーバーとは別のサーバーで起動する）
 tests/            テスト。src/ と同じ構成で *_test.ts を置く
   _support/       複数のテストで使う部品
 bench/            性能の計測。src/ と同じ構成で *_bench.ts を置く
@@ -87,6 +87,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 
 - `deno task test` で実行する。ファイルを指定すると、そのファイルだけを実行する。
   - テストは環境変数 `TEST_DATABASE_URL` の DB を使う。`deno task test` は `DATABASE_URL` をこの値に差し替えてから実行するので、`deno test` を直接実行しない。
+    - `deno task test` は、先に `TEST_MIGRATION_DATABASE_URL`（同じ DB に `migrator` で接続する）でマイグレーションを適用する。
   - `dist/public/` を読み込むテスト（`src/web/app.ts` の `createApp()` や `src/web/assets.ts` を使うもの）は、先に `deno task build` が要る。
 - `src/`・`scripts/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`、`scripts/gen-routes.ts` → `tests/scripts/gen-routes_test.ts`）。
   - 書き方は `tests/CLAUDE.md` に従う。
@@ -123,8 +124,13 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 - 値は必ずパラメータ（`$1` など）で渡す。SQL の文字列に値を連結しない。
 - 読んだ値をもとに書き込むときは、`transaction()` の中で `SELECT ... FOR UPDATE` などを使って守る。
   - await のたびに別のリクエストの処理が割り込むうえ、アプリが複数のインスタンスで動くこともあるため。
-- スキーマの変更は、`src/lib/db.ts` の `MIGRATIONS` の末尾に足す。適用済みの要素は書き換えない。
-- アプリは、スキーマ `app` だけを持つユーザーで接続する（`docker/db/init/`）。開発環境も同じ。
+- スキーマの変更は、`src/lib/migrations.ts` の `MIGRATIONS` の末尾に足す。適用済みの要素は書き換えない。
+  - マイグレーションはアプリとは別に、`deno task migrate`（本番は `compose.yaml` の `migrate`）で実行する。アプリの起動時には適用しない。
+  - アプリは起動時に、DB のスキーマのバージョンが `MIGRATIONS` の数と同じかを確かめ、違えば起動しない。
+- DB ユーザーを、権限で分けている（`docker/db/init/`）。開発環境も同じ。
+  - `app`：アプリが接続する。テーブルの読み書きだけができ、テーブル・関数などを作ったり消したりできない。アプリを乗っ取られたときの被害を、データの読み書きに留めるため。
+  - `migrator`：スキーマとテーブルを持ち、マイグレーションとバックアップ・復元を行う。アプリの実行中のコンテナには、パスワードを渡さない。
+  - スキーマを足すマイグレーションでは、`GRANT USAGE ON SCHEMA` で `app` に使わせる。テーブルの読み書きの権限は自動で付く。
   - 拡張の追加など、管理者の権限が要る変更はマイグレーションに書けない。管理者で実行する。
 
 ## サーバーの性能
@@ -155,6 +161,13 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 - 直したら `deno task bench` で前後を比べる。
   - `bench/` の同じパスの `*_bench.ts` で測る。DB は `deno task test` と同じく `TEST_DATABASE_URL` を使う。
   - 比べるときは、直す前のコミットを `git worktree` で別に取り出し、両方で実行する。
+
+## アプリの名前
+
+- このリポジトリはテンプレート。アプリの名前が要るところには `myapp` と書く。
+  - コピーした後に、`myapp` を一括で置き換えて使う（`README.md` の「テンプレートから作る」）。
+  - テンプレートの名前（`README.md` の見出し）は、ほかの場所に書かない。
+- 名前を含めなくて済むところには含めない（コンテナの中のパス、ログのタグなど）。
 
 ## コードの書き方
 
@@ -212,7 +225,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 - コメントの文末には「。」を付ける。
 - 処理の流れの説明や変更の経緯は書かない。経緯はコミットメッセージに残す。
 - `.env.example` には、見出しと値だけを書く。値の意味や選び方は、環境構築の手順と同じドキュメントに書く。
-  - 本番は `docker/README.md`、開発環境は `.devcontainer/README.md`。
+  - 本番は `docker/README/`（値の意味は `docker/README/env.md`）、開発環境は `.devcontainer/README.md`。
   - `.env` は手順を読みながら書くため。また、長いコメントは、コメントアウトした値と見分けにくいため。
 
 ## URL

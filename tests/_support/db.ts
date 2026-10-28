@@ -18,7 +18,9 @@ export async function resetDb(): Promise<void> {
   if (!name.endsWith("_test")) {
     throw new Error(`DB ${name} は名前が _test で終わらないので、テストでは空にしません`);
   }
-  await db.query("TRUNCATE accounts, sessions, login_throttles, login_devices RESTART IDENTITY");
+  // アプリと同じ DB ユーザー app で接続しているので、TRUNCATE はできない（テーブルの読み書きだけを許している）。
+  // sessions・login_devices は、accounts の行を消すと一緒に消える。
+  await db.query("DELETE FROM accounts; DELETE FROM login_throttles");
 }
 
 export const TEST_PASSWORD = "correct horse battery staple";

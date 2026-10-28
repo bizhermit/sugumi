@@ -6,15 +6,15 @@ service:
 
 pipeline:
   inputs:
-    # アプリのサーバーの log-forwarder（docker/log-forwarder/internal.yaml）から受け取る
+    # アプリサーバーの log-forwarder（docker/log-forwarder/internal.yaml）から受け取る
     - name: forward
       listen: 0.0.0.0
       port: 24224
       tls: on
       # 送り手は証明書ではなく、共有の鍵で確かめる
       tls.verify: off
-      tls.crt_file: /fluent-bit/etc/sugumi/certs/server.crt
-      tls.key_file: /fluent-bit/etc/sugumi/certs/server.key
+      tls.crt_file: /fluent-bit/etc/custom/certs/server.crt
+      tls.key_file: /fluent-bit/etc/custom/certs/server.key
       shared_key: ${LOG_SERVER_SHARED_KEY}
       self_hostname: ${LOG_SERVER_NAME}
       storage.type: filesystem
@@ -23,18 +23,18 @@ pipeline:
     # 送り手に、書き込むファイルの日付を選ばせない（receive-time.lua）
     - name: lua
       match: "*"
-      script: /fluent-bit/etc/sugumi/receive-time.lua
+      script: /fluent-bit/etc/custom/receive-time.lua
       call: set_receive_time
     # 監査ログは保存日数を分けるため、別のファイルに書く
     - name: rewrite_tag
-      match: sugumi.app
-      rule: $type ^audit$ sugumi.audit false
+      match: app
+      rule: $type ^audit$ audit false
       emitter_storage.type: filesystem
 
   outputs:
     # ファイル名に送り手の値を使わない。送り手が乗っ取られても、/logs の外に書かせないため
     - name: file
-      match: sugumi.app
+      match: app
       path: /logs
       file: app-%Y-%m-%d.jsonl
       enable_strftime: on
@@ -51,7 +51,7 @@ pipeline:
       rotate_max_files: 10000
       retry_limit: no_limits
     - name: file
-      match: sugumi.audit
+      match: audit
       path: /logs
       file: audit-%Y-%m-%d.jsonl
       enable_strftime: on

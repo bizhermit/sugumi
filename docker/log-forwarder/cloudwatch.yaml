@@ -1,4 +1,4 @@
-# CloudWatch Logs へ送る。AWS の権限は、EC2 のインスタンスに付けた IAM ロールから得る（docker/README.md）。
+# CloudWatch Logs へ送る。AWS の権限は、EC2 のインスタンスに付けた IAM ロールから得る（docker/README/logs.md）。
 # ロググループと保存日数は、管理者が先に作る。ロールに保存日数を変える権限があると、
 # サーバーを乗っ取られたときに保存日数を縮められ、送ったログを消されてしまうため
 includes:

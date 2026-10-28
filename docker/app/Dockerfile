@@ -1,4 +1,4 @@
-# 本番用のアプリのイメージ。compose.yaml から DB のイメージ（docker/db/）と一緒に起動する
+# 本番用のアプリのイメージ。docker/bake.hcl で作り、compose.yaml から DB のイメージ（docker/db/）と一緒に起動する
 # コンテキストはリポジトリのルート。除外するファイルは、隣の Dockerfile.dockerignore に書く
 # 更新時は `docker buildx imagetools inspect denoland/deno:<タグ>` で manifest list のダイジェストを取得して置き換える
 
@@ -11,7 +11,7 @@ COPY src/ ./src/
 # build タスクがバンドルの前後で import とバンドルの中身を確かめる
 COPY scripts/ ./scripts/
 # 実行時に npm からダウンロードしないよう、DENO_DIR に取得しておく。deno.lock と食い違えば失敗する
-RUN deno task build && deno cache --frozen src/main.ts
+RUN deno task build && deno cache --frozen src/main.ts src/migrate.ts
 
 # ---- runtime: サーバーを実行する ----
 # distroless はシェルやパッケージマネージャを含まないので、攻撃対象を小さくできる

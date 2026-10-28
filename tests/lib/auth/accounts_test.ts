@@ -288,13 +288,14 @@ Deno.test({
   ignore: MAX === 0,
   async fn() {
     await resetDb();
-    await addAccount();
+    const alice = await addAccount();
     await addAccount("bob");
     const bob = await authenticate("bob", TEST_PASSWORD, undefined, undefined);
     assert.ok(bob.status === "ok" && bob.deviceToken !== undefined);
     const expired = await aliceDevice();
-    await db.query("UPDATE login_devices SET expires_at = $1 WHERE account_id = 1", [
+    await db.query("UPDATE login_devices SET expires_at = $1 WHERE account_id = $2", [
       new Date(Date.now() - 1),
+      alice.id,
     ]);
     await lockAlice();
     for (const token of [bob.deviceToken, expired, "not a token"]) {
@@ -326,12 +327,13 @@ Deno.test({
   async fn() {
     await resetDb();
     await addAccount();
-    await addAccount("bob");
+    const bob = await addAccount("bob");
     const used = await aliceDevice();
     for (let i = 0; i < MAX; i++) await authenticate("alice", "wrong password", undefined, used);
     await authenticate("bob", TEST_PASSWORD, undefined, undefined);
-    await db.query("UPDATE login_devices SET expires_at = $1 WHERE account_id = 2", [
+    await db.query("UPDATE login_devices SET expires_at = $1 WHERE account_id = $2", [
       new Date(Date.now() - 1),
+      bob.id,
     ]);
     await sweepLoginDevices(Date.now());
     assert.deepEqual(await deviceRows(), []);

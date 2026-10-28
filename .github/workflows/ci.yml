@@ -14,8 +14,12 @@ jobs:
     timeout-minutes: 15
     env:
       TEST_DATABASE_URL: postgres://app:app@127.0.0.1:5432/app_test
+      TEST_MIGRATION_DATABASE_URL: postgres://migrator:migrator@127.0.0.1:5432/app_test
       # e2e/deno.json の permissions で、このパスのブラウザだけを読み込み・起動できるようにしている
       PLAYWRIGHT_BROWSERS_PATH: /usr/local/share/ms-playwright
+      # docker/bake.hcl で作るイメージの名前（ci/app:ci など）。CI ではレジストリに push しない
+      IMAGE_PREFIX: ci
+      IMAGE_TAG: ci
     steps:
       # 更新時は `gh api repos/<owner>/<repo>/commits/<タグ> --jq .sha` でコミットを取得して置き換える
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,11 +34,11 @@ jobs:
       # サービスコンテナはリポジトリの Dockerfile からビルドできないので、ここで起動し、初期化はテストの前に待つ
       - name: テスト用の DB を起動する
         run: |
-          docker build -t sugumi-db docker/db
+          docker buildx bake -f docker/bake.hcl --load db
           docker run -d --name db -p 127.0.0.1:5432:5432 \
             -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=admin -e POSTGRES_DB=app_test \
-            -e APP_DB_PASSWORD=app \
-            sugumi-db
+            -e APP_DB_PASSWORD=app -e MIGRATOR_DB_PASSWORD=migrator \
+            ci/db:ci
 
       - run: deno fmt --check
       - run: deno lint
@@ -52,15 +56,26 @@ jobs:
           git diff --exit-code src/routes.gen.ts
       - run: deno task build
       - name: 本番のイメージをビルドする
-        run: docker build -t sugumi-app -f docker/app/Dockerfile .
+        run: docker buildx bake -f docker/bake.hcl --load app
       # CI には送り先がないので、実際に送れるかまでは確かめられない。設定ファイルを読み込めることだけを確かめる
       - name: log-forwarder のイメージをビルドし、設定を確かめる
         run: |
-          docker build -t sugumi-log-forwarder docker/log-forwarder
+          docker buildx bake -f docker/bake.hcl --load log-forwarder
           for destination in cloudwatch internal; do
-            docker run --rm -e SERVER_NAME=ci -e LOG_BUFFER_MAX_SIZE=1G sugumi-log-forwarder \
-              /fluent-bit/bin/fluent-bit -c /fluent-bit/etc/sugumi/$destination.yaml --dry-run
+            docker run --rm -e SERVER_NAME=ci -e LOG_BUFFER_MAX_SIZE=1G ci/log-forwarder:ci \
+              /fluent-bit/bin/fluent-bit -c /fluent-bit/etc/custom/$destination.yaml --dry-run
           done
+      # 振り分け先と証明書はロードバランサーに置くものなので、仮のものを作って設定を読み込めることを確かめる
+      - name: lb のイメージをビルドし、設定を確かめる
+        run: |
+          docker buildx bake -f docker/bake.hcl --load lb
+          install -d "$RUNNER_TEMP/lb/upstream" "$RUNNER_TEMP/lb/certs"
+          cp docker/lb/servers.conf.example "$RUNNER_TEMP/lb/upstream/servers.conf"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=ci \
+            -keyout "$RUNNER_TEMP/lb/certs/privkey.pem" -out "$RUNNER_TEMP/lb/certs/fullchain.pem"
+          docker run --rm \
+            -v "$RUNNER_TEMP/lb/upstream:/etc/nginx/upstream:ro" -v "$RUNNER_TEMP/lb/certs:/etc/nginx/certs:ro" \
+            ci/lb:ci nginx -t
 
       - name: DB の初期化を待つ
         # 初期化の途中は Unix ソケットだけで待ち受けるので、TCP で確かめる
@@ -85,12 +100,20 @@ jobs:
         run: |
           install -d -m 755 "$RUNNER_TEMP/secrets"
           printf '%s' app > "$RUNNER_TEMP/secrets/db_app_password"
-          chmod 644 "$RUNNER_TEMP/secrets/db_app_password"
+          printf '%s' migrator > "$RUNNER_TEMP/secrets/db_migrator_password"
+          chmod 644 "$RUNNER_TEMP/secrets/db_app_password" "$RUNNER_TEMP/secrets/db_migrator_password"
+          # 本番の compose.yaml の migrate と同じく、イメージの src/migrate.ts を migrator で実行する。
+          # deno task test で適用済みなので、イメージの中で実行できることを確かめる
+          docker run --rm --network host \
+            -e DATABASE_URL=postgres://migrator@127.0.0.1:5432/app_test \
+            -e DATABASE_PASSWORD_FILE=/run/secrets/db_migrator_password \
+            -v "$RUNNER_TEMP/secrets:/run/secrets:ro" \
+            ci/app:ci run --cached-only -P src/migrate.ts
           docker run -d --name app --network host \
             -e DATABASE_URL=postgres://app@127.0.0.1:5432/app_test \
             -e DATABASE_PASSWORD_FILE=/run/secrets/db_app_password \
             -v "$RUNNER_TEMP/secrets:/run/secrets:ro" \
-            sugumi-app
+            ci/app:ci
       - name: 本番のイメージに対して e2e/ のテストを実行する
         run: deno task test:e2e
         env:

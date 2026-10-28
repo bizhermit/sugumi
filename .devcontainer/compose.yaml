@@ -9,6 +9,9 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgres://app:app@db:5432/app}
       # deno task test が使う DB。テストはテーブルを空にするので、開発用の DB とは分ける
       TEST_DATABASE_URL: ${TEST_DATABASE_URL:-postgres://app:app@db-test:5432/app_test}
+      # マイグレーション（deno task migrate）の接続先。スキーマを持つ migrator で接続する
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-postgres://migrator:migrator@db:5432/app}
+      TEST_MIGRATION_DATABASE_URL: ${TEST_MIGRATION_DATABASE_URL:-postgres://migrator:migrator@db-test:5432/app_test}
     build:
       # e2e/deno.json・deno.lock を読むため、コンテキストはリポジトリの直下にする。
       # 含めるものは Dockerfile.dockerignore で絞る
@@ -41,6 +44,7 @@ services:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: app
       APP_DB_PASSWORD: app
+      MIGRATOR_DB_PASSWORD: migrator
     volumes:
       # Rebuild しても残す。PostgreSQL 18 のイメージは /var/lib/postgresql の下にバージョンごとのディレクトリを作る
       - db-data:/var/lib/postgresql
@@ -54,6 +58,7 @@ services:
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: app_test
       APP_DB_PASSWORD: app
+      MIGRATOR_DB_PASSWORD: migrator
     tmpfs:
       - /var/lib/postgresql
 

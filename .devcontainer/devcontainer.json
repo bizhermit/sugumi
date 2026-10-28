@@ -1,5 +1,5 @@
 {
-  "name": "sugumi",
+  "name": "myapp",
   "dockerComposeFile": "compose.yaml",
   "service": "dev",
   "workspaceFolder": "/workspace",

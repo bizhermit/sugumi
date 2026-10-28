@@ -1,7 +1,10 @@
-# 社内のログ用のサーバー。アプリのサーバー（リポジトリ直下の compose.yaml）とは別のサーバーで起動する。
-# 値と証明書を用意してから（docker/README.md を参照）、このディレクトリで起動する。
+# ログ用サーバー。アプリサーバー（リポジトリ直下の compose.yaml）とは別のサーバーで起動する。
+# 値と証明書を用意してから（docker/README/log-server.md を参照）、このディレクトリで起動する。
 #
 #   docker compose --env-file .env up -d --build
+
+# ボリュームなどの名前の頭に付く。置いたディレクトリの名前で決まらないよう、固定する
+name: myapp-log-server
 
 services:
   receiver:
@@ -12,8 +15,8 @@ services:
       LOG_SERVER_SHARED_KEY: ${LOG_SERVER_SHARED_KEY:?.env に LOG_SERVER_SHARED_KEY を書いてください}
       LOG_FILE_MAX_SIZE: ${LOG_FILE_MAX_SIZE:-100M}
     ports:
-      # アプリのサーバーからだけ届くよう、Docker の外（DOCKER-USER チェーンやクラウドのセキュリティグループ）で絞る。
-      # Docker が公開するポートは、ufw などの INPUT の規則を通らない（docker/README.md）
+      # アプリサーバーからだけ届くよう、Docker の外（DOCKER-USER チェーンやクラウドのセキュリティグループ）で絞る。
+      # Docker が公開するポートは、ufw などの INPUT の規則を通らない（docker/README/log-server.md）
       - ${LOG_SERVER_LISTEN_ADDRESS:-0.0.0.0}:${LOG_SERVER_PORT:-24224}:24224
     volumes:
       - logs:/logs

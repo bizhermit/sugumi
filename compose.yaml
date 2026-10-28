@@ -1,16 +1,21 @@
-# 本番用。パスワードと設定を docker/.env に書き、--env-file で読み込んで起動する（docker/README.md を参照）。
+# 本番のアプリサーバー。何台でも置ける。パスワードと設定を docker/.env に書き、--env-file で読み込んで起動する（docker/README/setup.md を参照）。
+# DB（docker/db/compose.yaml）とロードバランサー（docker/lb/compose.yaml）は、それぞれ 1 つだけ置く。
 #
-#   docker compose --env-file docker/.env up -d --build
+#   docker compose --env-file docker/.env up -d
+#
+# イメージは、別のサーバーで docker/bake.hcl から作ってレジストリに置いたものを取得する。
+# アプリサーバーにはソースを置かないので、ここではビルドしない
+
+# ボリュームなどの名前の頭に付く。置いたディレクトリの名前で決まらないよう、固定する
+name: myapp
 
 services:
   app:
-    build:
-      # src/ などを含めるため、コンテキストはリポジトリのルートにする
-      context: .
-      dockerfile: docker/app/Dockerfile
+    image: ${IMAGE_PREFIX:?docker/.env に IMAGE_PREFIX を書いてください}/app:${IMAGE_TAG:?docker/.env に IMAGE_TAG を書いてください}
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://app@db:5432/app
+      # DB サーバーへは TLS で接続し、DB の証明書が DB_HOST のものか、DB の CA で確かめる
+      DATABASE_URL: postgres://app@${DB_HOST:?docker/.env に DB_HOST を書いてください}:5432/app?sslmode=verify-full&sslrootcert=/run/secrets/db_ca_cert
       DATABASE_PASSWORD_FILE: /run/secrets/db_app_password
       # docker/.env の値を渡す。書いていなければ空になり、アプリのデフォルト値が使われる。
       # env_file で渡さないのは、docker/.env のパスワードまでアプリの環境変数に入ってしまうため
@@ -31,37 +36,49 @@ services:
       DB_STATEMENT_TIMEOUT_SECONDS: ${DB_STATEMENT_TIMEOUT_SECONDS:-}
     secrets:
       - db_app_password
+      - db_ca_cert
     ports:
-      # Cookie に Secure を付けているので、HTTPS を受けるリバースプロキシを同じサーバーに置き、そこから転送する。
-      # このポートへの接続は、どこからでも APP_NETWORK_GATEWAY から届いたように見える。
-      # TRUSTED_PROXIES を書いたまま 127.0.0.1 以外にも公開すると、外から X-Forwarded-For で接続元を偽れる
-      - 127.0.0.1:3000:3000
-    networks:
-      - default
-      - db
+      # ロードバランサーから届くアドレスで待ち受ける。ロードバランサー以外からの接続は、ファイアウォールで止める。
+      # ロードバランサーが同じサーバーにあるなら 127.0.0.1 にする。127.0.0.1 への接続は、APP_NETWORK_GATEWAY から届いたように見える
+      - ${APP_LISTEN_ADDRESS:-127.0.0.1}:3000:3000
     # ログ（1 行の JSON）を、同じサーバーの log-forwarder に渡す。送り先は log-forwarder が LOG_DESTINATION で決める
     logging:
       driver: fluentd
       options:
         # Docker がホストから接続する。log-forwarder（ホストのネットワーク）の待ち受けと揃える
         fluentd-address: 127.0.0.1:24224
-        tag: sugumi.app
+        tag: app
         # log-forwarder の起動を待たずにアプリを起動する。届くまでは Docker がメモリにためて送り直す
         fluentd-async: "true"
+    # DB は別のサーバーにあるので、起動の順番は待てない。DB に接続できないうちは、起動に失敗して起動し直す
     depends_on:
-      db:
-        condition: service_healthy
       log-forwarder:
         condition: service_started
 
-  # アプリのログを受け取り、送り先（CloudWatch か社内のログ用のサーバー）へ送る。届くまではディスクにためる
+  # マイグレーション（src/migrate.ts）。常には動かさず、アプリを更新するときに、1 台のアプリサーバーだけで実行する。
+  #
+  #   docker compose --env-file docker/.env run --rm migrate
+  #
+  # スキーマを変えられる migrator のパスワードは、ここにだけ渡す。乗っ取られても取られないよう、常に動いている app には渡さない
+  migrate:
+    image: ${IMAGE_PREFIX:?docker/.env に IMAGE_PREFIX を書いてください}/app:${IMAGE_TAG:?docker/.env に IMAGE_TAG を書いてください}
+    profiles: [migrate]
+    command: ["run", "--cached-only", "-P", "src/migrate.ts"]
+    environment:
+      DATABASE_URL: postgres://migrator@${DB_HOST:?docker/.env に DB_HOST を書いてください}:5432/app?sslmode=verify-full&sslrootcert=/run/secrets/db_ca_cert
+      DATABASE_PASSWORD_FILE: /run/secrets/db_migrator_password
+    secrets:
+      - db_migrator_password
+      - db_ca_cert
+
+  # アプリのログを受け取り、送り先（CloudWatch かログ用サーバー）へ送る。届くまではディスクにためる
   log-forwarder:
-    build: ./docker/log-forwarder
+    image: ${IMAGE_PREFIX:?docker/.env に IMAGE_PREFIX を書いてください}/log-forwarder:${IMAGE_TAG:?docker/.env に IMAGE_TAG を書いてください}
     restart: unless-stopped
     command:
       - /fluent-bit/bin/fluent-bit
       - -c
-      - /fluent-bit/etc/sugumi/${LOG_DESTINATION:?docker/.env に LOG_DESTINATION（cloudwatch か internal）を書いてください}.yaml
+      - /fluent-bit/etc/custom/${LOG_DESTINATION:?docker/.env に LOG_DESTINATION（cloudwatch か internal）を書いてください}.yaml
     environment:
       SERVER_NAME: ${SERVER_NAME:?docker/.env に SERVER_NAME を書いてください}
       LOG_BUFFER_MAX_SIZE: ${LOG_BUFFER_MAX_SIZE:-5G}
@@ -77,35 +94,15 @@ services:
     network_mode: host
     volumes:
       - log-buffer:/fluent-bit/buffer
+      # internal で、ログ用サーバーの証明書を確かめる CA の証明書（log-server-ca.crt）。cloudwatch では空でよい。
+      # サーバーごとに違うので、イメージには入れず、アプリサーバーに置いたものを読む
+      - ./docker/log-forwarder/certs:/fluent-bit/etc/custom/certs:ro
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
 
-  db:
-    build: ./docker/db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
-      POSTGRES_DB: app
-      APP_DB_PASSWORD_FILE: /run/secrets/db_app_password
-    secrets:
-      - db_admin_password
-      - db_app_password
-    volumes:
-      # PostgreSQL 18 のイメージは /var/lib/postgresql の下にバージョンごとのディレクトリを作る
-      - db-data:/var/lib/postgresql
-    networks:
-      - db
-    healthcheck:
-      # 初期化の途中は Unix ソケットだけで待ち受けるので、TCP で確かめて初期化の完了を待つ
-      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "admin", "-d", "app"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
 networks:
-  # 同じサーバーのリバースプロキシから 127.0.0.1:3000 への接続は、アプリにはこのネットワークのゲートウェイから届く。
+  # 同じサーバーのロードバランサーから 127.0.0.1:3000 への接続は、アプリにはこのネットワークのゲートウェイから届く。
   # 作り直すたびにアドレスが変わると TRUSTED_PROXIES と合わなくなるので、固定する。
   # サーバーのほかのネットワークと重ならない範囲はサーバーごとに違うので、docker/.env で指定する
   default:
@@ -113,18 +110,18 @@ networks:
       config:
         - subnet: ${APP_NETWORK_SUBNET:?docker/.env に APP_NETWORK_SUBNET を書いてください}
           gateway: ${APP_NETWORK_GATEWAY:?docker/.env に APP_NETWORK_GATEWAY を書いてください}
-  # DB はこのネットワークだけに置く。internal なので、外部とも通信できない
-  db:
-    internal: true
 
 volumes:
-  db-data:
   log-buffer:
 
 # 環境変数に置くと docker inspect などで見えてしまうので、docker/.env の値からファイルを作り、/run/secrets/ に置く。
 # --env-file を付け忘れると、値がないので起動しない
 secrets:
-  db_admin_password:
-    environment: DB_ADMIN_PASSWORD
   db_app_password:
     environment: DB_APP_PASSWORD
+  # マイグレーションを実行するアプリサーバーにだけ書く
+  db_migrator_password:
+    environment: DB_MIGRATOR_PASSWORD
+  # DB サーバーの証明書を確かめる CA の証明書。サーバーごとに置く（docker/README/db-server.md）
+  db_ca_cert:
+    file: ./docker/certs/db-ca.crt

@@ -1,30 +1,62 @@
 #!/bin/sh
-# db-backup で取ったバックアップを標準入力から読み、スキーマ app のテーブルをその内容で置き換える。
-# アプリを止めてから実行し、終わったら起動し直す。アプリは起動時のマイグレーションの後のテーブルを前提に動くため。
+# db-backup で取ったバックアップを標準入力から読み、DB ユーザー migrator が持つスキーマを、その内容で置き換える。
+# アプリを止めてから実行し、終わったら起動し直す。アプリは起動時に、スキーマのバージョンが自身と同じかを確かめるため。
 #
-# すべてを、アプリと同じ DB のユーザー app で、1 つのトランザクションで実行する。
-# - 管理者で実行すると、app が仕込んだ関数（CHECK 制約など）が、データを入れるときに管理者の権限で動く。
-#   アプリを乗っ取られた後の復元で、DB の管理者やコンテナまで乗っ取られてしまう。
-# - どこで失敗しても、中断しても、元のデータのまま残る。
+# すべてを migrator で、1 つのトランザクションで実行する。
+# - 管理者で実行しない。バックアップの中の関数や制約が、データを入れるときに管理者の権限で動いてしまうため。
+#   migrator の関数は、マイグレーションでしか作れない（アプリの app は作れない）。
+# - どこで失敗しても、中断しても、元のデータのまま残る（書き換えられたバックアップを除く。下を参照）。
+#   ただし、バックアップを読み終えた後は、docker compose exec を中断しても、コンテナの中では COMMIT まで進む。
 set -eu
 set -o pipefail
 
 # COMMIT は、バックアップをすべて読めたときだけ送る。途中で失敗したら送らずに終わり、psql の切断でロールバックされる。
-# バックアップより後のマイグレーションで足したテーブルが残らないよう、先にすべてのテーブルを消す。
-# アプリが動いたままだと、テーブルのロックを待ち続けるので、時間を区切って失敗させる。
-# 最後に schema_migrations を読み、アプリのテーブルがないバックアップ（アプリを起動する前に取ったものなど）なら失敗させる。
+# ただし、書き換えられたバックアップは、データの中に COMMIT を埋め込めるので、元のまま残るとは限らない。
+#
+# - search_path を固定し、スキーマの中の同じ名前の関数やビュー（format・pg_namespace など）を使わないようにする。
+# - アプリの接続や、ほかの migrator の接続が残っていたら失敗させる。接続を閉じた後の止め忘れは分からないので、ロックの待ちにも時間を区切る。
+# - migrator のデフォルトの権限が、初期化のとき（docker/db/init/10-app-role.sh）と違えば失敗させる。
+#   作り直すスキーマやテーブルに付いてしまい、pg_dump は REVOKE を書かないので、乗っ取られた migrator が広げた権限が復元の後も残るため。
+# - バックアップより後のマイグレーションで足したスキーマやテーブルが残らないよう、先に migrator のスキーマをすべて消す。
+# - 作り直すテーブルに、migrator のデフォルトの権限（app の読み書き）を付けさせない。付くと、バックアップの権限より広くなる
+#   （pg_dump は、権限をデフォルトとの差ではなく GRANT だけで書くので、schema_migrations のように狭めた権限が戻らない）。
+#   終わったら、docker/db/init/10-app-role.sh と同じ権限に戻す。どちらもトランザクションの中なので、失敗したら元のまま残る。
+# - 最後に schema_migrations を読み、アプリのテーブルがないバックアップ（マイグレーションの前に取ったものなど）なら失敗させる。
 if ! {
   cat <<'SQL'
 BEGIN;
+SET LOCAL search_path = pg_catalog;
 SET LOCAL lock_timeout = '10s';
-SELECT format('DROP TABLE app.%I CASCADE', tablename) FROM pg_tables WHERE schemaname = 'app' \gexec
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_stat_activity WHERE usename = 'app') THEN
+    RAISE EXCEPTION 'アプリが DB に接続しています。アプリを止めてから実行してください';
+  END IF;
+  IF EXISTS (SELECT FROM pg_stat_activity WHERE usename = 'migrator' AND pid <> pg_backend_pid()) THEN
+    RAISE EXCEPTION 'ほかに migrator の接続があります。マイグレーションなどが終わってから実行してください';
+  END IF;
+  IF EXISTS (
+    SELECT FROM pg_default_acl
+    WHERE defaclrole = 'migrator'::regrole AND defaclnamespace = 0
+      AND NOT (defaclobjtype = 'r' AND defaclacl = '{migrator=arwdDxtm/migrator,app=arwd/migrator}'::aclitem[])
+      AND NOT (defaclobjtype = 'S' AND defaclacl = '{migrator=rwU/migrator,app=rU/migrator}'::aclitem[])
+  ) THEN
+    RAISE EXCEPTION 'migrator のデフォルトの権限が初期化のときと違います。docker/README/incident.md の手順で元に戻してください';
+  END IF;
+END
+$$;
+SELECT format('DROP SCHEMA %I CASCADE', nspname) FROM pg_namespace WHERE nspowner = 'migrator'::regrole \gexec
+ALTER DEFAULT PRIVILEGES FOR ROLE migrator REVOKE ALL ON TABLES FROM app;
+ALTER DEFAULT PRIVILEGES FOR ROLE migrator REVOKE ALL ON SEQUENCES FROM app;
 SQL
-  pg_restore --no-owner --no-privileges --file=- || exit 1
+  pg_restore --no-owner --file=- || exit 1
   cat <<'SQL'
+ALTER DEFAULT PRIVILEGES FOR ROLE migrator GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app;
+ALTER DEFAULT PRIVILEGES FOR ROLE migrator GRANT USAGE, SELECT ON SEQUENCES TO app;
 SELECT FROM app.schema_migrations LIMIT 1;
 COMMIT;
 SQL
-} | PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 --no-psqlrc --quiet --username app --dbname "$POSTGRES_DB" >/dev/null; then
-  echo "復元しませんでした。データは元のままです" >&2
+} | PGOPTIONS="-c client_min_messages=warning" psql -v ON_ERROR_STOP=1 --no-psqlrc --quiet --username migrator --dbname "$POSTGRES_DB" >/dev/null; then
+  echo "復元に失敗しました" >&2
   exit 1
 fi
