@@ -116,7 +116,9 @@ Deno.test("db: アプリの DB ユーザーは、マイグレーションの記�
 Deno.test("db: SCHEMA_VERSION は、docker/db/migrations/ の最後のマイグレーションの番号と同じ", async () => {
   let last = 0;
   for await (const entry of Deno.readDir("docker/db/migrations")) {
-    if (entry.name.endsWith(".sql")) last = Math.max(last, Number(entry.name.slice(0, 4)));
+    if (entry.name.endsWith(".sql")) {
+      last = Math.max(last, Number(entry.name.slice(0, 4)));
+    }
   }
   assert.equal(last, SCHEMA_VERSION);
 });

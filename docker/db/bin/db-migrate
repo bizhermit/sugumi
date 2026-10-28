@@ -64,14 +64,14 @@ SELECT :from_version >= $version AS skip \gset
 \else
 \echo 適用します: $name
 \set migration \`cat '$file'\`
-SELECT set_config('myapp.migration', :'migration', true);
+SELECT set_config('migration.sql', :'migration', true);
 DO \$\$
 BEGIN
   -- cat が失敗しても psql は空の値で続ける（ON_ERROR_STOP では止まらない）。何も実行せずに適用済みにしない
-  IF current_setting('myapp.migration') = '' THEN
+  IF current_setting('migration.sql') = '' THEN
     RAISE EXCEPTION 'マイグレーションのファイルを読めないか、空です: $name';
   END IF;
-  EXECUTE current_setting('myapp.migration');
+  EXECUTE current_setting('migration.sql');
 END
 \$\$;
 INSERT INTO schema_migrations (version) VALUES ($version);
