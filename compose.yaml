@@ -39,7 +39,9 @@ services:
       - db_ca_cert
     ports:
       # ロードバランサーから届くアドレスで待ち受ける。ロードバランサー以外からの接続は、ファイアウォールで止める。
-      # ロードバランサーが同じサーバーにあるなら 127.0.0.1 にする。127.0.0.1 への接続は、APP_NETWORK_GATEWAY から届いたように見える
+      # ロードバランサーが同じサーバーにあるなら 127.0.0.1 にする。127.0.0.1 への接続は、APP_NETWORK_GATEWAY から届いたように見える。
+      # TRUSTED_PROXIES を書いたまま、ロードバランサー以外からも届くようにすると、X-Forwarded-For で接続元を偽れる
+      # （docker/README/load-balancer.md の「接続元を偽装される条件」）
       - ${APP_LISTEN_ADDRESS:-127.0.0.1}:3000:3000
     # ログ（1 行の JSON）を、同じサーバーの log-forwarder に渡す。送り先は log-forwarder が LOG_DESTINATION で決める
     logging:
