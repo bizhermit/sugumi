@@ -1,6 +1,7 @@
 {
   "exclude": [
-    "e2e/"
+    "e2e/",
+    "local/"
   ],
   "lock": {
     "frozen": true

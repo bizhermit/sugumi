@@ -30,6 +30,7 @@ bench/            性能の計測。src/ と同じ構成で *_bench.ts を置く
 e2e/              ブラウザで画面を動かすテスト。専用の deno.json・deno.lock を持つ。src/ と同じ構成で *_test.ts を置く
   _support/       複数のテストで使う部品
 .github/workflows/  CI
+local/            手元だけで使うファイル（メモ・試作・調査の資料など）。コミットせず、deno の fmt・lint・check・test の対象にもしない
 ```
 
 - 依存の向きは `routes → web → lib` の一方向にする。逆向きに import しない。

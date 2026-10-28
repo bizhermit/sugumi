@@ -42,6 +42,9 @@ __pycache__/
 # Data
 /data/
 
+# 手元だけで使うファイル（CLAUDE.md のディレクトリ構成を参照）
+/local/
+
 # 証明書の秘密鍵・署名の要求・通し番号（docker/README/log-server.md・db-server.md の手順で作る）。手順を誤ってリポジトリの中で作っても、コミットしない
 *.key
 *.csr
