@@ -3,22 +3,19 @@
 # スキーマを持つ DB ユーザー migrator で実行する。アプリ（app）はスキーマを変更できず、マイグレーションにも関わらない。
 #
 # - 本番：DB のコンテナの中で、引数なしで実行する（docker compose exec db db-migrate）。コンテナの中からはパスワードなしで接続できる。
-# - 開発・テスト：deno task migrate・migrate:test が、接続先の URL を引数に、MIGRATIONS_DIR にリポジトリのディレクトリを渡す。
+# - 開発・テスト：deno task migrate・migrate:test（scripts/migrate.ts）が、接続先の URL を引数に、MIGRATIONS_DIR にリポジトリのディレクトリを渡す。
 #
 # ファイル名は「4 桁の番号_説明.sql」（英小文字・数字・_・-）。番号は 0001 から欠けずに続け、適用済みのファイルは書き換えない。
-# 番号が schema_migrations のバージョンになる。アプリは、src/lib/db.ts の SCHEMA_VERSION と同じでないと起動しない。
+# 番号が schema_migrations のバージョンになる。アプリは、src/lib/schema-version.ts の SCHEMA_VERSION と同じでないと起動しない。
 set -eu
 
-dir=${MIGRATIONS_DIR:-/migrations}
+# psql のバッククォートの中では、: で始まる変数が展開され、バッククォートで区切られる。
+# パスに何が入っていても読めるよう、ディレクトリはシェルの環境変数で渡し、psql にはその名前と確かめたファイル名だけを書く
+MIGRATIONS_DIR=${MIGRATIONS_DIR:-/migrations}
+export MIGRATIONS_DIR
 
 # 適用する SQL を組み立てる。ファイル名を先にすべて確かめ、1 つでもおかしければ、何も適用せずに終わる
 build() {
-  case $dir in
-  *"'"*)
-    echo "MIGRATIONS_DIR に ' を含められません: $dir" >&2
-    exit 1
-    ;;
-  esac
   cat <<'SQL'
 \o /dev/null
 BEGIN;
@@ -33,7 +30,7 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON schema_migrations FROM app;
 SELECT coalesce(max(version), 0) AS from_version FROM schema_migrations \gset
 SQL
   expected=1
-  for file in "$dir"/*.sql; do
+  for file in "$MIGRATIONS_DIR"/*.sql; do
     [ -e "$file" ] || break
     name=${file##*/}
     case $name in
@@ -63,7 +60,7 @@ SELECT :from_version >= $version AS skip \gset
 \if :skip
 \else
 \echo 適用します: $name
-\set migration \`cat '$file'\`
+\set migration \`cat "\$MIGRATIONS_DIR/$name"\`
 SELECT set_config('migration.sql', :'migration', true);
 DO \$\$
 BEGIN
