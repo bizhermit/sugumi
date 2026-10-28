@@ -10,9 +10,13 @@ set -eu
 schemas=$(psql --no-psqlrc -At --username migrator --dbname "$POSTGRES_DB" \
   -c "SELECT quote_ident(nspname) FROM pg_catalog.pg_namespace WHERE nspowner = 'migrator'::regrole ORDER BY 1")
 set --
-for schema in $schemas; do
+# 引用符を付けた名前は空白や * を含みうるので、シェルに分割・展開させず、1 行ずつ読む
+while IFS= read -r schema; do
+  [ -n "$schema" ] || continue
   set -- "$@" "--schema=$schema"
-done
+done <<EOF
+$schemas
+EOF
 if [ $# -eq 0 ]; then
   echo "migrator が持つスキーマがありません" >&2
   exit 1
