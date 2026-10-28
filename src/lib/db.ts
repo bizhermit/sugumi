@@ -1,5 +1,6 @@
 /**
- * アプリの DB の接続。DB ユーザー app で接続し、テーブルの読み書きだけができる。スキーマの変更は ./migrations.ts で行う。
+ * アプリの DB の接続。DB ユーザー app で接続し、テーブルの読み書きだけができる。
+ * スキーマの変更（マイグレーション）は、アプリとは別に docker/db/migrations/ の SQL を db-migrate で適用する。
  *
  * クエリの値は必ずパラメータ（$1 など）で渡す。SQL の文字列に値を連結しない。
  * await のたびに別のリクエストの処理が割り込み、アプリが複数のインスタンスで動くこともある。
@@ -14,7 +15,12 @@ import {
   DB_STATEMENT_TIMEOUT_SECONDS,
 } from "./env.ts";
 import { logError } from "./log.ts";
-import { MIGRATIONS } from "./migrations.ts";
+
+/**
+ * アプリが前提にする DB スキーマのバージョン。docker/db/migrations/ の最後のファイルの番号と同じにする。
+ * マイグレーションを足したら上げる。食い違うと tests/lib/db_test.ts が失敗する。
+ */
+export const SCHEMA_VERSION = 4;
 
 // query_timeout（クライアント側のタイムアウト）は使わない。タイムアウトしても、接続は送信済みの文のレスポンスを待ったまま Pool に戻り、
 // 次にその接続を使うクエリが後ろで待たされるため。statement_timeout なら DB が文を取り消すので、接続はそのまま使える。
@@ -84,7 +90,7 @@ export async function secret(name: string, bytes: number): Promise<Uint8Array<Ar
   return new Uint8Array(rows[0].value);
 }
 
-// マイグレーションはアプリとは別に、DB ユーザー migrator で実行する（src/migrate.ts）。
+// アプリはマイグレーションを適用せず、バージョンを突き合わせるだけにする。
 // 実行を忘れたまま、またはアプリより新しい DB で動くと、テーブルや列がずれたまま書き込んでしまうので、起動させない。
 async function checkSchemaVersion() {
   let version: number;
@@ -98,9 +104,9 @@ async function checkSchemaVersion() {
     if ((e as { code?: unknown }).code !== "42P01") throw e;
     version = 0;
   }
-  if (version !== MIGRATIONS.length) {
+  if (version !== SCHEMA_VERSION) {
     throw new Error(
-      `DB のスキーマのバージョンがアプリと合いません。マイグレーションを実行してください: DB ${version}、アプリ ${MIGRATIONS.length}`,
+      `DB のスキーマのバージョンがアプリと合いません。マイグレーションを実行してください: DB ${version}、アプリ ${SCHEMA_VERSION}`,
     );
   }
 }

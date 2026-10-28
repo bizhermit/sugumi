@@ -32,35 +32,28 @@
       docker compose --env-file .env up -d
       ```
 
-3. すべてのアプリサーバーで、ファイルとタグを新しくし、イメージを取得する。まだ起動しない。
+3. DB サーバーで、マイグレーションを実行する（「[マイグレーションの実行方法](migration.md#マイグレーションの実行方法)」）。
+   アプリの起動では適用されないので、DB スキーマが変わらない更新でも行う。
+
+   ```sh
+   docker compose --env-file .env exec db db-migrate
+   ```
+
+4. すべてのアプリサーバーで、ファイルとタグを新しくし、起動する。
    1. [compose.yaml](../../compose.yaml) を、イメージをビルドしたのと同じコミットのものに置き換える。
       [docker/.env.example](../.env.example) に増えた値があれば、`docker/.env` にも書く。
    2. `docker/.env` の `IMAGE_TAG` を、新しいイメージのタグに書き換える。
-   3. レジストリにログインし（「[イメージのビルド方法](build.md)」の手順の 2 と同じ）、イメージを取得する。
+   3. レジストリにログインし（「[イメージのビルド方法](build.md)」の手順の 2 と同じ）、イメージを取得して起動する。
 
       ```sh
       docker compose --env-file docker/.env pull
+      docker compose --env-file docker/.env up -d
       ```
 
-4. マイグレーションを実行するアプリサーバー（`DB_MIGRATOR_PASSWORD` を書いたサーバー）で、マイグレーションを実行する。
-
-   ```sh
-   docker compose --env-file docker/.env run --rm migrate
-   ```
-
-   - 適用したときは `マイグレーションを適用しました: 4 → 5` のように、なければ `適用するマイグレーションはありません: 5` と出る。
-   - 1 つのトランザクションで適用するので、失敗したときは元のスキーマのまま残る。
-     アプリは起動せず、「[マイグレーションに失敗した](troubleshooting.md#マイグレーションに失敗した)」を参照する。
-
-5. すべてのアプリサーバーで、アプリを起動する。
-
-   ```sh
-   docker compose --env-file docker/.env up -d
-   ```
-
-6. ロードバランサーを、手順 2 と同じように更新する（`/opt/myapp-lb` で、[docker/lb/compose.yaml](../lb/compose.yaml)・[docker/lb/.env.example](../lb/.env.example) を使う）。
+5. ロードバランサーを、手順 2 と同じように更新する（`/opt/myapp-lb` で、[docker/lb/compose.yaml](../lb/compose.yaml)・[docker/lb/.env.example](../lb/.env.example) を使う）。
 
 - 更新の間、アプリは止まる。
+- 更新を戻すときは、「[マイグレーションの取り消し方法](migration.md#マイグレーションの取り消し方法)」を参照する。
 - アプリは起動時に、DB スキーマのバージョンが自身と同じかを確認し、違えば起動しない。
   マイグレーションを忘れると、`app` が再起動を繰り返す（「[アプリが再起動を繰り返す](troubleshooting.md#アプリが再起動を繰り返す)」）。
 - DB のデータは、DB サーバーのボリュームに残る。DB コンテナを再起動しても消えない。

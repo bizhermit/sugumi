@@ -14,8 +14,9 @@ PostgreSQL を動かすサーバー。1 つだけ置き、すべてのアプリ�
   | `app`       | テーブルの読み書きだけ                         | アプリ                                                     |
 
   アプリを乗っ取られても、テーブルや関数を作成・削除できず、被害はデータの読み書きに留まる。
-- コンテナの外からは、`app` と `migrator` だけが、TLS で、アプリの DB にだけ接続できる（[docker/db/conf/pg_hba.conf](../db/conf/pg_hba.conf)）。
-- 管理者（`admin`）は、コンテナの外から接続できない。管理の作業は、DB サーバーで `docker compose exec` で行う。
+- コンテナの外からは、`app` だけが、TLS で、アプリの DB にだけ接続できる（[docker/db/conf/pg_hba.conf](../db/conf/pg_hba.conf)）。
+- `migrator` と管理者は、コンテナの外から接続できない。マイグレーション・DB バックアップ・管理の作業は、DB サーバーで `docker compose exec` で行う。
+  `migrator` にはパスワードがなく、アプリサーバーにはスキーマを変更できる資格情報を置かない。
 - RDS などのマネージドな DB を使うなら、このページは使わない。
   [docker/db/init/10-app-role.sh](../db/init/10-app-role.sh) と同じ DB ユーザー・スキーマ・権限を作成し、アプリサーバーの `DB_HOST` と CA 証明書を、その DB のものにする。
 
@@ -76,13 +77,19 @@ openssl x509 -req -days 825 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateser
 4. レジストリにログインする（「[イメージのビルド方法](build.md)」の手順の 2 と同じ）。
 
 5. 起動する。初回は、DB ユーザー `app`・`migrator` とスキーマ `app` が作成される。
-   テーブルは、アプリサーバーでマイグレーションを実行したときに作成される（「[アプリサーバーの構築方法](setup.md#アプリサーバーの構築方法)」）。
+   テーブルは、手順の 6 のマイグレーションで作成される。
 
    ```sh
    docker compose --env-file .env up -d
    ```
 
-6. DB バックアップの保存先として、ほかのユーザーが読み書きできないディレクトリを作成する。
+6. マイグレーションを実行し、テーブルを作成する（「[マイグレーションの実行方法](migration.md#マイグレーションの実行方法)」）。
+
+   ```sh
+   docker compose --env-file .env exec db db-migrate
+   ```
+
+7. DB バックアップの保存先として、ほかのユーザーが読み書きできないディレクトリを作成する。
    `/opt/myapp-db` の中には置かない。使い方は「[DB バックアップ](backup.md)」を参照。
 
    ```sh
@@ -104,17 +111,14 @@ DB の初期化（パスワードの設定を含む）は、データのボリ�
    docker compose --env-file .env exec db psql -U admin -d app -c '\password app'
    ```
 
-   `migrator` は `\password migrator`、管理者は `\password admin` で変更する。
+   管理者は `\password admin` で変更する。`migrator` にはパスワードがない（コンテナの中からだけ接続する）。
 
-2. DB サーバーの `.env` の `DB_APP_PASSWORD`（`migrator` なら `DB_MIGRATOR_PASSWORD`、管理者なら `DB_ADMIN_PASSWORD`）を、新しい値に書き換える。
+2. DB サーバーの `.env` の `DB_APP_PASSWORD`（管理者なら `DB_ADMIN_PASSWORD`）を、新しい値に書き換える。
 
 3. `app` のパスワードを変更したときは、すべてのアプリサーバーで、`docker/.env` の `DB_APP_PASSWORD` を書き換え、再起動する。
 
    ```sh
    docker compose --env-file docker/.env up -d --force-recreate app
    ```
-
-4. `migrator` のパスワードを変更したときは、マイグレーションを実行するアプリサーバーで、`docker/.env` の `DB_MIGRATOR_PASSWORD` を書き換える。
-   次にマイグレーションを実行するときから使われる。
 
 確認方法：アプリサーバーで `docker compose --env-file docker/.env ps` を実行し、`app` が再起動を繰り返していない。

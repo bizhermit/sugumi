@@ -7,13 +7,13 @@
 
 ## サーバー構成
 
-| サーバー         | 数     | 起動するもの                                                                                | 手順                                                  |
-| ---------------- | ------ | ------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| ビルド           | 1      | （イメージをビルドするだけ）                                                                | [イメージのビルド方法](build.md)                      |
-| DB               | 1      | [docker/db/compose.yaml](../db/compose.yaml)（`db`）                                        | [DB サーバー](db-server.md)                           |
-| アプリ           | 1 以上 | [compose.yaml](../../compose.yaml)（`app`・`log-forwarder`。1 台では `migrate` も実行する） | [アプリサーバーの構築方法](#アプリサーバーの構築方法) |
-| ロードバランサー | 1      | [docker/lb/compose.yaml](../lb/compose.yaml)（`lb`）                                        | [ロードバランサー](load-balancer.md)                  |
-| ログ用           | 0 か 1 | [docker/log-server/compose.yaml](../log-server/compose.yaml)                                | [ログ用サーバー](log-server.md)                       |
+| サーバー         | 数     | 起動するもの                                                 | 手順                                                  |
+| ---------------- | ------ | ------------------------------------------------------------ | ----------------------------------------------------- |
+| ビルド           | 1      | （イメージをビルドするだけ）                                 | [イメージのビルド方法](build.md)                      |
+| DB               | 1      | [docker/db/compose.yaml](../db/compose.yaml)（`db`）         | [DB サーバー](db-server.md)                           |
+| アプリ           | 1 以上 | [compose.yaml](../../compose.yaml)（`app`・`log-forwarder`） | [アプリサーバーの構築方法](#アプリサーバーの構築方法) |
+| ロードバランサー | 1      | [docker/lb/compose.yaml](../lb/compose.yaml)（`lb`）         | [ロードバランサー](load-balancer.md)                  |
+| ログ用           | 0 か 1 | [docker/log-server/compose.yaml](../log-server/compose.yaml) | [ログ用サーバー](log-server.md)                       |
 
 - DB・アプリ・ロードバランサーを、1 つのサーバーにまとめてもよい（アプリサーバーが 1 台のときなど）。
   - DB の `DB_LISTEN_ADDRESS` は、`127.0.0.1` ではなく、そのサーバーのアドレスにする（「[DB サーバーの構築方法](db-server.md#db-サーバーの構築方法)」）。
@@ -56,7 +56,6 @@
    - 書く値は「[アプリサーバー（docker/.env）](env.md#アプリサーバーdockerenv)」を参照。
    - `IMAGE_PREFIX`・`IMAGE_TAG` は、「[イメージのビルド方法](build.md)」で指定したものにする。
    - `SERVER_NAME` は、アプリサーバーごとに違う値にする。
-   - `DB_MIGRATOR_PASSWORD` は、マイグレーションを実行する 1 台にだけ書く。ほかのアプリサーバーでは書かない。
 
    ```sh
    cd /opt/myapp
@@ -76,21 +75,14 @@
 
 6. レジストリにログインする（「[イメージのビルド方法](build.md)」の手順の 2 と同じ）。
 
-7. 1 台目のアプリサーバー（`DB_MIGRATOR_PASSWORD` を書いたサーバー）では、マイグレーションを実行し、DB にテーブルを作成する。
-   2 台目以降では行わない。イメージはレジストリから取得する。
-
-   ```sh
-   docker compose --env-file docker/.env run --rm migrate
-   ```
-
-8. 起動する。
+7. 起動する。
 
    ```sh
    docker compose --env-file docker/.env up -d
    ```
 
 - DB パスワードは、コンテナには環境変数ではなく `/run/secrets/` のファイルとして渡る。
-- `DB_MIGRATOR_PASSWORD`（スキーマを変更できる DB ユーザー `migrator` のパスワード）は、`migrate` にだけ渡り、常に動いている `app` には渡らない。
+- アプリサーバーには、スキーマを変更できる DB ユーザー（`migrator`）の資格情報を置かない。テーブルは、DB サーバーの構築時にマイグレーションで作成してある。
 
 確認方法：
 

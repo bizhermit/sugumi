@@ -10,7 +10,7 @@ services:
   db:
     image: ${IMAGE_PREFIX:?.env に IMAGE_PREFIX を書いてください}/db:${IMAGE_TAG:?.env に IMAGE_TAG を書いてください}
     restart: unless-stopped
-    # コンテナの外からは、app と migrator だけを TLS で受け付ける（conf/pg_hba.conf）
+    # コンテナの外からは、app だけを TLS で受け付ける（conf/pg_hba.conf）
     command:
       - postgres
       - -c
@@ -26,11 +26,9 @@ services:
       POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
       POSTGRES_DB: app
       APP_DB_PASSWORD_FILE: /run/secrets/db_app_password
-      MIGRATOR_DB_PASSWORD_FILE: /run/secrets/db_migrator_password
     secrets:
       - db_admin_password
       - db_app_password
-      - db_migrator_password
     ports:
       # アプリサーバーから届くアドレスで待ち受ける。アプリサーバー以外からの接続は、ファイアウォールで止める
       - ${DB_LISTEN_ADDRESS:?.env に DB_LISTEN_ADDRESS を書いてください}:5432:5432
@@ -55,5 +53,3 @@ secrets:
     environment: DB_ADMIN_PASSWORD
   db_app_password:
     environment: DB_APP_PASSWORD
-  db_migrator_password:
-    environment: DB_MIGRATOR_PASSWORD

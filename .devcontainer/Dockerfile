@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
         locales \
         tzdata \
+        # deno task migrate・migrate:test が docker/db/bin/db-migrate で使用。DB のイメージ（docker/db/Dockerfile）とメジャーバージョンを揃える
+        postgresql-client-18 \
         # postCreate.sh が使用
         python3 \
         python3-openpyxl \

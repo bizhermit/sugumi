@@ -11,7 +11,7 @@ COPY src/ ./src/
 # build タスクがバンドルの前後で import とバンドルの中身を確かめる
 COPY scripts/ ./scripts/
 # 実行時に npm からダウンロードしないよう、DENO_DIR に取得しておく。deno.lock と食い違えば失敗する
-RUN deno task build && deno cache --frozen src/main.ts src/migrate.ts
+RUN deno task build && deno cache --frozen src/main.ts
 
 # ---- runtime: サーバーを実行する ----
 # distroless はシェルやパッケージマネージャを含まないので、攻撃対象を小さくできる

@@ -1,6 +1,6 @@
 #!/bin/sh
 # アプリが使う DB ユーザーと、スキーマ app を作る。
-# - migrator：スキーマとテーブルを持ち、マイグレーション（src/migrate.ts）とバックアップ・復元（db-backup・db-restore）を行う。
+# - migrator：スキーマとテーブルを持ち、マイグレーション・バックアップ・復元（db-migrate・db-backup・db-restore）を行う。
 # - app：アプリが常に接続するユーザー。テーブルの読み書きだけができ、テーブル・関数・トリガーを作ったり消したりできない。
 # アプリを乗っ取られても、データの読み書きより先へは進めないようにするため。
 # 管理者（POSTGRES_USER）でアプリが接続すると、COPY ... TO PROGRAM で DB のコンテナ上でコマンドを実行されたり、
@@ -8,6 +8,8 @@
 #
 # パスワードは、POSTGRES_PASSWORD と同じく、*_FILE（ファイルのパス。compose の secrets 用）か、その名前の環境変数に指定する。
 # app：APP_DB_PASSWORD_FILE か APP_DB_PASSWORD、migrator：MIGRATOR_DB_PASSWORD_FILE か MIGRATOR_DB_PASSWORD。
+# 本番の migrator にはパスワードを付けない。DB のコンテナの中からだけ接続する（conf/pg_hba.conf）ので、要らないため。
+# 開発と CI は、コンテナの外から migrator で接続してマイグレーションを適用するので、パスワードを付ける。
 # このスクリプトは再実行されないので、パスワードを後から変えるときは、管理者で ALTER ROLE ... PASSWORD を実行する。
 set -eu
 
@@ -23,19 +25,16 @@ read_password() {
 
 app_password=$(read_password APP_DB_PASSWORD)
 migrator_password=$(read_password MIGRATOR_DB_PASSWORD)
-# パスワードが空だと、パスワード認証でログインできなくなるので、初期化を止める
+# app はパスワードが空だと、パスワード認証でログインできなくなるので、初期化を止める
 if [ -z "$app_password" ]; then
   echo "app のパスワードがありません。APP_DB_PASSWORD か APP_DB_PASSWORD_FILE を指定してください" >&2
-  exit 1
-fi
-if [ -z "$migrator_password" ]; then
-  echo "migrator のパスワードがありません。MIGRATOR_DB_PASSWORD か MIGRATOR_DB_PASSWORD_FILE を指定してください" >&2
   exit 1
 fi
 
 # パスワードは psql の変数で渡し、:'...' で SQL のリテラルとしてクォートさせる
 psql -v ON_ERROR_STOP=1 -v app_password="$app_password" -v migrator_password="$migrator_password" \
   --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
+-- 空の文字列を渡すと、パスワードなし（パスワード認証ではログインできない）になる
 CREATE ROLE migrator LOGIN PASSWORD :'migrator_password';
 CREATE ROLE app LOGIN PASSWORD :'app_password';
 -- デフォルトでは、どのユーザーもすべての DB に接続でき、一時テーブルを作れる。

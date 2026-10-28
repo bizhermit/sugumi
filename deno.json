@@ -82,7 +82,8 @@
         "dist/test",
         "static",
         "deno.lock",
-        "e2e/deno.lock"
+        "e2e/deno.lock",
+        "docker/db/migrations"
       ],
       "write": [
         "dist/test"
@@ -208,8 +209,8 @@
     "watch": "deno task migrate && deno task build && (deno task gen --watch & deno task bundle --watch & deno run --watch=src/routes/,dist/public/,static/ -P src/main.ts)",
     "gen": "deno run -P=gen scripts/gen-routes.ts",
     "start": "deno run -P src/main.ts",
-    "migrate": "(test -n \"$MIGRATION_DATABASE_URL\" || (echo '環境変数 MIGRATION_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$MIGRATION_DATABASE_URL deno run -P src/migrate.ts",
-    "migrate:test": "(test -n \"$TEST_MIGRATION_DATABASE_URL\" || (echo '環境変数 TEST_MIGRATION_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_MIGRATION_DATABASE_URL deno run -P src/migrate.ts",
+    "migrate": "(test -n \"$MIGRATION_DATABASE_URL\" || (echo '環境変数 MIGRATION_DATABASE_URL を設定してください' >&2 && exit 1)) && MIGRATIONS_DIR=docker/db/migrations sh docker/db/bin/db-migrate \"$MIGRATION_DATABASE_URL\"",
+    "migrate:test": "(test -n \"$TEST_MIGRATION_DATABASE_URL\" || (echo '環境変数 TEST_MIGRATION_DATABASE_URL を設定してください' >&2 && exit 1)) && MIGRATIONS_DIR=docker/db/migrations sh docker/db/bin/db-migrate \"$TEST_MIGRATION_DATABASE_URL\"",
     "build": "rm -rf dist/public && deno task check:imports && deno task bundle && deno task check:bundle",
     "bundle": "deno bundle --platform browser --minify --sourcemap=external --code-splitting --outdir dist/public src/**/_assets/index.ts src/**/_assets/index.css",
     "check:imports": "deno run -P=check-imports scripts/check-imports.ts",

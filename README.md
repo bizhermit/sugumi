@@ -35,7 +35,7 @@ deno task dev       # マイグレーションを適用し、開発サーバー�
 deno task dev:mock  # 開発サーバーを APP_MODE=MOCK で起動（routes の *.mock.* を使う）
 deno task dev:prod  # 開発サーバーを APP_MODE=PROD で起動
 deno task build  # クライアントコードをバンドル
-deno task migrate  # 開発用 DB にマイグレーションを適用（MIGRATION_DATABASE_URL の DB を使う）
+deno task migrate  # 開発用 DB にマイグレーション（docker/db/migrations/）を適用（MIGRATION_DATABASE_URL の DB を使う。psql が必要）
 deno task start  # サーバー起動（先に deno task build と deno task migrate が必要）
 deno task account:add <ユーザー名> <表示名>  # アカウントを追加（パスワードは入力を求める）
 deno task account:unlock <アカウントの id>  # ロックしたアカウントを解除

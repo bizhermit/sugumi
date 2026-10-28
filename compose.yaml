@@ -55,22 +55,6 @@ services:
       log-forwarder:
         condition: service_started
 
-  # マイグレーション（src/migrate.ts）。常には動かさず、アプリを更新するときに、1 台のアプリサーバーだけで実行する。
-  #
-  #   docker compose --env-file docker/.env run --rm migrate
-  #
-  # スキーマを変えられる migrator のパスワードは、ここにだけ渡す。乗っ取られても取られないよう、常に動いている app には渡さない
-  migrate:
-    image: ${IMAGE_PREFIX:?docker/.env に IMAGE_PREFIX を書いてください}/app:${IMAGE_TAG:?docker/.env に IMAGE_TAG を書いてください}
-    profiles: [migrate]
-    command: ["run", "--cached-only", "-P", "src/migrate.ts"]
-    environment:
-      DATABASE_URL: postgres://migrator@${DB_HOST:?docker/.env に DB_HOST を書いてください}:5432/app?sslmode=verify-full&sslrootcert=/run/secrets/db_ca_cert
-      DATABASE_PASSWORD_FILE: /run/secrets/db_migrator_password
-    secrets:
-      - db_migrator_password
-      - db_ca_cert
-
   # アプリのログを受け取り、送り先（CloudWatch かログ用サーバー）へ送る。届くまではディスクにためる
   log-forwarder:
     image: ${IMAGE_PREFIX:?docker/.env に IMAGE_PREFIX を書いてください}/log-forwarder:${IMAGE_TAG:?docker/.env に IMAGE_TAG を書いてください}
@@ -119,9 +103,6 @@ volumes:
 secrets:
   db_app_password:
     environment: DB_APP_PASSWORD
-  # マイグレーションを実行するアプリサーバーにだけ書く
-  db_migrator_password:
-    environment: DB_MIGRATOR_PASSWORD
   # DB サーバーの証明書を確かめる CA の証明書。サーバーごとに置く（docker/README/db-server.md）
   db_ca_cert:
     file: ./docker/certs/db-ca.crt
