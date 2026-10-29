@@ -4,7 +4,7 @@
 
 - アサーションは `node:assert/strict` を使う。ライブラリは足さない。
 - ディレクトリやファイルを読む処理には、`tests/_support/fixture.ts` の `withTempDir()` で `dist/test/` にテスト用のものを作って渡す。
-  - そのために、読む場所を引数で受け取れるようにしておく（`loadRouter()` の `root`、`createApp()` の `routes`・`staticDir` など）。
+  - そのために読む場所を引数で受け取れるようにしておく（`loadRouter()` の `root`、`createApp()` の `routes`・`staticDir` など）。
 - 環境変数の検証は、`src/lib/env.ts` の `parse` で始まる関数に値を直接渡して確かめる。
 - テストは環境変数 `TEST_DATABASE_URL` の DB を使う。開発用の DB とは分ける。
   - 本番と同じく、アプリの DB ユーザー `app` で接続する。テーブルの読み書きしかできないので、テストでも `TRUNCATE` やテーブルの作成はできない。

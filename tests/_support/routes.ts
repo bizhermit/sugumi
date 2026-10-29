@@ -25,7 +25,7 @@ export function handler(name: string): string {
 
 /**
  * main を `[name main]` の形で包み、slots.aside があれば `{aside}` も付ける layout の、ファイルの中身を返す。
- * title には、default export の title に書く式のソースを渡す（例：`"サイト"`、`(t: string) => t + " - 管理"`）。
+ * title には default export の title に書く式のソースを渡す（例：`"サイト"`, `(t: string) => t + " - 管理"`）。
  */
 export function layout(name: string, title?: string): string {
   return `import { jsxTemplate } from ${JSON.stringify(JSX_RUNTIME)};

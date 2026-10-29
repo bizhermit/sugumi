@@ -5,14 +5,14 @@ description: src/lib/html-attributes.ts の JSX の属性の型に、MDN の情�
 
 # HTML の属性の型を追加・更新する
 
-`src/lib/html-attributes.ts` の `HtmlElements` は、JSX で属性を型チェックするタグと、その属性の一覧。ここにないタグには、どの属性でも書ける。このスキルでは、MDN をもとにタグを足したり、既存のタグを最新の仕様と対応状況に合わせたりする。
+[src/lib/html-attributes.ts](../../../src/lib/html-attributes.ts) の `HtmlElements` は、JSX で属性を型チェックするタグと、その属性の一覧。ここにないタグには、どの属性でも書ける。このスキルでは、MDN をもとにタグを足したり、既存のタグを最新の仕様と対応状況に合わせたりする。
 
 ## 1. 対象を決める
 
 - 引数や依頼にタグ名があれば、それを対象にする。全要素共通の属性（`Global`）を見直すときは `global` を対象にする。
 - 「全部更新」なら、`HtmlElements` のすべてのキーと `global` を対象にする。
 - 対象が分からなければ、ユーザーに聞く。
-- 先に `src/lib/html-attributes.ts` を読み、いまの型と書き方を把握する。
+- 先に [src/lib/html-attributes.ts](../../../src/lib/html-attributes.ts) を読み、いまの型と書き方を把握する。
 
 ## 2. 情報を集める
 
@@ -20,7 +20,7 @@ description: src/lib/html-attributes.ts の JSX の属性の型に、MDN の情�
 
 ### 対応状況：compat.ts
 
-このスキルのディレクトリにある `compat.ts` を、対象ごとに実行する。
+このスキルのディレクトリにある [compat.ts](compat.ts) を、対象ごとに実行する。
 
 ```sh
 deno run --allow-net=raw.githubusercontent.com .claude/skills/html-attribute-types/compat.ts <対象>
@@ -86,11 +86,18 @@ https://raw.githubusercontent.com/mdn/content/main/files/en-us/<スラッグを�
 - 複数のタグで同じ値の組み合わせを使うものは、既存の型（`Target`・`FormMethod` など）を使うか、新しく型にまとめる。
 - 型は `interface` ではなく `type` で書く。`Record<string, unknown>` に代入できるようにするため。
 - タグは、似た用途のタグの近くに置く。
-- コメントは、コードを読んでも分からない制約だけを書く（CLAUDE.md の「コメント」に従う）。
+- コメントは、コードを読んでも分からない制約だけを書く（[CLAUDE.md](../../../CLAUDE.md) の「コメント」に従う）。
 
 ## 5. 確かめる
 
-1. `deno fmt src/lib/html-attributes.ts`、`deno check src scripts`、`deno lint` を実行する。
+1. 整形・型チェック・lint を実行する。
+
+   ```sh
+   deno fmt src/lib/html-attributes.ts
+   deno check src scripts
+   deno lint
+   ```
+
    - 既存のページが型エラーになったら、型の誤りか、ページの誤りかを見分けてユーザーに伝える。
 2. 足した・変えたタグについて、正しい書き方が通り、誤りが型エラーになることを確かめる。
    - スクラッチパッドに次の `deno.json` を置き、`<リポジトリ>` を絶対パスにする。
@@ -104,7 +111,7 @@ https://raw.githubusercontent.com/mdn/content/main/files/en-us/<スラッグを�
 
    - 同じディレクトリに `.tsx` を書き、`deno check` する。
      - 足した属性を正しい値で書いたもの：通ること。
-     - 属性名のスペルミス、決まった値以外の値：エラーになること。
+     - 属性名のスペルミス、または決まった値以外の値：エラーになること。
 
 ## 6. 報告する
 

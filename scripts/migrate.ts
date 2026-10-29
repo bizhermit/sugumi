@@ -39,7 +39,7 @@ if (import.meta.main) {
 /**
  * 接続先の URL を、パスワードを除いた URL と、デコードしたパスワードに分ける。
  * パスワードはユーザー名の後ろに書いたものだけを受け付ける。なければ undefined にする。
- * postgres:// の URL として読めなければ invalid を返す（key=value の形式や、複数のホストを書いた URL、
+ * postgres:// の URL として読めなければ invalid を返す（key=value の形式や複数のホストを書いた URL、
  * パスワードの % の後ろが 16 進数 2 桁でない URL など）。
  * クエリにパスワード（?password=）があっても invalid を返す。URLSearchParams は + を空白に読むが、
  * libpq は + をそのまま読むので、正しく取り出すにはクエリを自前でパースすることになるため。

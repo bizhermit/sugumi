@@ -7,7 +7,8 @@
 # サーバーの設定を変えられたりするので、どちらも管理者とは分けている。
 #
 # パスワードは、POSTGRES_PASSWORD と同じく、*_FILE（ファイルのパス。compose の secrets 用）か、その名前の環境変数に指定する。
-# app：APP_DB_PASSWORD_FILE か APP_DB_PASSWORD、migrator：MIGRATOR_DB_PASSWORD_FILE か MIGRATOR_DB_PASSWORD。
+# - app：APP_DB_PASSWORD_FILE か APP_DB_PASSWORD
+# - migrator：MIGRATOR_DB_PASSWORD_FILE か MIGRATOR_DB_PASSWORD
 # 本番の migrator にはパスワードを付けない。DB のコンテナの中からだけ接続する（conf/pg_hba.conf）ので、要らないため。
 # 開発と CI は、コンテナの外から migrator で接続してマイグレーションを適用するので、パスワードを付ける。
 # このスクリプトは再実行されないので、パスワードを後から変えるときは、管理者で ALTER ROLE ... PASSWORD を実行する。

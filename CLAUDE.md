@@ -48,7 +48,7 @@ local/            手元だけで使うファイル（メモ・試作・調査�
     - ルートでないディレクトリにも置ける。
     - `src/routes/` に近いものから順に実行し、最後に `before.ts` を実行する。
     - 置いたディレクトリ自身を除きたいときは、`before.tree.ts` の中で `ctx.route` を見て分岐する。
-      - `ctx.route` は、マッチしたルートのパターン（例：`"/admin"`、`"/user/[id]"`）。
+      - `ctx.route` は、マッチしたルートのパターン（例：`"/admin"`, `"/user/[id]"`）。
       - `req.url` の pathname で判定しない。`/%61dmin` も `/admin` にマッチするため。
   - 405 を返すときは、どの before も実行しない。
   - すべてのルートは、デフォルトでログインを求める（`src/routes/before.tree.ts`）。
@@ -93,7 +93,7 @@ local/            手元だけで使うファイル（メモ・試作・調査�
     - マイグレーションは適用しない。`deno task migrate:test`（`TEST_MIGRATION_DATABASE_URL` の同じ DB に `migrator` で接続する）で適用しておく。
       - DevContainer は起動のたびに適用する（`.devcontainer/postStart.sh`）。マイグレーションを足したときは、手で実行する。
   - `dist/public/` を読み込むテスト（`src/web/app.ts` の `createApp()` や `src/web/assets.ts` を使うもの）は、先に `deno task build` が要る。
-- `src/`・`scripts/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`、`scripts/gen-routes.ts` → `tests/scripts/gen-routes_test.ts`）。
+- `src/`・`scripts/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`, `scripts/gen-routes.ts` → `tests/scripts/gen-routes_test.ts`）。
   - 書き方は `tests/CLAUDE.md` に従う。
 - `_assets/` の JS と、画面が CSP の違反なく動くことは、`e2e/` のテストでブラウザを動かして確かめる。`deno task test:e2e` で実行する。
   - 書き方は `e2e/CLAUDE.md` に従う。
@@ -104,14 +104,13 @@ local/            手元だけで使うファイル（メモ・試作・調査�
 ## ライブラリ
 
 - フレームワーク・ライブラリは使わない。
-  - 例外：サーバーから外部サービスに接続するためのクライアントライブラリ。
-    - DB のドライバ、外部 API の SDK など。
-  - 例外：テストで、Deno と標準の API ではできないことをするためのライブラリ。
-    - ブラウザを操作する Playwright など。
-    - アサーション・モック・テストランナーは含めない（`node:assert/strict` と `deno test` を使う）。
-    - ルートの `deno.json` には入れず、`e2e/` のように別の `deno.json` を持つディレクトリに入れる。
-      - ルートの `deno.lock` にある npm のパッケージは、import していなくても本番のイメージに入るため。
-      - `e2e/deno.lock` のパッケージ（推移的な依存を含む）がルートの `deno.lock` にないことを、`tests/scripts/test-e2e_test.ts` で確かめている。
+  - 例外：
+    - サーバーから外部サービスに接続するためのクライアントライブラリ（DB のドライバ、外部 API の SDK など）。
+    - テストで、Deno と標準の API ではできないことをするためのライブラリ（ブラウザを操作する Playwright など）。
+      - アサーション・モック・テストランナーは含めない（`node:assert/strict` と `deno test` を使う）。
+      - ルートの `deno.json` には入れず、`e2e/` のように別の `deno.json` を持つディレクトリに入れる。
+        - ルートの `deno.lock` にある npm のパッケージは、import していなくても本番のイメージに入るため。
+        - `e2e/deno.lock` のパッケージ（推移的な依存を含む）がルートの `deno.lock` にないことを、`tests/scripts/test-e2e_test.ts` で確かめている。
   - ブラウザで読み込む外部のスクリプト（解析ツールのタグなど）は、例外に含めない。
     - CSP を緩める必要があるため、個別に判断する。
 - 追加するときは、`deno.json` の `imports` に正確なバージョンで書き、`deno.lock` もコミットする。
@@ -204,7 +203,7 @@ local/            手元だけで使うファイル（メモ・試作・調査�
   - ただし、次のときはファイルの中だけで使う関数でも書く。
     - 戻り値が union のとき（`| undefined` を含む）。返しうる結果を型で示し、`return` を足したときに結果の種類が黙って増えないようにするため。判別 union は、推論すると `status` が `string` に広がり、判別できなくなる。
     - 推論では意図した型にならないとき（再帰する関数、`any` や広すぎる型になるとき）。
-- 想定内の失敗（パスワードの誤り、ロックなど）は、例外にせず `status` で判別する union で返す。結果が 2 通りでも `status` にする。
+- 想定内の失敗（パスワードの誤り、ロックなど）は例外にせず、`status` で判別する union で返す。結果が 2 通りでも `status` にする。
   - 例：`{ status: "ok"; account: Account } | { status: "locked" }`
   - 例外は想定外のことだけに使う。
 - 中身ごと変わらないモジュールの定数（固定の値・正規表現・固定の `Set` など）は `UPPER_SNAKE_CASE`、中身が変わるものやインスタンスは camelCase にする。

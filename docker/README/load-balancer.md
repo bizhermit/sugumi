@@ -122,7 +122,7 @@ HTTPS を受け、アプリサーバーへ振り分ける。1 つだけ置く。
 
 アプリの時間制限（「[アプリの時間制限](env.md#アプリの時間制限)」）を変更したときに見直す。
 
-アプリのタイムアウトは、アプリまで届いた接続にしか効かない。ロードバランサーでも、遅い接続を打ち切る（[nginx.conf](../lb/nginx.conf) の `client_header_timeout`・`client_body_timeout`・`send_timeout`、接続元ごとの同時接続数の `limit_conn`）。
+アプリのタイムアウトは、アプリまで届いた接続にしか効かない。ロードバランサーでも、遅い接続を打ち切る（[nginx.conf](../lb/nginx.conf) の `client_header_timeout`, `client_body_timeout`, `send_timeout` と、接続元ごとの同時接続数の `limit_conn`）。
 
 - nginx は、リクエストボディを受け取り終えてからアプリに送る（デフォルトの `proxy_request_buffering on`）。
   - ボディを少しずつ送ってくる接続は、アプリではなく nginx が受け持ち、上の設定で打ち切る。
