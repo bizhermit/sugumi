@@ -22,13 +22,14 @@ build() {
 BEGIN;
 -- 2 人が同時に実行しても、1 つずつ適用する
 SELECT pg_advisory_xact_lock(7316001);
-CREATE TABLE IF NOT EXISTS schema_migrations (
+-- マイグレーションが search_path を変えても、別のスキーマに記録しないよう、スキーマを付けて書く。
+CREATE TABLE IF NOT EXISTS app.schema_migrations (
   version integer PRIMARY KEY,
   applied_at timestamptz NOT NULL DEFAULT now()
 );
 -- アプリが読めるのは、起動時にバージョンを確かめるため。書き換えさせない
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON schema_migrations FROM app;
-SELECT coalesce(max(version), 0) AS from_version FROM schema_migrations \gset
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON app.schema_migrations FROM app;
+SELECT coalesce(max(version), 0) AS from_version FROM app.schema_migrations \gset
 SQL
   expected=1
   for file in "$MIGRATIONS_DIR"/*.sql; do
@@ -72,7 +73,7 @@ BEGIN
   EXECUTE current_setting('migration.sql');
 END
 \$\$;
-INSERT INTO schema_migrations (version) VALUES ($version);
+INSERT INTO app.schema_migrations (version) VALUES ($version);
 \endif
 SQL
     expected=$((expected + 1))
@@ -83,13 +84,13 @@ SQL
   cat <<SQL
 DO \$\$
 BEGIN
-  IF (SELECT max(version) FROM schema_migrations) > $last THEN
-    RAISE EXCEPTION 'DB のスキーマのほうが新しいです。新しいイメージで実行してください: DB %、ファイル %',
-      (SELECT max(version) FROM schema_migrations), $last;
+  IF (SELECT max(version) FROM app.schema_migrations) > $last THEN
+    RAISE EXCEPTION 'DB のスキーマのほうが新しいです。新しいイメージで実行してください: DB % / ファイル %',
+      (SELECT max(version) FROM app.schema_migrations), $last;
   END IF;
 END
 \$\$;
-SELECT coalesce(max(version), 0) AS to_version FROM schema_migrations \gset
+SELECT coalesce(max(version), 0) AS to_version FROM app.schema_migrations \gset
 COMMIT;
 SELECT :from_version = :to_version AS same \gset
 \if :same

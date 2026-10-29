@@ -46,7 +46,7 @@ docker compose --env-file .env exec db psql -U app -d app -c "SELECT version, ap
 
 - `version` が、適用したマイグレーションの番号。最後の番号が、DB スキーマのバージョン。
 - `applied_at` は、適用した日時（UTC）。
-- アプリが起動しないときは、アプリのログの `DB 4、アプリ 5` のような値と見比べる（「[アプリが再起動を繰り返す](troubleshooting.md#アプリが再起動を繰り返す)」）。
+- アプリが起動しないときは、アプリのログの `DB 4 / アプリ 5` のような値と見比べる（「[アプリが再起動を繰り返す](troubleshooting.md#アプリが再起動を繰り返す)」）。
 
 ## マイグレーションの取り消し方法
 

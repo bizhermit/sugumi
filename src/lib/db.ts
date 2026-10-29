@@ -101,7 +101,7 @@ async function checkSchemaVersion() {
   }
   if (version !== SCHEMA_VERSION) {
     throw new Error(
-      `DB のスキーマのバージョンがアプリと合いません。マイグレーションを実行してください: DB ${version}、アプリ ${SCHEMA_VERSION}`,
+      `DB のマイグレーションのバージョンがアプリと異なります: DB ${version} / アプリ ${SCHEMA_VERSION}`,
     );
   }
 }

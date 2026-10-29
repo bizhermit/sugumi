@@ -3,8 +3,10 @@
 #
 #   docker/scripts/build-images
 #
-# 端末から実行すると、値を対話で尋ねる。環境変数 IMAGE_PREFIX・IMAGE_TAG・IMAGE_PLATFORM があれば、それを既定値にする。
+# 端末から実行すると、値を対話で尋ねる。環境変数 IMAGE_PREFIX・IMAGE_PLATFORM があれば、それを既定値にする。
 # 端末がないとき（CI など）は尋ねず、環境変数の値で実行する。
+# タグの既定値は、環境変数 IMAGE_TAG ではなく、コミットのハッシュにする。
+# 前に使った IMAGE_TAG が残っていると、別のコミットのイメージを同じタグで push してしまうため。
 set -eu
 
 cd "$(dirname "$0")/../.."
@@ -17,7 +19,7 @@ fi
 
 commit=$(git rev-parse --short=12 HEAD)
 prefix=${IMAGE_PREFIX:-}
-tag=${IMAGE_TAG:-$commit}
+tag=$commit
 platform=${IMAGE_PLATFORM:-}
 
 if [ -t 0 ]; then
