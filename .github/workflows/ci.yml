@@ -89,7 +89,7 @@ jobs:
           cp docker/lb/servers.conf.example "$RUNNER_TEMP/lb/upstream/servers.conf"
           openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=ci \
             -keyout "$RUNNER_TEMP/lb/certs/privkey.pem" -out "$RUNNER_TEMP/lb/certs/fullchain.pem"
-          docker run --rm \
+          docker run --rm -e LB_SERVER_NAME=ci \
             -v "$RUNNER_TEMP/lb/upstream:/etc/nginx/upstream:ro" -v "$RUNNER_TEMP/lb/certs:/etc/nginx/certs:ro" \
             ci/lb:ci nginx -t
 
