@@ -1,6 +1,6 @@
 #!/bin/sh
 # アプリが使う DB ユーザーと、スキーマ app を作る。
-# - migrator：スキーマとテーブルを持ち、マイグレーション・バックアップ・復元（db-migrate・db-backup・db-restore）を行う。
+# - migrator：スキーマとテーブルを持ち、マイグレーション（db-migrate）を行う。
 # - app：アプリが常に接続するユーザー。テーブルの読み書きだけができ、テーブル・関数・トリガーを作ったり消したりできない。
 # アプリを乗っ取られても、データの読み書きより先へは進めないようにするため。
 # 管理者（POSTGRES_USER）でアプリが接続すると、COPY ... TO PROGRAM で DB のコンテナ上でコマンドを実行されたり、
@@ -48,10 +48,9 @@ GRANT CONNECT, CREATE ON DATABASE :"DBNAME" TO migrator;
 CREATE SCHEMA app AUTHORIZATION migrator;
 GRANT USAGE ON SCHEMA app TO app;
 -- migrator がこれから作るテーブル・シーケンスを、app が読み書きできるようにする。スキーマを問わない。
--- 変えるときは、docker/db/bin/db-restore で戻す権限も揃える
 ALTER DEFAULT PRIVILEGES FOR ROLE migrator GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app;
 ALTER DEFAULT PRIVILEGES FOR ROLE migrator GRANT USAGE, SELECT ON SEQUENCES TO app;
--- ラージオブジェクトはスキーマに属さず、バックアップにも入らず、復元でも消えない。アプリは使わないので、作れないようにする
+-- アプリはラージオブジェクトを使わないので、作れないようにする。
 REVOKE EXECUTE ON FUNCTION lo_creat(integer), lo_create(oid), lo_from_bytea(oid, bytea) FROM PUBLIC;
 ALTER ROLE app SET search_path = app;
 ALTER ROLE migrator SET search_path = app;

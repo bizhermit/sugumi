@@ -1,25 +1,13 @@
 #!/bin/sh
-# DB ユーザー migrator が持つすべてのスキーマ（テーブル・ビュー・関数・型・権限を含む）のバックアップを、
-# pg_dump の custom 形式で標準出力に書き出す。戻すときは db-restore に渡す。
-# pg_dump は 1 つのスナップショットから読むので、アプリが書き込んでいる最中でも、ある時点のそろった状態になる。
+# DB 全体（すべての DB・DB ユーザー・パスワード・設定を含む）のバックアップを、pg_basebackup の tar 形式を gzip で圧縮して、
+# 標準出力に書き出す。戻すときは db-restore に渡す。
+# DB を動かしたまま取れる。取っている間の WAL も含めるので、復元すると、取り終えた時点のそろった状態になる。
 #
-# スキーマはマイグレーションで足せるので、決め打ちせず、実行のたびに migrator が持つものを調べる。
-# quote_ident で引用符を付け、pg_dump がワイルドカードや大文字小文字を読み替えないようにする。
+# レプリケーションの接続で読むので、管理者で接続する（conf/pg_hba.conf）。
 set -eu
 
-schemas=$(psql --no-psqlrc -At --username migrator --dbname "$POSTGRES_DB" \
-  -c "SELECT quote_ident(nspname) FROM pg_catalog.pg_namespace WHERE nspowner = 'migrator'::regrole ORDER BY 1")
-set --
-# 引用符を付けた名前は空白や * を含みうるので、シェルに分割・展開させず、1 行ずつ読む。
-while IFS= read -r schema; do
-  [ -n "$schema" ] || continue
-  set -- "$@" "--schema=$schema"
-done <<EOF
-$schemas
-EOF
-if [ $# -eq 0 ]; then
-  echo "migrator が持つスキーマがありません" >&2
-  exit 1
-fi
-
-exec pg_dump --username migrator --dbname "$POSTGRES_DB" --format=custom "$@"
+# --wal-method=fetch：WAL を最後にまとめて読み、同じ tar に入れる。標準出力に書くときは、stream を使えない。
+#   取っている間に書き込みが多いと、読む前に WAL が消されて失敗する。そのときは取り直す。
+# --checkpoint=fast：すぐに取り始める。デフォルトでは、次の定期のチェックポイントまで待つことがある。
+exec pg_basebackup --username "$POSTGRES_USER" --pgdata=- --format=tar --gzip \
+  --wal-method=fetch --checkpoint=fast
