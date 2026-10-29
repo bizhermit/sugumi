@@ -11,7 +11,7 @@ const DB_MIGRATE = new URL("../docker/db/bin/db-migrate", import.meta.url);
 const VERSION_OUTPUT = /^(\d+)\n$/;
 
 if (import.meta.main) {
-  const result = await readMigrationVersion(MIGRATIONS_DIR);
+  const result = await readMigrationVersion();
   if (result.status === "invalid") {
     // 理由は db-migrate が標準エラーに出している。
     Deno.exit(1);
@@ -28,12 +28,12 @@ if (import.meta.main) {
 
 // テストからは呼ばない。テストの権限に sh の実行を許すと、deno.json の permissions の制限を越えられるため。
 // ファイル名の確認は、CI の deno task gen と deno task build が、リポジトリのマイグレーションで行う。
-async function readMigrationVersion(
-  migrations: URL,
-): Promise<{ status: "ok"; version: number } | { status: "invalid" }> {
+async function readMigrationVersion(): Promise<
+  { status: "ok"; version: number } | { status: "invalid" }
+> {
   const { code, stdout } = await new Deno.Command("sh", {
     args: [decodeURIComponent(DB_MIGRATE.pathname), "--check"],
-    env: { MIGRATIONS_DIR: decodeURIComponent(migrations.pathname) },
+    env: { MIGRATIONS_DIR: decodeURIComponent(MIGRATIONS_DIR.pathname) },
     stderr: "inherit",
   }).output();
   if (code !== 0) {

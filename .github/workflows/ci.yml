@@ -35,11 +35,14 @@ jobs:
           # docker/app/Dockerfile のイメージ・.devcontainer/Dockerfile の DENO_VERSION と揃える。
           deno-version: 2.9.7
 
+      # 1 回の bake で、すべてのイメージを並列にビルドする。
+      - name: 本番のイメージをビルドする
+        run: docker buildx bake -f docker/bake.hcl --load
+
       # 本番と同じイメージ・docker/db/compose.yaml（pg_hba.conf・TLS・db-proxy）で起動する（docker/README/db-server.md の手順）。
       # サービスコンテナはリポジトリの Dockerfile からビルドできないので、ここで起動する。
       - name: テスト用の DB を起動する
         run: |
-          docker buildx bake -f docker/bake.hcl --load db db-proxy
           # 証明書は docker/README/db-server.md の「証明書の作成方法」と同じく作る。接続先は IP アドレスにする。
           ca="$RUNNER_TEMP/db-ca"
           install -d -m 700 "$ca"
@@ -72,20 +75,16 @@ jobs:
           deno task gen
           git diff --exit-code src/routes.gen.ts src/lib/schema-version.gen.ts
       - run: deno task build
-      - name: 本番のイメージをビルドする
-        run: docker buildx bake -f docker/bake.hcl --load app
       # CI には送り先がないので、実際に送れるかまでは確かめられない。設定ファイルを読み込めることだけを確かめる。
-      - name: log-forwarder のイメージをビルドし、設定を確かめる
+      - name: log-forwarder の設定を確かめる
         run: |
-          docker buildx bake -f docker/bake.hcl --load log-forwarder
           for destination in cloudwatch internal; do
             docker run --rm -e SERVER_NAME=ci -e LOG_BUFFER_MAX_SIZE=1G ci/log-forwarder:ci \
               /fluent-bit/bin/fluent-bit -c /fluent-bit/etc/custom/$destination.yaml --dry-run
           done
       # 振り分け先と証明書はロードバランサーに置くものなので、仮のものを作って設定を読み込めることを確かめる。
-      - name: lb のイメージをビルドし、設定を確かめる
+      - name: lb の設定を確かめる
         run: |
-          docker buildx bake -f docker/bake.hcl --load lb
           install -d "$RUNNER_TEMP/lb/upstream" "$RUNNER_TEMP/lb/certs"
           cp docker/lb/servers.conf.example "$RUNNER_TEMP/lb/upstream/servers.conf"
           openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=ci \

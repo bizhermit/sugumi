@@ -32,11 +32,14 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON app.schema_migrations FROM app;
 SELECT coalesce(max(version), 0) AS from_version FROM app.schema_migrations \gset
 SQL
   expected=1
-  for file in "$MIGRATIONS_DIR"/*.sql; do
+  # *.sql だけを読むと、拡張子を誤ったファイル（0005_x.SQL など）を、エラーにせず飛ばしてしまう。
+  for file in "$MIGRATIONS_DIR"/*; do
     [ -e "$file" ] || break
     name=${file##*/}
     case $name in
     [0-9][0-9][0-9][0-9]_*.sql) ;;
+    # 書き方の決まり。イメージには入れない（docker/db/.dockerignore）が、開発・テストではリポジトリのディレクトリを読む。
+    CLAUDE.md) continue ;;
     *)
       echo "マイグレーションのファイル名は「4 桁の番号_説明.sql」にしてください: $name" >&2
       exit 1
