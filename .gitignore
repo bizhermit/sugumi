@@ -42,13 +42,22 @@ __pycache__/
 # Data
 /data/
 
-# 証明書の秘密鍵・署名の要求・通し番号（docker/README.md の手順で作る）。手順を誤ってリポジトリの中で作っても、コミットしない
+# 手元だけで使うファイル（CLAUDE.md）
+/local/
+
+# 証明書の秘密鍵・署名の要求・通し番号（docker/README/log-server.md, docker/README/db-server.md）
 *.key
 *.csr
 *.srl
 
-# ログ用のサーバーの証明書・鍵と設定（docker/README.md の手順で作る）
+# ログ用サーバーの証明書・鍵と設定（docker/README/log-server.md）
 /docker/log-forwarder/certs/*
 !/docker/log-forwarder/certs/.gitkeep
 /docker/log-server/certs/*
 !/docker/log-server/certs/.gitkeep
+
+# 各サーバーに置く証明書・設定（docker/README/）
+/docker/certs/
+/docker/db/certs/
+/docker/lb/certs/
+/docker/lb/upstream/

@@ -1,4 +1,4 @@
-# 更新時は `docker buildx imagetools inspect ubuntu:26.04` で manifest list のダイジェストを取得して置き換える
+# 更新時は `docker buildx imagetools inspect ubuntu:26.04` で manifest list のダイジェストを取得して置き換える。
 FROM ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -8,7 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # 基本ツール
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        # --no-install-recommends では curl と一緒に入らないので、明示する
+        # --no-install-recommends では curl と一緒に入らないので、明示する。
         ca-certificates \
         curl \
         git \
@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         unzip \
         locales \
         tzdata \
+        # deno task migrate・migrate:test が docker/db/bin/db-migrate で使用。DB のイメージ（docker/db/Dockerfile）とメジャーバージョンを揃える。
+        postgresql-client-18 \
         # postCreate.sh が使用
         python3 \
         python3-openpyxl \
@@ -42,8 +44,8 @@ RUN GH_VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.c
     && rm -rf "gh_${GH_VERSION}_linux_${ARCH}.tar.gz" gh_checksums.txt "gh_${GH_VERSION}_linux_${ARCH}"
 
 # Deno
-# 公式の install.sh (curl | sh) は改ざんを検知できないので使わず、チェックサムを検証して配置する
-# docker/app/Dockerfile のイメージ・.github/workflows/ci.yml の deno-version と揃える
+# 公式の install.sh (curl | sh) は改ざんを検知できないので使わず、チェックサムを検証して配置する。
+# docker/app/Dockerfile のイメージ・.github/workflows/ci.yml の deno-version と揃える。
 ARG DENO_VERSION=2.9.7
 RUN if [ "${DENO_VERSION}" = "latest" ]; then \
         DENO_VERSION=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/denoland/deno/releases/latest | grep -oP 'v\K[\d.]+'); \
@@ -64,12 +66,12 @@ RUN if [ "${DENO_VERSION}" = "latest" ]; then \
 
 # Playwright
 # - e2e/deno.json の imports のバージョンを、e2e/deno.lock でハッシュを確かめて入れる（--frozen）。
-#   e2e/deno.json を変えたら Rebuild する。しないと、入れたものと別のリビジョンのブラウザを探して、起動できなくなる
-# - --with-deps は apt で OS のパッケージを入れるので、root で実行できるビルド時に入れる
-# - ブラウザは dev ユーザーからも参照できるよう、共有のパスに置く
-# - fonts-noto-cjk はスクリーンショットで日本語を表示するため
-# - root の Deno のキャッシュは dev ユーザーが使わないので消す
-# - playwright コマンド（screenshot など）は、同じものを Deno で実行するラッパーにする
+#   e2e/deno.json を変えたら Rebuild する。しないと、入れたものと別のリビジョンのブラウザを探して、起動できなくなる。
+# - --with-deps は apt で OS のパッケージを入れるので、root で実行できるビルド時に入れる。
+# - ブラウザは dev ユーザーからも参照できるよう、共有のパスに置く。
+# - fonts-noto-cjk はスクリーンショットで日本語を表示するため。
+# - root の Deno のキャッシュは dev ユーザーが使わないので消す。
+# - playwright コマンド（screenshot など）は、同じものを Deno で実行するラッパーにする。
 ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/share/ms-playwright
 COPY e2e/deno.json e2e/deno.lock /tmp/playwright/
 RUN apt-get update \
@@ -83,19 +85,19 @@ RUN apt-get update \
 COPY --chmod=0755 .devcontainer/playwright /usr/local/bin/playwright
 
 # 開発用ユーザー
-# - ubuntu ユーザーは最初から sudo グループなどに入っているので、削除して最小権限で作り直す
-# - UID / GID は .devcontainer/.env でホスト側に合わせる
+# - ubuntu ユーザーは最初から sudo グループなどに入っているので、削除して最小権限で作り直す。
+# - UID / GID は .devcontainer/.env でホスト側に合わせる。
 ARG UID=1000
 ARG GID=1000
 RUN userdel -r ubuntu \
     && if getent group ubuntu > /dev/null; then groupdel ubuntu; fi \
     && groupadd -g "${GID}" dev \
     && useradd -m -s /bin/bash -u "${UID}" -g "${GID}" dev \
-    # ボリュームのマウントポイント。dev の所有で作っておかないと、初回のマウントで root の所有になる
+    # ボリュームのマウントポイント。dev の所有で作っておかないと、初回のマウントで root の所有になる。
     && mkdir -p /home/dev/.claude /home/dev/.config/gh /workspace/data \
     && chown -R "${UID}:${GID}" /home/dev /workspace/data
 
-# sudo の権限は与えない。必要なときだけ、次の行を有効にして Rebuild する
+# sudo の権限は与えない。必要なときだけ、次の行を有効にして Rebuild する。
 # RUN echo 'dev ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/dev \
 #     && chmod 0440 /etc/sudoers.d/dev
 

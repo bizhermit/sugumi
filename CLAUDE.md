@@ -16,19 +16,22 @@ src/
     _assets/      全ページで読み込む JS・CSS
   lib/            複数のディレクトリの画面で使う部品
     auth/         アカウント・パスワード・セッション
-    db.ts         DB の接続と、全テーブルのスキーマ
+    db.ts         DB の接続
+    schema-version.gen.ts  前提にする DB スキーマのバージョン（生成物）
     jsx-runtime.ts  JSX の変換先（deno.json の compilerOptions で指定）
     _shared/      サーバーとクライアントの両方で使う部品（必要になったら作る）
 static/           URL が外部の取り決めで決まるファイル（favicon.ico・robots.txt など）。同じパスで配信する
 scripts/          deno task から実行するスクリプト
-docker/           コンテナのイメージ（app/・db/・log-forwarder/）と、本番の設定（.env。コミットしない）・手順（README.md）
-  log-server/     社内のログ用のサーバー（アプリのサーバーとは別のサーバーで起動する）
+docker/           コンテナのイメージと、サーバーごとの compose.yaml（db/・lb/・log-server/。アプリサーバーはリポジトリ直下）・本番の手順（README/）
+  db/migrations/  マイグレーション（SQL ファイル）
+  log-server/     ログ用サーバー（アプリサーバーとは別のサーバーで起動する）
 tests/            テスト。src/ と同じ構成で *_test.ts を置く
   _support/       複数のテストで使う部品
 bench/            性能の計測。src/ と同じ構成で *_bench.ts を置く
 e2e/              ブラウザで画面を動かすテスト。専用の deno.json・deno.lock を持つ。src/ と同じ構成で *_test.ts を置く
   _support/       複数のテストで使う部品
 .github/workflows/  CI
+local/            手元だけで使うファイル（メモ・試作・調査の資料など）。コミットせず、deno の fmt・lint・check・test の対象にもしない
 ```
 
 - 依存の向きは `routes → web → lib` の一方向にする。逆向きに import しない。
@@ -45,7 +48,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
     - ルートでないディレクトリにも置ける。
     - `src/routes/` に近いものから順に実行し、最後に `before.ts` を実行する。
     - 置いたディレクトリ自身を除きたいときは、`before.tree.ts` の中で `ctx.route` を見て分岐する。
-      - `ctx.route` は、マッチしたルートのパターン（例：`"/admin"`、`"/user/[id]"`）。
+      - `ctx.route` は、マッチしたルートのパターン（例：`"/admin"`, `"/user/[id]"`）。
       - `req.url` の pathname で判定しない。`/%61dmin` も `/admin` にマッチするため。
   - 405 を返すときは、どの before も実行しない。
   - すべてのルートは、デフォルトでログインを求める（`src/routes/before.tree.ts`）。
@@ -87,26 +90,27 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 
 - `deno task test` で実行する。ファイルを指定すると、そのファイルだけを実行する。
   - テストは環境変数 `TEST_DATABASE_URL` の DB を使う。`deno task test` は `DATABASE_URL` をこの値に差し替えてから実行するので、`deno test` を直接実行しない。
+    - マイグレーションは適用しない。`deno task migrate:test`（`TEST_MIGRATION_DATABASE_URL` の同じ DB に `migrator` で接続する）で適用しておく。
+      - DevContainer は起動のたびに適用する（`.devcontainer/postStart.sh`）。マイグレーションを足したときは、手で実行する。
   - `dist/public/` を読み込むテスト（`src/web/app.ts` の `createApp()` や `src/web/assets.ts` を使うもの）は、先に `deno task build` が要る。
-- `src/`・`scripts/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`、`scripts/gen-routes.ts` → `tests/scripts/gen-routes_test.ts`）。
+- `src/`・`scripts/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`, `scripts/gen-routes.ts` → `tests/scripts/gen-routes_test.ts`）。
   - 書き方は `tests/CLAUDE.md` に従う。
 - `_assets/` の JS と、画面が CSP の違反なく動くことは、`e2e/` のテストでブラウザを動かして確かめる。`deno task test:e2e` で実行する。
   - 書き方は `e2e/CLAUDE.md` に従う。
   - 環境変数 `E2E_BASE_URL` で、動いているアプリに対して実行できる。受け付けるのはこのマシンのアプリだけで、`scripts/test-e2e.ts` が確かめている。この制限は外さない。本番やステージングに向けると、テストのログインでアカウントや接続元がロックされるため。
   - ルートの `deno fmt`・`deno lint`・`deno check` は `e2e/` を除外する。`e2e/` の中で実行する。
-- PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`（ルートと `e2e/`）・`routes.gen.ts` の差分・`deno task build`・本番のイメージのビルド・`deno task test`・本番のイメージに対する `deno task test:e2e` を確かめる。
+- PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`（ルートと `e2e/`）・`routes.gen.ts`・`schema-version.gen.ts` の差分・`deno task build`・本番のイメージのビルド・`deno task test`・本番のイメージに対する `deno task test:e2e` を確かめる。
 
 ## ライブラリ
 
 - フレームワーク・ライブラリは使わない。
-  - 例外：サーバーから外部サービスに接続するためのクライアントライブラリ。
-    - DB のドライバ、外部 API の SDK など。
-  - 例外：テストで、Deno と標準の API ではできないことをするためのライブラリ。
-    - ブラウザを操作する Playwright など。
-    - アサーション・モック・テストランナーは含めない（`node:assert/strict` と `deno test` を使う）。
-    - ルートの `deno.json` には入れず、`e2e/` のように別の `deno.json` を持つディレクトリに入れる。
-      - ルートの `deno.lock` にある npm のパッケージは、import していなくても本番のイメージに入るため。
-      - `e2e/deno.lock` のパッケージ（推移的な依存を含む）がルートの `deno.lock` にないことを、`tests/scripts/test-e2e_test.ts` で確かめている。
+  - 例外：
+    - サーバーから外部サービスに接続するためのクライアントライブラリ（DB のドライバ、外部 API の SDK など）。
+    - テストで、Deno と標準の API ではできないことをするためのライブラリ（ブラウザを操作する Playwright など）。
+      - アサーション・モック・テストランナーは含めない（`node:assert/strict` と `deno test` を使う）。
+      - ルートの `deno.json` には入れず、`e2e/` のように別の `deno.json` を持つディレクトリに入れる。
+        - ルートの `deno.lock` にある npm のパッケージは、import していなくても本番のイメージに入るため。
+        - `e2e/deno.lock` のパッケージ（推移的な依存を含む）がルートの `deno.lock` にないことを、`tests/scripts/test-e2e_test.ts` で確かめている。
   - ブラウザで読み込む外部のスクリプト（解析ツールのタグなど）は、例外に含めない。
     - CSP を緩める必要があるため、個別に判断する。
 - 追加するときは、`deno.json` の `imports` に正確なバージョンで書き、`deno.lock` もコミットする。
@@ -123,9 +127,16 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 - 値は必ずパラメータ（`$1` など）で渡す。SQL の文字列に値を連結しない。
 - 読んだ値をもとに書き込むときは、`transaction()` の中で `SELECT ... FOR UPDATE` などを使って守る。
   - await のたびに別のリクエストの処理が割り込むうえ、アプリが複数のインスタンスで動くこともあるため。
-- スキーマの変更は、`src/lib/db.ts` の `MIGRATIONS` の末尾に足す。適用済みの要素は書き換えない。
-- アプリは、スキーマ `app` だけを持つユーザーで接続する（`docker/db/init/`）。開発環境も同じ。
-  - 拡張の追加など、管理者の権限が要る変更はマイグレーションに書けない。管理者で実行する。
+- スキーマの変更（マイグレーション）は、`docker/db/migrations/` に SQL ファイルで足す。
+  - 書き方は `docker/db/migrations/CLAUDE.md` に従う。
+  - アプリはマイグレーションに関わらない。DB のコンテナの `docker/db/bin/db-migrate` が適用する（開発・テストでは `deno task migrate`・`migrate:test`）。
+  - アプリは起動時に、`src/lib/schema-version.gen.ts` の `SCHEMA_VERSION` と DB のバージョンを突き合わせ、違えば起動しない。
+    - `SCHEMA_VERSION` は、`deno task gen` が最後のマイグレーションの番号から生成する（`deno task migrate` も先に実行する）。生成したファイルはコミットする。
+    - ファイル名と番号の並びは、生成のときに `db-migrate --check` で確かめる。本番で適用できない並びは、生成で失敗する。
+    - 生成し忘れは、`deno task build`（`check:schema-version`）が検出する。本番のイメージのビルドでも実行される。
+- DB ユーザーを、権限で分けている（`docker/db/init/`）。開発環境も同じ。
+  - `app`：アプリが接続する。テーブルの読み書きだけができ、テーブル・関数などを作ったり消したりできない。アプリを乗っ取られたときの被害を、データの読み書きに留めるため。
+  - `migrator`：スキーマとテーブルを持ち、マイグレーションを行う。本番では DB のコンテナの中からだけ接続し、パスワードを持たない。
 
 ## サーバーの性能
 
@@ -156,6 +167,13 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
   - `bench/` の同じパスの `*_bench.ts` で測る。DB は `deno task test` と同じく `TEST_DATABASE_URL` を使う。
   - 比べるときは、直す前のコミットを `git worktree` で別に取り出し、両方で実行する。
 
+## アプリの名前
+
+- このリポジトリはテンプレート。アプリの名前が要るところには `myapp` と書く。
+  - コピーした後に、`myapp` を一括で置き換えて使う（`README.md` の「テンプレートから作る方法」）。
+  - テンプレートの名前（`README.md` の見出し）は、ほかの場所に書かない。
+- 名前を含めなくて済むところには含めない（コンテナの中のパス、ログのタグなど）。
+
 ## コードの書き方
 
 - 整形は `deno fmt` に任せる。設定は `deno.json` と `e2e/deno.json` の `fmt` に同じ値で書く。
@@ -185,7 +203,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
   - ただし、次のときはファイルの中だけで使う関数でも書く。
     - 戻り値が union のとき（`| undefined` を含む）。返しうる結果を型で示し、`return` を足したときに結果の種類が黙って増えないようにするため。判別 union は、推論すると `status` が `string` に広がり、判別できなくなる。
     - 推論では意図した型にならないとき（再帰する関数、`any` や広すぎる型になるとき）。
-- 想定内の失敗（パスワードの誤り、ロックなど）は、例外にせず `status` で判別する union で返す。結果が 2 通りでも `status` にする。
+- 想定内の失敗（パスワードの誤り、ロックなど）は例外にせず、`status` で判別する union で返す。結果が 2 通りでも `status` にする。
   - 例：`{ status: "ok"; account: Account } | { status: "locked" }`
   - 例外は想定外のことだけに使う。
 - 中身ごと変わらないモジュールの定数（固定の値・正規表現・固定の `Set` など）は `UPPER_SNAKE_CASE`、中身が変わるものやインスタンスは camelCase にする。
@@ -212,7 +230,7 @@ e2e/              ブラウザで画面を動かすテスト。専用の deno.js
 - コメントの文末には「。」を付ける。
 - 処理の流れの説明や変更の経緯は書かない。経緯はコミットメッセージに残す。
 - `.env.example` には、見出しと値だけを書く。値の意味や選び方は、環境構築の手順と同じドキュメントに書く。
-  - 本番は `docker/README.md`、開発環境は `.devcontainer/README.md`。
+  - 本番は `docker/README/`（値の意味は `docker/README/env.md`）、開発環境は `.devcontainer/README.md`。
   - `.env` は手順を読みながら書くため。また、長いコメントは、コメントアウトした値と見分けにくいため。
 
 ## URL

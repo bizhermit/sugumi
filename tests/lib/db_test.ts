@@ -85,3 +85,30 @@ Deno.test("db: isDbTimeout は、クエリがタイムアウトで止まった�
   assert.equal(isDbTimeout(new Error("x")), false);
   assert.equal(isDbTimeout("timeout"), false);
 });
+
+// アプリを乗っ取られても、データの読み書きより先へは進めないことを確かめる（docker/db/init/10-app-role.sh）。
+Deno.test("db: アプリの DB ユーザーは、テーブルや関数を作ったり消したりできない", async () => {
+  for (
+    const sql of [
+      "CREATE TABLE app.planted (id integer)",
+      "CREATE TEMP TABLE planted (id integer)",
+      "CREATE FUNCTION app.planted() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
+      "CREATE SCHEMA planted",
+      "DROP TABLE accounts",
+      "ALTER TABLE accounts ADD COLUMN planted integer",
+      "TRUNCATE accounts",
+      "SELECT lo_create(0)",
+    ]
+  ) {
+    // 42501 は insufficient_privilege。テーブルの持ち主でないときも、この番号になる。
+    await assert.rejects(db.query(sql), (e: { code?: string }) => e.code === "42501", sql);
+  }
+});
+
+Deno.test("db: アプリの DB ユーザーは、マイグレーションの記録を読めるが書き換えられない", async () => {
+  await db.query("SELECT max(version) FROM schema_migrations");
+  await assert.rejects(
+    db.query("DELETE FROM schema_migrations"),
+    (e: { code?: string }) => e.code === "42501",
+  );
+});

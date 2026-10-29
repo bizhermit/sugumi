@@ -5,20 +5,31 @@ import { createAccount } from "../../src/lib/auth/accounts.ts";
 import type { Account } from "../../src/lib/auth/accounts.ts";
 import { db } from "../../src/lib/db.ts";
 
+// テスト用の DB に、管理者が COMMENT ON DATABASE で付ける印。
+// .devcontainer/db-test/disposable.sql と .github/workflows/ci.yml が付ける。
+const DISPOSABLE_COMMENT = "disposable";
+
 /**
  * テストで作った行を消す。secrets は消さない（CSRF の鍵はモジュールの読み込み時に読むので、消しても前の鍵が使われ続ける）。
- * 接続先の DB の名前が _test で終わらなければ、例外を投げる。
- * deno task test を通さずに実行したときや、TEST_DATABASE_URL に開発用の DB を書いてしまったときに、
- * 開発用の DB を空にしないため。URL の文字列で比べないのは、書き方が違うだけの同じ DB を見分けられないから。
+ * 接続先の DB のコメントが disposable（使い捨て）でなければ、例外を投げる。
+ * deno task test を通さずに実行したときや、TEST_DATABASE_URL に開発用・本番の DB を書いてしまったときに、空にしないため。
+ * URL の文字列で比べないのは、書き方が違うだけの同じ DB を見分けられないから。
+ * 名前ではなくコメントで見分けるのは、テスト用の DB も本番と同じ名前（app）にするため。
+ * コメントを付けられるのは DB の持ち主か管理者だけで、app は付けられない。
  */
 export async function resetDb(): Promise<void> {
-  const { rows: [{ name }] } = await db.query<{ name: string }>(
-    "SELECT current_database() AS name",
+  const { rows: [{ name, comment }] } = await db.query<{ name: string; comment: string | null }>(
+    "SELECT datname AS name, shobj_description(oid, 'pg_database') AS comment" +
+      " FROM pg_database WHERE datname = current_database()",
   );
-  if (!name.endsWith("_test")) {
-    throw new Error(`DB ${name} は名前が _test で終わらないので、テストでは空にしません`);
+  if (comment !== DISPOSABLE_COMMENT) {
+    throw new Error(
+      `DB ${name} は使い捨ての DB の印（COMMENT ON DATABASE ... IS '${DISPOSABLE_COMMENT}'）がないので、テストでは空にしません`,
+    );
   }
-  await db.query("TRUNCATE accounts, sessions, login_throttles, login_devices RESTART IDENTITY");
+  // アプリと同じ DB ユーザー app で接続しているので、TRUNCATE はできない（テーブルの読み書きだけを許している）。
+  // sessions・login_devices は、accounts の行を消すと一緒に消える。
+  await db.query("DELETE FROM accounts; DELETE FROM login_throttles");
 }
 
 export const TEST_PASSWORD = "correct horse battery staple";

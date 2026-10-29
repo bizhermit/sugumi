@@ -1,0 +1,60 @@
+#!/bin/sh
+# 本番のイメージ（docker/bake.hcl）を作り、レジストリに push する。手順は docker/README/build.md を参照。
+#
+#   docker/scripts/build-images
+#
+# 端末から実行すると、値を対話で尋ねる。環境変数 IMAGE_PREFIX・IMAGE_PLATFORM があれば、それを既定値にする。
+# 端末がないとき（CI など）は尋ねず、環境変数の値で実行する。
+# タグの既定値は、環境変数 IMAGE_TAG ではなく、コミットのハッシュにする。
+# 前に使った IMAGE_TAG が残っていると、別のコミットのイメージを同じタグで push してしまうため。
+set -eu
+
+cd "$(dirname "$0")/../.."
+
+# タグからコミットを特定できるよう、コミットしていない変更を含めない。
+if [ -n "$(git status --porcelain)" ]; then
+  echo "コミットしていない変更があります。コミットするか取り消してから実行してください" >&2
+  exit 1
+fi
+
+commit=$(git rev-parse --short=12 HEAD)
+prefix=${IMAGE_PREFIX:-}
+tag=$commit
+platform=${IMAGE_PLATFORM:-}
+
+if [ -t 0 ]; then
+  printf 'イメージの置き場所（レジストリ/アプリの名前。例：123456789012.dkr.ecr.ap-northeast-1.amazonaws.com/myapp）[%s]: ' "$prefix"
+  read -r answer
+  prefix=${answer:-$prefix}
+  printf 'タグ [%s]: ' "$tag"
+  read -r answer
+  tag=${answer:-$tag}
+  printf 'アプリサーバーの CPU（linux/amd64 か linux/arm64。空ならこのサーバーと同じ）[%s]: ' "$platform"
+  read -r answer
+  platform=${answer:-$platform}
+fi
+
+if [ -z "$prefix" ]; then
+  echo "イメージの置き場所を指定してください" >&2
+  exit 1
+fi
+
+if [ -t 0 ]; then
+  echo
+  echo "コミット: $commit"
+  echo "push 先: $prefix/{app,log-forwarder,db,db-proxy,lb}:$tag"
+  echo "CPU: ${platform:-このサーバーと同じ}"
+  printf 'イメージを作って push しますか？ [y/N]: '
+  read -r answer
+  [ "$answer" = y ] || exit 1
+fi
+
+if [ -n "$platform" ]; then
+  set -- --set "*.platform=$platform"
+fi
+IMAGE_PREFIX=$prefix IMAGE_TAG=$tag docker buildx bake -f docker/bake.hcl --push "$@"
+
+echo
+echo "各サーバーの .env に書く値:"
+echo "IMAGE_PREFIX='$prefix'"
+echo "IMAGE_TAG='$tag'"

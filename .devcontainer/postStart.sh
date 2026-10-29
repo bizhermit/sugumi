@@ -35,6 +35,18 @@ if ! gh auth status </dev/null >/dev/null 2>&1; then
   $(code 'gh auth login --git-protocol ssh')"
 fi
 
+# db-test はデータをメモリに置くので、起動するたびに空になる。テストの前に要るマイグレーションを、ここで適用する。
+# 初期化の途中は Unix ソケットだけで待ち受けるので、TCP で受け付けるまで待つ。
+if timeout 60 sh -c 'until pg_isready -q -d "$TEST_DATABASE_URL"; do sleep 1; done'; then
+  if ! (cd .. && deno task migrate:test </dev/null >/dev/null); then
+    warn "テスト用 DB へのマイグレーションに失敗しました。ターミナルで実行し、エラーを確認してください。
+  $(code 'deno task migrate:test')"
+  fi
+else
+  warn "テスト用 DB（db-test）が起動していません。起動したら、マイグレーションを適用してください。
+  $(code 'deno task migrate:test')"
+fi
+
 if ! command -v claude >/dev/null 2>&1; then
   warn "claude コマンドが見つかりません。Claude Code のインストールを確認してください。"
 else

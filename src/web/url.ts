@@ -127,7 +127,7 @@ export function safeUrl(value: string | null | undefined): string | undefined {
   } catch {
     return undefined;
   }
-  // 拒否するスキームを並べると、未知のスキームや表記の揺れ（大文字、前後の空白や制御文字）を取りこぼす。そこで、許可するものだけを並べる。
+  // 拒否するスキームを並べると、未知のスキームや表記の揺れ（大文字、前後の空白や制御文字）を取りこぼす。許可するものだけを並べる。
   if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
   // `https://example.com@evil.example/` は evil.example を指すのに、example.com へのリンクに見えてしまう。
   if (url.username !== "" || url.password !== "") return undefined;

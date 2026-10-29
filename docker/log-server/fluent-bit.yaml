@@ -1,44 +1,44 @@
 service:
-  # ファイルに書けない間（ディスクの不調など）も、受け取ったログを捨てずにためる
+  # ファイルに書けない間（ディスクの不調など）も、受け取ったログを捨てずにためる。
   storage.path: /fluent-bit/buffer
   storage.sync: full
   log_level: info
 
 pipeline:
   inputs:
-    # アプリのサーバーの log-forwarder（docker/log-forwarder/internal.yaml）から受け取る
+    # アプリサーバーの log-forwarder（docker/log-forwarder/internal.yaml）から受け取る。
     - name: forward
       listen: 0.0.0.0
       port: 24224
       tls: on
-      # 送り手は証明書ではなく、共有の鍵で確かめる
+      # 送り手は証明書ではなく、共有の鍵で確かめる。
       tls.verify: off
-      tls.crt_file: /fluent-bit/etc/sugumi/certs/server.crt
-      tls.key_file: /fluent-bit/etc/sugumi/certs/server.key
+      tls.crt_file: /fluent-bit/etc/custom/certs/server.crt
+      tls.key_file: /fluent-bit/etc/custom/certs/server.key
       shared_key: ${LOG_SERVER_SHARED_KEY}
       self_hostname: ${LOG_SERVER_NAME}
       storage.type: filesystem
 
   filters:
-    # 送り手に、書き込むファイルの日付を選ばせない（receive-time.lua）
+    # 送り手に、書き込むファイルの日付を選ばせない（receive-time.lua）。
     - name: lua
       match: "*"
-      script: /fluent-bit/etc/sugumi/receive-time.lua
+      script: /fluent-bit/etc/custom/receive-time.lua
       call: set_receive_time
-    # 監査ログは保存日数を分けるため、別のファイルに書く
+    # 監査ログは保存日数を分けるため、別のファイルに書く。
     - name: rewrite_tag
-      match: sugumi.app
-      rule: $type ^audit$ sugumi.audit false
+      match: app
+      rule: $type ^audit$ audit false
       emitter_storage.type: filesystem
 
   outputs:
-    # ファイル名に送り手の値を使わない。送り手が乗っ取られても、/logs の外に書かせないため
+    # ファイル名に送り手の値を使わない。送り手が乗っ取られても、/logs の外に書かせないため。
     - name: file
-      match: sugumi.app
+      match: app
       path: /logs
       file: app-%Y-%m-%d.jsonl
       enable_strftime: on
-      # 日付ごとのファイルは日数がたつほど増えるので、数で打ち切らない
+      # 日付ごとのファイルは日数がたつほど増えるので、数で打ち切らない。
       max_dynamic_files: 0
       on_missing_field: fallback
       fallback_path: /logs
@@ -47,21 +47,21 @@ pipeline:
       rotate: on
       rotate_max_size: ${LOG_FILE_MAX_SIZE}
       # 上限は 1 以上で、無制限にはできない。数で消すのが、1 日に 100M × 1 万を超えたときだけになるよう、大きくしておく。
-      # 大量に送られると古いものが押し出されるが、log-cleaner の合計の上限と同じく、アクセスログなどではそれを受け入れる
+      # 大量に送られると古いものが押し出されるが、log-cleaner の合計の上限と同じく、アクセスログなどではそれを受け入れる。
       rotate_max_files: 10000
       retry_limit: no_limits
     - name: file
-      match: sugumi.audit
+      match: audit
       path: /logs
       file: audit-%Y-%m-%d.jsonl
       enable_strftime: on
-      # 日付ごとのファイルは日数がたつほど増えるので、数で打ち切らない
+      # 日付ごとのファイルは日数がたつほど増えるので、数で打ち切らない。
       max_dynamic_files: 0
       on_missing_field: fallback
       fallback_path: /logs
       fallback_file: audit-fallback.jsonl
       format: plain
       # 分けない。分けると、rotate_max_files を超えた古いものを Fluent Bit が消してしまい、
-      # 共有の鍵を持つ送り手が大量に送るだけで、その日の監査ログを押し出せる。増えた分には、ディスクの監視で気づく
+      # 共有の鍵を持つ送り手が大量に送るだけで、その日の監査ログを押し出せる。増えた分には、ディスクの監視で気づく。
       rotate: off
       retry_limit: no_limits

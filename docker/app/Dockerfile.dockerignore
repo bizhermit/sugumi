@@ -1,13 +1,15 @@
-# ビルドコンテキストに含めるもの以外はすべて除外する（許可リスト方式）
+# ビルドコンテキストに含めるもの以外はすべて除外する（許可リスト方式）。
 *
 !deno.json
 !deno.lock
 !src/
 !static/
 !scripts/
-# static/ の . で始まるものは、static.ts と同じく .well-known/ だけを含める（.DS_Store などを入れない）
+!docker/db/migrations/
+!docker/db/bin/db-migrate
+# static/ の . で始まるものは、static.ts と同じく .well-known/ だけを含める（.DS_Store などを入れない）。
 static/**/.*
 !static/.well-known
 static/.well-known/**/.*
-# モックは開発用なので、本番のイメージに含めない
+# モックは開発用なので、本番のイメージに含めない。
 **/*.mock.*

@@ -1,7 +1,7 @@
 /**
  * Deno.env を参照するのはこのファイルだけにする（tests/ と、テストを起動する scripts/test-e2e.ts は除く）。
  * 変数を追加したら、deno.json の permissions の default・account・test・test-e2e の env.allow にも追記すること。
- * 本番で設定できるようにするなら、compose.yaml の app の environment、docker/.env.example、docker/README.md にも追記すること。
+ * 本番で設定できるようにするなら、compose.yaml の app の environment、docker/.env.example、docker/README/env.md にも追記すること。
  * ファイルのパスを受け取る変数なら、そのファイルの読み込みも permissions で許可すること。
  *
  * 検証は parse で始まる関数に分け、値を引数で受け取る。環境変数を変えなくてもテストで確かめられるようにするため。

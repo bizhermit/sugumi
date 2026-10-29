@@ -1,0 +1,2 @@
+# 受け付けるホスト名。起動時に、.env の LB_SERVER_NAME から /etc/nginx/conf.d/server-name.conf を作る（nginx のイメージの機能）。
+server_name ${LB_SERVER_NAME};

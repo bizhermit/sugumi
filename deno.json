@@ -1,6 +1,7 @@
 {
   "exclude": [
-    "e2e/"
+    "e2e/",
+    "local/"
   ],
   "lock": {
     "frozen": true
@@ -63,6 +64,25 @@
         "src/routes.gen.ts"
       ]
     },
+    "gen-schema-version": {
+      "run": [
+        "sh"
+      ],
+      "read": [
+        "src/lib/schema-version.gen.ts"
+      ],
+      "write": [
+        "src/lib/schema-version.gen.ts"
+      ]
+    },
+    "check-schema-version": {
+      "run": [
+        "sh"
+      ],
+      "read": [
+        "src/lib/schema-version.gen.ts"
+      ]
+    },
     "check-imports": {
       "read": [
         "src",
@@ -74,6 +94,15 @@
         "dist/public"
       ]
     },
+    "migrate": {
+      "run": [
+        "sh"
+      ],
+      "env": [
+        "MIGRATION_DATABASE_URL",
+        "TEST_MIGRATION_DATABASE_URL"
+      ]
+    },
     "test": {
       "net": true,
       "read": [
@@ -82,7 +111,8 @@
         "dist/test",
         "static",
         "deno.lock",
-        "e2e/deno.lock"
+        "e2e/deno.lock",
+        "docker/certs/db-ca.crt"
       ],
       "write": [
         "dist/test"
@@ -120,6 +150,9 @@
       "net": true,
       "run": [
         "deno"
+      ],
+      "read": [
+        "docker/certs/db-ca.crt"
       ],
       "write": [
         "dist/e2e"
@@ -205,13 +238,16 @@
     "dev": "APP_MODE=DEV deno task watch",
     "dev:mock": "APP_MODE=MOCK deno task watch",
     "dev:prod": "APP_MODE=PROD deno task watch",
-    "watch": "deno task build && (deno task gen --watch & deno task bundle --watch & deno run --watch=src/routes/,dist/public/,static/ -P src/main.ts)",
-    "gen": "deno run -P=gen scripts/gen-routes.ts",
+    "watch": "deno task build && (deno run -P=gen scripts/gen-routes.ts --watch & deno task bundle --watch & deno run --watch=src/routes/,dist/public/,static/ -P src/main.ts)",
+    "gen": "deno run -P=gen-schema-version scripts/gen-schema-version.ts && deno run -P=gen scripts/gen-routes.ts",
     "start": "deno run -P src/main.ts",
-    "build": "rm -rf dist/public && deno task check:imports && deno task bundle && deno task check:bundle",
+    "migrate": "deno task gen && deno run -P=migrate scripts/migrate.ts MIGRATION_DATABASE_URL",
+    "migrate:test": "deno run -P=migrate scripts/migrate.ts TEST_MIGRATION_DATABASE_URL",
+    "build": "rm -rf dist/public && deno task check:schema-version && deno task check:imports && deno task bundle && deno task check:bundle",
     "bundle": "deno bundle --platform browser --minify --sourcemap=external --code-splitting --outdir dist/public src/**/_assets/index.ts src/**/_assets/index.css",
     "check:imports": "deno run -P=check-imports scripts/check-imports.ts",
     "check:bundle": "deno run -P=check-bundle scripts/check-bundle.ts",
+    "check:schema-version": "deno run -P=check-schema-version scripts/gen-schema-version.ts --check",
     "account:add": "deno run -P=account scripts/add-account.ts",
     "account:unlock": "deno run -P=account scripts/unlock-account.ts",
     "test": "(test -n \"$TEST_DATABASE_URL\" || (echo '環境変数 TEST_DATABASE_URL を設定してください' >&2 && exit 1)) && DATABASE_URL=$TEST_DATABASE_URL deno test -P=test",
