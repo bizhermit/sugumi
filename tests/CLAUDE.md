@@ -11,7 +11,7 @@
   - 行の `id` は決め打ちしない。`resetDb()` は行を消すだけで、`id` の番号は戻さない。作った行の `id` を使う。
   - DB を使うテストは、初めに `tests/_support/db.ts` の `resetDb()` で空にする。
   - 結果を読むクエリは、`db.query<{ ... }>` で行の型を付ける。付けないと行が `any` になる。
-  - テスト用の DB は、名前を `_test` で終わらせる。`resetDb()` は、それ以外の名前の DB を空にしない。
+  - テスト用の DB には、使い捨ての印（`COMMENT ON DATABASE ... IS 'disposable'`）を管理者で付ける。`resetDb()` は、印のない DB を空にしない。
 - 失敗したテストの DB の中身を見るときは、そのテストだけを実行してから接続する。
   - ほかのテストも一緒に実行すると、次のテストの `resetDb()` で行が消えてしまう。
   - `deno task test tests/routes/before.tree_test.ts --filter "テストの名前の一部"`
@@ -19,6 +19,6 @@
 
     ```sh
     project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$HOSTNAME")
-    docker exec -it "${project}-db-test-1" psql -U app -d app_test
+    docker exec -it "${project}-db-test-1" psql -U app -d app
     ```
 - タイムアウトなどの値は、テストに直接書かず `src/lib/env.ts` の値を使う。開発環境で値を変えていてもテストが通るようにするため。

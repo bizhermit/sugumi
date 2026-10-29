@@ -13,7 +13,7 @@
 # このスクリプトは再実行されないので、パスワードを後から変えるときは、管理者で ALTER ROLE ... PASSWORD を実行する。
 set -eu
 
-# $1 の名前の環境変数か、$1_FILE のファイルからパスワードを読む
+# $1 の名前の環境変数か、$1_FILE のファイルからパスワードを読む。
 read_password() {
   file=$(printenv "$1_FILE" || true)
   if [ -n "$file" ]; then
@@ -25,13 +25,13 @@ read_password() {
 
 app_password=$(read_password APP_DB_PASSWORD)
 migrator_password=$(read_password MIGRATOR_DB_PASSWORD)
-# app はパスワードが空だと、パスワード認証でログインできなくなるので、初期化を止める
+# app はパスワードが空だと、パスワード認証でログインできなくなるので、初期化を止める。
 if [ -z "$app_password" ]; then
   echo "app のパスワードがありません。APP_DB_PASSWORD か APP_DB_PASSWORD_FILE を指定してください" >&2
   exit 1
 fi
 
-# パスワードは psql の変数で渡し、:'...' で SQL のリテラルとしてクォートさせる
+# パスワードは psql の変数で渡し、:'...' で SQL のリテラルとしてクォートさせる。
 psql -v ON_ERROR_STOP=1 -v app_password="$app_password" -v migrator_password="$migrator_password" \
   --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
 -- 空の文字列を渡すと、パスワードなし（パスワード認証ではログインできない）になる

@@ -6,7 +6,7 @@
 - フレームワーク・ライブラリ不使用（外部サービスに接続するためのライブラリおよびテスト用ライブラリは例外）
 - SSRを基本とし、クライアントサイドのJavaScriptは段階的な機能拡張を担う
 
-## テンプレートの使い方
+## テンプレートから作る方法
 
 アプリの名前が必要なところ（イメージの保存先・ボリューム・手順書の例など）には `myapp` と書いてある。
 コピーした後に、アプリの名前（英小文字・数字・`-`）へ一括で置き換える。
@@ -27,22 +27,24 @@ git grep -lz myapp | xargs -0 sed -i 's/myapp/<アプリの名前>/g'
 - DevContainer の外で動かすときは、`DATABASE_URL`・`TEST_DATABASE_URL`・`MIGRATION_DATABASE_URL`・`TEST_MIGRATION_DATABASE_URL` に接続先を設定する。
   - 例：`postgres://user:password@host:5432/dbname`
   - DB ユーザーとスキーマは、[docker/db/init/10-app-role.sh](docker/db/init/10-app-role.sh) と同じように作る。
-  - 開発用とテスト用は別の DB にし、テスト用 DB は名前を `_test` で終わらせる（例：`app_test`）。
-    テストは、名前が `_test` で終わらない DB を空にしない。
+  - 開発用とテスト用は別の DB にし、テスト用 DB には管理者で使い捨ての印を付ける（`COMMENT ON DATABASE <DB の名前> IS 'disposable'`）。
+    テストは、印のない DB を空にしない。
 
 ```sh
 deno task dev       # 開発サーバーを起動（ファイル監視あり、APP_MODE=DEV。先に deno task migrate が必要）
 deno task dev:mock  # 開発サーバーを APP_MODE=MOCK で起動（routes の *.mock.* を使う）
 deno task dev:prod  # 開発サーバーを APP_MODE=PROD で起動
 deno task build  # クライアントコードをバンドル
-deno task migrate  # 開発用 DB にマイグレーション（docker/db/migrations/）を適用し、SCHEMA_VERSION を揃える（MIGRATION_DATABASE_URL の DB を使う。psql が必要）
+deno task gen  # ルートの型（src/routes.gen.ts）と SCHEMA_VERSION（src/lib/schema-version.gen.ts）を生成
+deno task migrate  # 開発用 DB にマイグレーション（docker/db/migrations/）を適用し、SCHEMA_VERSION を生成（MIGRATION_DATABASE_URL の DB を使う。psql が必要）
+deno task migrate:test  # テスト用 DB にマイグレーションを適用（TEST_MIGRATION_DATABASE_URL の DB を使う。psql が必要。DevContainer は起動のたびに実行する）
 deno task start  # サーバー起動（先に deno task build と deno task migrate が必要）
 deno task account:add <ユーザー名> <表示名>  # アカウントを追加（パスワードは入力を求める）
 deno task account:unlock <アカウントの id>  # ロックしたアカウントを解除
 deno task check:imports  # サーバー・クライアント間の import の取り決めを確認
 deno task check:bundle   # バンドルにサーバーのコードが入っていないかを確認（build でも実行される）
-deno task check:schema-version  # SCHEMA_VERSION とマイグレーションの番号の食い違いを確認（build でも実行される）
-deno task test   # テストを実行（TEST_DATABASE_URL の DB を使う。先に deno task build が必要）
+deno task check:schema-version  # SCHEMA_VERSION を生成し忘れていないかを確認（build でも実行される）
+deno task test   # テストを実行（TEST_DATABASE_URL の DB を使う。先に deno task build と deno task migrate:test が必要）
 ```
 
 ## 本番

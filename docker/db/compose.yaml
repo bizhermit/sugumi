@@ -3,14 +3,14 @@
 #
 #   docker compose --env-file .env up -d
 
-# ボリュームなどの名前の頭に付く。置いたディレクトリの名前で決まらないよう、固定する
+# ボリュームなどの名前の頭に付く。置いたディレクトリの名前で決まらないよう、固定する。
 name: myapp-db
 
 services:
   db:
     image: ${IMAGE_PREFIX:?.env に IMAGE_PREFIX を書いてください}/db:${IMAGE_TAG:?.env に IMAGE_TAG を書いてください}
     restart: unless-stopped
-    # コンテナの外からは、app だけを TLS で受け付ける（conf/pg_hba.conf）
+    # コンテナの外からは、app だけを TLS で受け付ける（conf/pg_hba.conf）。
     command:
       - postgres
       - -c
@@ -29,27 +29,27 @@ services:
     secrets:
       - db_admin_password
       - db_app_password
-    # ポートは公開せず、db-proxy から受ける
+    # ポートは公開せず、db-proxy から受ける。
     networks:
       - db
     volumes:
-      # PostgreSQL 18 のイメージは /var/lib/postgresql の下にバージョンごとのディレクトリを作る
+      # PostgreSQL 18 のイメージは /var/lib/postgresql の下にバージョンごとのディレクトリを作る。
       - db-data:/var/lib/postgresql
       - ./certs:/certs:ro
     healthcheck:
-      # 初期化の途中は Unix ソケットだけで待ち受けるので、TCP で確かめて初期化の完了を待つ
+      # 初期化の途中は Unix ソケットだけで待ち受けるので、TCP で確かめて初期化の完了を待つ。
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "admin", "-d", "app"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   # アプリサーバーからの接続を受け、DB へそのまま流す（docker/db-proxy/nginx.conf）。
-  # ポートを公開するには外へ通信できるネットワークが要るので、DB の代わりにこれが受け持つ。データを持たず、中身も解釈しない
+  # ポートを公開するには外へ通信できるネットワークが要るので、DB の代わりにこれが受け持つ。データを持たず、中身も解釈しない。
   db-proxy:
     image: ${IMAGE_PREFIX:?.env に IMAGE_PREFIX を書いてください}/db-proxy:${IMAGE_TAG:?.env に IMAGE_TAG を書いてください}
     restart: unless-stopped
     ports:
-      # アプリサーバーから届くアドレスで待ち受ける。アプリサーバー以外からの接続は、ファイアウォールで止める
+      # アプリサーバーから届くアドレスで待ち受ける。アプリサーバー以外からの接続は、ファイアウォールで止める。
       - ${DB_LISTEN_ADDRESS:?.env に DB_LISTEN_ADDRESS を書いてください}:5432:5432
     networks:
       - default
@@ -61,14 +61,14 @@ services:
     tmpfs:
       - /run
       - /var/cache/nginx
-    # ワーカーを nginx ユーザーに切り替えるのに要るものだけを残す
+    # ワーカーを nginx ユーザーに切り替えるのに要るものだけを残す。
     cap_drop: [ALL]
     cap_add: [SETUID, SETGID]
     security_opt: [no-new-privileges:true]
 
 networks:
   # DB はこのネットワークだけに置く。internal なので、外へ通信できず、Docker の DNS も外の名前を引かない。
-  # 外へ接続する機能（dblink・postgres_fdw・WAL のアーカイブの送信など）を足すときは、置き方を見直す
+  # 外へ接続する機能（dblink・postgres_fdw・WAL のアーカイブの送信など）を足すときは、置き方を見直す。
   db:
     internal: true
 
@@ -76,7 +76,7 @@ volumes:
   db-data:
 
 # 環境変数に置くと docker inspect などで見えてしまうので、.env の値からファイルを作り、/run/secrets/ に置く。
-# --env-file を付け忘れると、値がないので起動しない
+# --env-file を付け忘れると、値がないので起動しない。
 secrets:
   db_admin_password:
     environment: DB_ADMIN_PASSWORD

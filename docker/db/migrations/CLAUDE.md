@@ -9,9 +9,10 @@ DB スキーマの変更（マイグレーション）。`docker/db/bin/db-migra
   - 番号が `schema_migrations` のバージョンになる。
 - 適用済みのファイルは書き換えない。適用済みかどうかは番号で決まるので、書き換えても適用し直されず、DB ごとに中身が食い違う。
 - 取り消すときは、打ち消すマイグレーションを新しく足す。down は作らない。
-- 足したら、`deno task migrate` で開発用 DB に適用する。`src/lib/schema-version.ts` の `SCHEMA_VERSION` も最後の番号に上がる。
+- 足したら、`deno task migrate` で開発用 DB に、`deno task migrate:test` でテスト用 DB に適用する。
+  - `deno task migrate` は、先に `deno task gen` で `src/lib/schema-version.gen.ts` の `SCHEMA_VERSION` を最後の番号にする。生成したファイルもコミットする。
   - アプリは起動時にこれと DB のバージョンを突き合わせ、違えば起動しない。
-  - 上げ忘れは `deno task build`（`check:schema-version`）が検出する。
+  - 生成し忘れは `deno task build`（`check:schema-version`）が検出する。本番のイメージのビルドでも実行される。
 
 ## 書けること・書けないこと
 

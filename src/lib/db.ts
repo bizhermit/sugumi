@@ -15,7 +15,7 @@ import {
   DB_STATEMENT_TIMEOUT_SECONDS,
 } from "./env.ts";
 import { logError } from "./log.ts";
-import { SCHEMA_VERSION } from "./schema-version.ts";
+import { SCHEMA_VERSION } from "./schema-version.gen.ts";
 
 // query_timeout（クライアント側のタイムアウト）は使わない。タイムアウトしても、接続は送信済みの文のレスポンスを待ったまま Pool に戻り、
 // 次にその接続を使うクエリが後ろで待たされるため。statement_timeout なら DB が文を取り消すので、接続はそのまま使える。

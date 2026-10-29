@@ -24,7 +24,7 @@ group "default" {
 }
 
 target "app" {
-  # src/ などを含めるため、コンテキストはリポジトリのルートにする
+  # src/ などを含めるため、コンテキストはリポジトリのルートにする。
   context    = "."
   dockerfile = "docker/app/Dockerfile"
   tags       = ["${IMAGE_PREFIX}/app:${IMAGE_TAG}"]

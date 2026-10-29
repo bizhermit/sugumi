@@ -3,7 +3,7 @@
 #
 #   docker compose --env-file .env up -d --build
 
-# ボリュームなどの名前の頭に付く。置いたディレクトリの名前で決まらないよう、固定する
+# ボリュームなどの名前の頭に付く。置いたディレクトリの名前で決まらないよう、固定する。
 name: myapp-log-server
 
 services:
@@ -16,7 +16,7 @@ services:
       LOG_FILE_MAX_SIZE: ${LOG_FILE_MAX_SIZE:-100M}
     ports:
       # アプリサーバーからだけ届くよう、Docker の外（DOCKER-USER チェーンやクラウドのセキュリティグループ）で絞る。
-      # Docker が公開するポートは、ufw などの INPUT の規則を通らない（docker/README/log-server.md）
+      # Docker が公開するポートは、ufw などの INPUT の規則を通らない（docker/README/log-server.md）。
       - ${LOG_SERVER_LISTEN_ADDRESS:-0.0.0.0}:${LOG_SERVER_PORT:-24224}:24224
     volumes:
       - logs:/logs
@@ -25,7 +25,7 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
 
-  # 保存日数を過ぎたファイルと、アクセスログなどの合計の上限を超えた分を消す（log-cleaner.sh）
+  # 保存日数を過ぎたファイルと、アクセスログなどの合計の上限を超えた分を消す（log-cleaner.sh）。
   log-cleaner:
     build:
       context: .

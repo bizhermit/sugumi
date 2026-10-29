@@ -17,7 +17,7 @@ src/
   lib/            複数のディレクトリの画面で使う部品
     auth/         アカウント・パスワード・セッション
     db.ts         DB の接続
-    schema-version.ts  前提にする DB スキーマのバージョン
+    schema-version.gen.ts  前提にする DB スキーマのバージョン（生成物）
     jsx-runtime.ts  JSX の変換先（deno.json の compilerOptions で指定）
     _shared/      サーバーとクライアントの両方で使う部品（必要になったら作る）
 static/           URL が外部の取り決めで決まるファイル（favicon.ico・robots.txt など）。同じパスで配信する
@@ -90,7 +90,8 @@ local/            手元だけで使うファイル（メモ・試作・調査�
 
 - `deno task test` で実行する。ファイルを指定すると、そのファイルだけを実行する。
   - テストは環境変数 `TEST_DATABASE_URL` の DB を使う。`deno task test` は `DATABASE_URL` をこの値に差し替えてから実行するので、`deno test` を直接実行しない。
-    - `deno task test` は、先に `TEST_MIGRATION_DATABASE_URL`（同じ DB に `migrator` で接続する）でマイグレーションを適用する。
+    - マイグレーションは適用しない。`deno task migrate:test`（`TEST_MIGRATION_DATABASE_URL` の同じ DB に `migrator` で接続する）で適用しておく。
+      - DevContainer は起動のたびに適用する（`.devcontainer/postStart.sh`）。マイグレーションを足したときは、手で実行する。
   - `dist/public/` を読み込むテスト（`src/web/app.ts` の `createApp()` や `src/web/assets.ts` を使うもの）は、先に `deno task build` が要る。
 - `src/`・`scripts/` のファイルの動作は、`tests/` の同じパスの `*_test.ts` で確かめる（`src/web/csrf.tsx` → `tests/web/csrf_test.ts`、`scripts/gen-routes.ts` → `tests/scripts/gen-routes_test.ts`）。
   - 書き方は `tests/CLAUDE.md` に従う。
@@ -98,7 +99,7 @@ local/            手元だけで使うファイル（メモ・試作・調査�
   - 書き方は `e2e/CLAUDE.md` に従う。
   - 環境変数 `E2E_BASE_URL` で、動いているアプリに対して実行できる。受け付けるのはこのマシンのアプリだけで、`scripts/test-e2e.ts` が確かめている。この制限は外さない。本番やステージングに向けると、テストのログインでアカウントや接続元がロックされるため。
   - ルートの `deno fmt`・`deno lint`・`deno check` は `e2e/` を除外する。`e2e/` の中で実行する。
-- PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`（ルートと `e2e/`）・`routes.gen.ts` の差分・`deno task build`・本番のイメージのビルド・`deno task test`・本番のイメージに対する `deno task test:e2e` を確かめる。
+- PR では `.github/workflows/ci.yml` が、`deno fmt --check`・`deno lint`・`deno check`（ルートと `e2e/`）・`routes.gen.ts`・`schema-version.gen.ts` の差分・`deno task build`・本番のイメージのビルド・`deno task test`・本番のイメージに対する `deno task test:e2e` を確かめる。
 
 ## ライブラリ
 
@@ -130,9 +131,10 @@ local/            手元だけで使うファイル（メモ・試作・調査�
 - スキーマの変更（マイグレーション）は、`docker/db/migrations/` に SQL ファイルで足す。
   - 書き方は `docker/db/migrations/CLAUDE.md` に従う。
   - アプリはマイグレーションに関わらない。DB のコンテナの `docker/db/bin/db-migrate` が適用する（開発・テストでは `deno task migrate`・`migrate:test`）。
-    - `deno task migrate` は、開発用 DB に適用したあと、`SCHEMA_VERSION` を最後のマイグレーションの番号に書き換える。
-  - アプリは起動時に、`src/lib/schema-version.ts` の `SCHEMA_VERSION` と DB のバージョンを突き合わせ、違えば起動しない。
-    - `SCHEMA_VERSION` と最後のマイグレーションの番号の食い違いは、`deno task build`（`check:schema-version`）が検出する。
+  - アプリは起動時に、`src/lib/schema-version.gen.ts` の `SCHEMA_VERSION` と DB のバージョンを突き合わせ、違えば起動しない。
+    - `SCHEMA_VERSION` は、`deno task gen` が最後のマイグレーションの番号から生成する（`deno task migrate` も先に実行する）。生成したファイルはコミットする。
+    - ファイル名と番号の並びは、生成のときに `db-migrate --check` で確かめる。本番で適用できない並びは、生成で失敗する。
+    - 生成し忘れは、`deno task build`（`check:schema-version`）が検出する。本番のイメージのビルドでも実行される。
 - DB ユーザーを、権限で分けている（`docker/db/init/`）。開発環境も同じ。
   - `app`：アプリが接続する。テーブルの読み書きだけができ、テーブル・関数などを作ったり消したりできない。アプリを乗っ取られたときの被害を、データの読み書きに留めるため。
   - `migrator`：スキーマとテーブルを持ち、マイグレーションとバックアップ・復元を行う。本番では DB のコンテナの中からだけ接続し、パスワードを持たない。
@@ -169,7 +171,7 @@ local/            手元だけで使うファイル（メモ・試作・調査�
 ## アプリの名前
 
 - このリポジトリはテンプレート。アプリの名前が要るところには `myapp` と書く。
-  - コピーした後に、`myapp` を一括で置き換えて使う（`README.md` の「テンプレートから作る」）。
+  - コピーした後に、`myapp` を一括で置き換えて使う（`README.md` の「テンプレートから作る方法」）。
   - テンプレートの名前（`README.md` の見出し）は、ほかの場所に書かない。
 - 名前を含めなくて済むところには含めない（コンテナの中のパス、ログのタグなど）。
 

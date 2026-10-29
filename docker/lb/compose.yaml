@@ -3,7 +3,7 @@
 #
 #   docker compose --env-file .env up -d
 
-# ボリュームなどの名前の頭に付く。置いたディレクトリの名前で決まらないよう、固定する
+# ボリュームなどの名前の頭に付く。置いたディレクトリの名前で決まらないよう、固定する。
 name: myapp-lb
 
 services:
@@ -11,9 +11,9 @@ services:
     image: ${IMAGE_PREFIX:?.env に IMAGE_PREFIX を書いてください}/lb:${IMAGE_TAG:?.env に IMAGE_TAG を書いてください}
     restart: unless-stopped
     # ユーザーの本当の接続元を見るため、ホストのネットワークで動かす。
-    # ポートを公開する形では、環境によって（IPv6 の接続など）接続元が Docker のゲートウェイのアドレスになり、全員が同じ接続元に見える
+    # ポートを公開する形では、環境によって（IPv6 の接続など）接続元が Docker のゲートウェイのアドレスになり、全員が同じ接続元に見える。
     network_mode: host
     volumes:
-      # ファイルではなくディレクトリをマウントする。ファイルだけだと、作り直して保存するエディターで書き換えたときに、古いファイルを読み続ける
+      # ファイルではなくディレクトリをマウントする。ファイルだけだと、作り直して保存するエディターで書き換えたときに、古いファイルを読み続ける。
       - ./upstream:/etc/nginx/upstream:ro
       - ./certs:/etc/nginx/certs:ro

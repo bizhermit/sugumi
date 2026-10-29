@@ -4,17 +4,18 @@
 #
 # - 本番：DB のコンテナの中で、引数なしで実行する（docker compose exec db db-migrate）。コンテナの中からはパスワードなしで接続できる。
 # - 開発・テスト：deno task migrate・migrate:test（scripts/migrate.ts）が、接続先の URL を引数に、MIGRATIONS_DIR にリポジトリのディレクトリを渡す。
+# - --check：DB に接続せず、ファイル名と番号だけを確かめ、最後の番号を出力する。deno task gen（scripts/gen-schema-version.ts）が使う。
 #
 # ファイル名は「4 桁の番号_説明.sql」（英小文字・数字・_・-）。番号は 0001 から欠けずに続け、適用済みのファイルは書き換えない。
-# 番号が schema_migrations のバージョンになる。アプリは、src/lib/schema-version.ts の SCHEMA_VERSION と同じでないと起動しない。
+# 番号が schema_migrations のバージョンになる。アプリは、src/lib/schema-version.gen.ts の SCHEMA_VERSION と同じでないと起動しない。
 set -eu
 
 # psql のバッククォートの中では、: で始まる変数が展開され、バッククォートで区切られる。
-# パスに何が入っていても読めるよう、ディレクトリはシェルの環境変数で渡し、psql にはその名前と確かめたファイル名だけを書く
+# パスに何が入っていても読めるよう、ディレクトリはシェルの環境変数で渡し、psql にはその名前と確かめたファイル名だけを書く。
 MIGRATIONS_DIR=${MIGRATIONS_DIR:-/migrations}
 export MIGRATIONS_DIR
 
-# 適用する SQL を組み立てる。ファイル名を先にすべて確かめ、1 つでもおかしければ、何も適用せずに終わる
+# 適用する SQL を組み立てる。ファイル名を先にすべて確かめ、1 つでもおかしければ、何も適用せずに終わる。
 build() {
   cat <<'SQL'
 \o /dev/null
@@ -46,7 +47,7 @@ SQL
       exit 1
       ;;
     esac
-    # 先頭の 0 を 8 進数と読ませないよう、1 を付けてから引く
+    # 先頭の 0 を 8 進数と読ませないよう、1 を付けてから引く。
     version=$((1${name%%_*} - 10000))
     if [ "$version" -ne "$expected" ]; then
       echo "マイグレーションの番号が続いていません（$expected のはず）: $name" >&2
@@ -54,7 +55,7 @@ SQL
     fi
     # ファイルの中身は psql に読ませず、PL/pgSQL の EXECUTE で実行する。
     # psql のメタコマンド（\! など）でコンテナの中のコマンドを動かしたり、COMMIT で途中まで確定させたりできないようにするため
-    # （トランザクションの中の DO では、COMMIT・ROLLBACK はエラーになる）
+    # （トランザクションの中の DO では、COMMIT・ROLLBACK はエラーになる）。
     cat <<SQL
 SELECT :from_version >= $version AS skip \gset
 \if :skip
@@ -78,7 +79,7 @@ SQL
   done
   last=$((expected - 1))
   # DB のほうが新しいときは、古いイメージで実行している。知らないマイグレーションが適用済みのまま進めない。
-  # psql の変数は $$ の中で展開されないので、DO の中では表を読む
+  # psql の変数は $$ の中で展開されないので、DO の中では表を読む。
   cat <<SQL
 DO \$\$
 BEGIN
@@ -98,6 +99,13 @@ SELECT :from_version = :to_version AS same \gset
 \endif
 SQL
 }
+
+# build を $(...) の中で呼ぶと、サブシェルで実行され、last が残らない。
+if [ "${1:-}" = --check ]; then
+  build >/dev/null
+  echo "$last"
+  exit 0
+fi
 
 sql=$(build)
 
