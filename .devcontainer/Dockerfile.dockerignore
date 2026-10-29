@@ -1,5 +1,0 @@
-# ビルドコンテキストはリポジトリの直下。イメージに使うもの以外はすべて除外する（許可リスト方式）
-*
-!.devcontainer/playwright
-!e2e/deno.json
-!e2e/deno.lock
