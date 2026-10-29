@@ -35,15 +35,15 @@ fi
 # パスワードは psql の変数で渡し、:'...' で SQL のリテラルとしてクォートさせる。
 psql -v ON_ERROR_STOP=1 -v app_password="$app_password" -v migrator_password="$migrator_password" \
   --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
--- 空の文字列を渡すと、パスワードなし（パスワード認証ではログインできない）になる
+-- 空の文字列を渡すと、パスワードなし（パスワード認証ではログインできない）になる。
 CREATE ROLE migrator LOGIN PASSWORD :'migrator_password';
 CREATE ROLE app LOGIN PASSWORD :'app_password';
 -- デフォルトでは、どのユーザーもすべての DB に接続でき、一時テーブルを作れる。
--- app はアプリの DB に接続するだけにし、一時テーブルも含めて、何も作れないようにする
+-- app はアプリの DB に接続するだけにし、一時テーブルも含めて、何も作れないようにする。
 REVOKE ALL ON DATABASE :"DBNAME" FROM PUBLIC;
 REVOKE CONNECT ON DATABASE postgres, template1 FROM PUBLIC;
 GRANT CONNECT ON DATABASE :"DBNAME" TO app;
--- migrator は、マイグレーションでスキーマを足せるようにする
+-- migrator は、マイグレーションでスキーマを足せるようにする。
 GRANT CONNECT, CREATE ON DATABASE :"DBNAME" TO migrator;
 CREATE SCHEMA app AUTHORIZATION migrator;
 GRANT USAGE ON SCHEMA app TO app;
