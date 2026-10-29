@@ -1,0 +1,14 @@
+{
+  "exclude": [
+    "local/"
+  ],
+  "fmt": {
+    "lineWidth": 120,
+    "proseWrap": "preserve",
+    "quoteProps": "asNeeded"
+  },
+  "tasks": {
+    "dev": "deno run --watch --allow-net src/main.ts",
+    "start": "deno run --allow-net src/main.ts"
+  }
+}
