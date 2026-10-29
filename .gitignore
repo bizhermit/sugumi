@@ -1,4 +1,37 @@
-CLAUDE.local.md
-.claude/settings.local.json
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.AppleDouble
+.LSOverride
 
+# Editor
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/scripts/
+.idea/
+*.swp
+*.swo
+*~
+
+# log/tmp
+*.log
+*.tmp
+*.temp
+*.bak
+
+# env
+.env
+.env.*
+!.env.example
+
+# Claude
+.claude/settings.local.json
+CLAUDE.local.md
+
+# local
 /local/
