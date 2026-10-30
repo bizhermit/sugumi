@@ -30,7 +30,7 @@
 
    ターミナルで以下のコマンドを実行する。タグの入力を求められるので、任意の値（例：`v1.2.0`）を入力する。入力したタグはgitのタグとして作成およびpushされる。未入力の場合はコミットハッシュがタグになる（gitのタグは作成されない）。
    ```bash
-   deno task build:image
+   npm run build:image
    ```
 
 2. 作成されたイメージファイル（`dist/server-images/myapp-<タグ>.tar.gz`）をサーバーに配置する

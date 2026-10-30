@@ -1,14 +1,23 @@
 # 更新するときはダイジェストを取得して置き換える。
-# > docker buildx imagetools inspect denoland/deno:distroless-<バージョン>
-FROM denoland/deno:distroless-2.9.7@sha256:16583ef81ce73d6fdf806174fbda68bf4c57e914659ffe6b1c2b600ac2327962
+# > docker buildx imagetools inspect node:<バージョン>-bookworm-slim
+# > docker buildx imagetools inspect gcr.io/distroless/nodejs26-debian13:nonroot
+FROM node:26.13.0-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f021078f5f4a5d687a77d280c1d9 AS deps
 
 WORKDIR /app
-COPY deno.json ./
-COPY src/ ./src/
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
-# nonrootユーザー
-USER 65532:65532
+# 実行用
+# - ENTRYPOINT: node
+# - USER: nonroot(65532)
+FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:a51c5d631b90e1b298e17a88a307b77f0b959b47de942d033acce0c96be3fb83
+
+ENV NODE_ENV=production
+
+WORKDIR /app
+COPY --from=deps /app/ ./
+COPY src/ ./src/
 
 EXPOSE 3000
 
-CMD ["run", "--allow-net", "--allow-env=APP_*", "src/main.ts"]
+CMD ["src/main.ts"]
