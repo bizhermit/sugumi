@@ -1,5 +1,6 @@
 {
   "exclude": [
+    "dist/",
     "local/"
   ],
   "fmt": {
@@ -9,6 +10,7 @@
   },
   "tasks": {
     "dev": "deno run --watch --allow-net src/main.ts",
-    "start": "deno run --allow-net src/main.ts"
+    "start": "deno run --allow-net src/main.ts",
+    "build:image": "deno run --allow-run=git,docker --allow-write=dist scripts/build-image.ts"
   }
 }

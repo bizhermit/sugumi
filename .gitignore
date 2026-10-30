@@ -33,5 +33,8 @@ $RECYCLE.BIN/
 .claude/settings.local.json
 CLAUDE.local.md
 
+# Build
+/dist/
+
 # local
 /local/

@@ -15,10 +15,13 @@
 ## セットアップ方法
 
 1. 環境変数ファイル（`.devcontainer/.env`）を[.env.example](.env.example)から作成する
+
    ```bash
    cp .devcontainer/.env.example .devcontainer/.env
    ```
+
 2. 環境変数ファイルの値を適宜設定する
+
    | キー  |           必須           | 説明          |
    | ----- | :----------------------: | ------------- |
    | `UID` | LinuxまたはWSL使用時のみ | ホストの`UID` |
@@ -32,6 +35,7 @@
    # GID
    id -g
    ```
+
 3. VSCodeでリポジトリを開き、コマンドパレットの「Dev Containers: Reopen in Container」を実行する
 
 ## その他

@@ -1,10 +1,17 @@
 name: myapp
 
 services:
+  lb:
+    image: myapp/lb:${IMAGE_TAG:?.envにIMAGE_TAGを設定してください}
+    build: ../lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - app
   app:
+    image: myapp/app:${IMAGE_TAG:?.envにIMAGE_TAGを設定してください}
     build:
       context: ../..
       dockerfile: deploy/app/Dockerfile
-    ports:
-      - "3000:3000"
     restart: unless-stopped
