@@ -11,4 +11,4 @@ USER 65532:65532
 
 EXPOSE 3000
 
-CMD ["run", "--allow-net", "src/main.ts"]
+CMD ["run", "--allow-net", "--allow-env=APP_*", "src/main.ts"]

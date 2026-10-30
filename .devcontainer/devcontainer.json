@@ -21,8 +21,7 @@
         "EditorConfig.EditorConfig",
         "redhat.vscode-yaml",
         "ms-azuretools.vscode-docker",
-        "Anthropic.claude-code",
-        "denoland.vscode-deno"
+        "Anthropic.claude-code"
       ],
       "settings": {
         "files.exclude": {

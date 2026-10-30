@@ -33,6 +33,9 @@ $RECYCLE.BIN/
 .claude/settings.local.json
 CLAUDE.local.md
 
+# Node.js
+node_modules/
+
 # Build
 /dist/
 

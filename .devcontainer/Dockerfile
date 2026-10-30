@@ -13,25 +13,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     less \
     procps \
-    unzip \
+    xz-utils \
+    libatomic1 \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-# Deno
-# install.sh（curl|sh）は改竄を検知できないので、zipをダウンロードしてチェックサムを確かめる。
-ARG DENO_VERSION=2.9.7
+# Node.js
+# 公式のtar.xzをダウンロードし、SHASUMS256.txtでチェックサムを確かめてから/usr/localに展開する。
+ARG NODE_VERSION=26.13.0
 RUN case "$(dpkg --print-architecture)" in \
-        amd64) target=x86_64-unknown-linux-gnu ;; \
-        arm64) target=aarch64-unknown-linux-gnu ;; \
+        amd64) target=linux-x64 ;; \
+        arm64) target=linux-arm64 ;; \
         *) echo "未対応のアーキテクチャです: $(dpkg --print-architecture)" >&2; exit 1 ;; \
     esac \
     && cd /tmp \
-    && curl -fsSL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-${target}.zip" -o "deno-${target}.zip" \
-    && curl -fsSL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-${target}.zip.sha256sum" -o "deno-${target}.zip.sha256sum" \
-    && sha256sum --check "deno-${target}.zip.sha256sum" \
-    && unzip -o "deno-${target}.zip" -d /usr/local/bin \
-    && chmod 0755 /usr/local/bin/deno \
-    && rm -f "deno-${target}.zip" "deno-${target}.zip.sha256sum"
+    && file="node-v${NODE_VERSION}-${target}.tar.xz" \
+    && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/${file}" -o "${file}" \
+    && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt" -o SHASUMS256.txt \
+    && grep " ${file}\$" SHASUMS256.txt | sha256sum --check \
+    && tar -xJf "${file}" -C /usr/local --strip-components=1 --no-same-owner \
+    && rm -f "${file}" SHASUMS256.txt /usr/local/CHANGELOG.md /usr/local/LICENSE /usr/local/README.md
+
+# npm install -g の先を開発用ユーザーのホームにする（/usr/localはroot所有のため）。
+ENV NPM_CONFIG_PREFIX=/home/dev/.local
 
 # 開発用ユーザー
 # ubuntuユーザーはsudoグループに入っているので消し、最小限の権限で作り直す。
