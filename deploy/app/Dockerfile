@@ -5,7 +5,8 @@ FROM node:26.13.0-bookworm-slim@sha256:bc0a2afd3b74ce12222fc8bab99271e66257f0210
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# dependenciesが空だとnode_modules/が作られず、後のCOPYが失敗するため、空でも作っておく。
+RUN npm ci --omit=dev && mkdir -p node_modules
 
 # 実行用
 # - ENTRYPOINT: node
@@ -15,7 +16,8 @@ FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:a51c5d631b90e1b298e17a88
 ENV NODE_ENV=production
 
 WORKDIR /app
-COPY --from=deps /app/ ./
+COPY --from=deps /app/node_modules/ ./node_modules/
+COPY package.json ./
 COPY src/ ./src/
 
 EXPOSE 3000
