@@ -10,6 +10,26 @@
     "perf": "warn"
   },
   "rules": {
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-control-regex": "off",
+    "no-empty": "warn",
+    "no-empty-pattern": "warn",
+    "no-fallthrough": "warn",
+    "no-var": "error",
+    "no-unused-expressions": "warn",
+    "no-unused-vars": [
+      "warn",
+      {
+        "args": "after-used",
+        "argsIgnorePattern": "^_",
+        "caughtErrors": "none",
+        "destructuredArrayIgnorePattern": "^_",
+        "ignoreRestSiblings": true,
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "prefer-const": "warn",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
     "typescript/no-explicit-any": "error",
     "typescript/no-unsafe-argument": "error",
     "typescript/no-unsafe-assignment": "error",
@@ -18,12 +38,27 @@
     "typescript/no-unsafe-return": "error",
     "typescript/no-misused-promises": "error",
     "typescript/only-throw-error": "error",
-    "typescript/prefer-promise-reject-errors": "error",
-    "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-promise-reject-errors": ["error", { "allowThrowingUnknown": true }],
+    "typescript/prefer-nullish-coalescing": "warn",
     "typescript/restrict-plus-operands": "error",
-    "typescript/switch-exhaustiveness-check": "error"
+    "typescript/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }]
   },
   "env": {
     "node": true
-  }
+  },
+  "ignorePatterns": ["**/*.min.{js,mjs,cjs}"],
+  "overrides": [
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "typescript/no-explicit-any": "off"
+      }
+    }
+  ]
 }

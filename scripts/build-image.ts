@@ -30,9 +30,12 @@ async function git(args: Array<string>) {
 /** 終了コード0ならtrue。出力は端末にそのまま流す。 */
 function run(command: string, args: Array<string>, env?: Record<string, string>) {
   return new Promise<boolean>((resolve) => {
-    spawn(command, args, { stdio: "inherit", env: { ...process.env, ...env } }).on("close", (code) =>
-      resolve(code === 0),
-    );
+    spawn(command, args, {
+      stdio: "inherit",
+      env: { ...process.env, ...env },
+    }).on("close", (code) => {
+      resolve(code === 0);
+    });
   });
 }
 
