@@ -49,6 +49,10 @@ RUN userdel -r ubuntu \
     && mkdir -p /home/dev/.claude /home/dev/.config/gh \
     && chown -R "${UID}:${GID}" /home/dev
 
+# VS Codeのoxc拡張機能はログインシェルの環境変数を取り込んで言語サーバーを起動する。
+# Ubuntu 26.04の/etc/profileはPATHをexportしないため、そのままだとoxlint/oxfmtがnodeを見つけられない。
+RUN echo 'export PATH' > /etc/profile.d/export-path.sh
+
 USER dev
 
 # Claude Code

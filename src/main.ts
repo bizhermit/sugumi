@@ -1,3 +1,4 @@
+// oxlint-disable no-console
 import { createServer } from "node:http";
 import { handler } from "./web/app.ts";
 

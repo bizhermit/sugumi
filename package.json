@@ -15,7 +15,8 @@
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "build:image": "node scripts/build-image.ts"
+    "build:image": "node scripts/build-image.ts",
+    "test": "node --test tests/"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

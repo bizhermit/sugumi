@@ -57,7 +57,19 @@
     {
       "files": ["**/*.test.ts"],
       "rules": {
-        "typescript/no-explicit-any": "off"
+        "typescript/no-explicit-any": "off",
+        "typescript/no-floating-promises": [
+          "error",
+          {
+            "allowForKnownSafeCalls": [
+              {
+                "from": "package",
+                "package": "node:test",
+                "name": ["describe", "it", "test", "suite", "before", "after", "beforeEach", "afterEach"]
+              }
+            ]
+          }
+        ]
       }
     }
   ]
