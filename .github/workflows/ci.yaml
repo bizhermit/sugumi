@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # actionsはタグではなくコミットで固定する。
+      # 更新時はコミットを取得して置き換える。
+      # > gh api repos/<owner>/<repo>/git/ref/tags/<タグ> --jq .object.sha
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # .devcontainer/Dockerfile の NODE_VERSION、deploy/app/Dockerfile のイメージと揃える。
+          node-version: 26.13.0
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run lint -- --deny-warnings
+      - run: npm run format:check
+      - run: npm test
+
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      IMAGE_TAG: ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: 本番と同じイメージをビルドする
+        run: docker compose -f deploy/server/compose.yaml build
+      - name: コンテナを起動し、ロードバランサー経由でヘルスチェックに応答することを確認する
+        run: |
+          docker compose -f deploy/server/compose.yaml up -d
+          for i in $(seq 1 10); do
+            if curl -fsS http://127.0.0.1/healthz; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ヘルスチェックに応答しませんでした。" >&2
+          exit 1
+      - name: ログを出力する
+        if: failure()
+        run: docker compose -f deploy/server/compose.yaml logs
+      - name: コンテナを停止および削除する
+        if: always()
+        run: docker compose -f deploy/server/compose.yaml down
