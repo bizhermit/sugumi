@@ -28,6 +28,7 @@
    | `GID` | LinuxまたはWSL使用時のみ | ホストの`GID` |
 
    **UID/GIDの調べ方**
+
    ```bash
    # UID
    id -u

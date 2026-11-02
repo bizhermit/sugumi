@@ -30,8 +30,9 @@ async function git(args: Array<string>) {
 /** 終了コード0ならtrue。出力は端末にそのまま流す。 */
 function run(command: string, args: Array<string>, env?: Record<string, string>) {
   return new Promise<boolean>((resolve) => {
-    spawn(command, args, { stdio: "inherit", env: { ...process.env, ...env } })
-      .on("close", (code) => resolve(code === 0));
+    spawn(command, args, { stdio: "inherit", env: { ...process.env, ...env } }).on("close", (code) =>
+      resolve(code === 0),
+    );
   });
 }
 
@@ -82,16 +83,14 @@ async function main() {
   }
 
   if (!TAG_PATTERN.test(tag)) {
-    fail(
-      "タグに使えない名前です。",
-      "  半角英数字で始まり、半角英数字と記号（._-）のみ可。1~128文字",
-      `: ${tag}`,
-    );
+    fail("タグに使えない名前です。", "  半角英数字で始まり、半角英数字と記号（._-）のみ可。1~128文字", `: ${tag}`);
   }
 
   if (createTag) {
-    const exists = await execFileAsync("git", ["rev-parse", "--quiet", "--verify", `refs/tags/${tag}`])
-      .then(() => true, () => false);
+    const exists = await execFileAsync("git", ["rev-parse", "--quiet", "--verify", `refs/tags/${tag}`]).then(
+      () => true,
+      () => false,
+    );
     if (exists) {
       fail(`すでにタグが存在します: ${tag}`);
     }

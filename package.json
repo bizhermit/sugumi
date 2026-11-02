@@ -11,10 +11,17 @@
     "dev": "node --watch src/main.ts",
     "start": "node src/main.ts",
     "check": "tsc",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "build:image": "node scripts/build-image.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "oxfmt": "0.75.0",
+    "oxlint": "1.90.0",
+    "oxlint-tsgolint": "7.0.2005",
     "typescript": "7.0.2"
   }
 }

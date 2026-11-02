@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { handler } from "./web/app.ts";
 
-const port = Number(process.env.APP_PORT || 3000);
+const port = Number(process.env.APP_PORT ?? 3000);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   console.error(`APP_PORTが不正です: ${process.env.APP_PORT}`);
   process.exit(1);

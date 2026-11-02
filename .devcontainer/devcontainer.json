@@ -21,7 +21,8 @@
         "EditorConfig.EditorConfig",
         "redhat.vscode-yaml",
         "ms-azuretools.vscode-docker",
-        "Anthropic.claude-code"
+        "Anthropic.claude-code",
+        "oxc.oxc-vscode"
       ],
       "settings": {
         "files.exclude": {
@@ -30,7 +31,10 @@
           "**/.hg": true,
           "**/.DS_Store": true,
           "**/Thumbs.db": true
-        }
+        },
+        "editor.defaultFormatter": "oxc.oxc-vscode",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file"
       }
     }
   }
