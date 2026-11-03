@@ -1,21 +1,44 @@
-// oxlint-disable no-console
 import { createServer } from "node:http";
 import { handler } from "./web/app.ts";
+import { ConfigError, loadConfig } from "./lib/config.ts";
+import { createLogger } from "./lib/logger.ts";
 
-const port = Number(process.env.APP_PORT ?? 3000);
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  console.error(`APP_PORTが不正です: ${process.env.APP_PORT}`);
-  process.exit(1);
+function loadConfigOrExit() {
+  try {
+    return loadConfig();
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      console.error(err.message);
+      process.exit(1);
+    }
+    throw err;
+  }
 }
 
-const server = createServer(handler);
-server.listen(port, () => {
-  console.log(`Listening on http://localhost:${port}/`);
-});
+function main() {
+  const config = loadConfigOrExit();
+  const logger = createLogger(config.log);
 
-process.on("SIGTERM", () => {
-  console.log("SIGTERMを受信しました。サーバーを停止します。");
-  server.close(() => {
-    console.log("サーバーを停止しました。");
+  const server = createServer(handler);
+  server.on("error", (err) => {
+    logger.error("サーバーの起動に失敗しました。", { err });
+    process.exit(1);
   });
-});
+  server.listen(config.port, () => {
+    logger.info("サーバーを起動しました。", { env: config.env, port: config.port });
+  });
+
+  process.on("SIGTERM", () => {
+    logger.info("SIGTERMを受信しました。サーバーを停止します。");
+    server.close((err) => {
+      if (err) {
+        logger.error("サーバーの停止に失敗しました。", { err });
+        process.exitCode = 1;
+        return;
+      }
+      logger.info("サーバーを停止しました。");
+    });
+  });
+}
+
+main();

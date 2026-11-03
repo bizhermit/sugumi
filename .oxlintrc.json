@@ -30,6 +30,10 @@
     ],
     "prefer-const": "warn",
     "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-restricted-properties": [
+      "error",
+      { "object": "process", "property": "env", "message": "環境変数はloadConfigを通して参照してください" }
+    ],
     "typescript/no-explicit-any": "error",
     "typescript/no-unsafe-argument": "error",
     "typescript/no-unsafe-assignment": "error",
@@ -49,9 +53,16 @@
   "ignorePatterns": ["**/*.min.{js,mjs,cjs}"],
   "overrides": [
     {
+      "files": ["src/lib/config.ts"],
+      "rules": {
+        "no-restricted-properties": "off"
+      }
+    },
+    {
       "files": ["scripts/**"],
       "rules": {
-        "no-console": "off"
+        "no-console": "off",
+        "no-restricted-properties": "off"
       }
     },
     {
