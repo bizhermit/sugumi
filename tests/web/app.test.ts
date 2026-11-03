@@ -1,14 +1,15 @@
 import { createServer, type Server } from "node:http";
 import { after, before, describe, it } from "node:test";
-import { handler } from "../../src/web/app.ts";
+import { createApp } from "../../src/web/app.ts";
 import assert from "node:assert/strict";
+import { routes } from "../../src/routes.ts";
 
-describe("handler", () => {
+describe("createApp", () => {
   let server: Server;
   let baseUrl: string;
 
   before(async () => {
-    server = createServer(handler);
+    server = createServer(createApp(routes));
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     assert.ok(address !== null && typeof address === "object");
@@ -27,9 +28,10 @@ describe("handler", () => {
     assert.equal(await res.text(), "OK");
   });
 
-  it("[GET] / : 200 OK", async () => {
-    const res = await fetch(`${baseUrl}/`);
-    assert.equal(res.status, 200);
+  it("[GET] / : 302 → /login", async () => {
+    const res = await fetch(`${baseUrl}/`, { redirect: "manual" });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get("location"), "/login");
   });
 
   it("[GET] /unknown : 404 NotFound", async () => {

@@ -7,16 +7,23 @@
   "engines": {
     "node": "=26"
   },
+  "imports": {
+    "#jsx/jsx-runtime": {
+      "types": "./src/web/jsx-runtime.ts",
+      "default": "./dist/src/web/jsx-runtime.js"
+    }
+  },
   "scripts": {
-    "dev": "node --watch src/main.ts",
-    "start": "node src/main.ts",
-    "check": "tsc",
+    "dev": "node scripts/dev.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/src/main.js",
+    "check": "tsc --noEmit",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "build:image": "node scripts/build-image.ts",
-    "test": "node --test tests/"
+    "test": "tsc && node --test dist/tests/"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

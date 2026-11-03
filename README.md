@@ -9,8 +9,10 @@ Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレー�
 | コマンド              | 説明                                                                    |
 | --------------------- | ----------------------------------------------------------------------- |
 | `npm run dev`         | 開発サーバーを起動する                                                  |
+| `npm run build`       | ソースをビルドする                                                      |
+| `npm run start`       | サーバーを起動する（事前にビルドする必要あり）                          |
 | `npm run check`       | 型チェック（tsc）を実行する                                             |
 | `npm run lint`        | lint（oxlint）を実行する                                                |
-| `npm run format`      | フォーマと（oxfmt）を実行する                                           |
-| `npm test`            | テストを実行する                                                        |
+| `npm run format`      | フォーマット（oxfmt）を実行する                                         |
+| `npm run test`        | テストを実行する                                                        |
 | `npm run build:image` | 本番イメージを作成する。手順は[サーバー](deploy/server/README.md)を参照 |

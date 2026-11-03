@@ -1,7 +1,8 @@
 import { createServer } from "node:http";
-import { handler } from "./web/app.ts";
+import { createApp } from "./web/app.ts";
 import { ConfigError, loadConfig } from "./lib/config.ts";
 import { createLogger } from "./lib/logger.ts";
+import { routes } from "./routes.ts";
 
 function loadConfigOrExit() {
   try {
@@ -19,7 +20,7 @@ function main() {
   const config = loadConfigOrExit();
   const logger = createLogger(config.log);
 
-  const server = createServer(handler);
+  const server = createServer(createApp(routes));
   server.on("error", (err) => {
     logger.error("サーバーの起動に失敗しました。", { err });
     process.exit(1);
