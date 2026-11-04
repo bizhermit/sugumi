@@ -29,4 +29,9 @@ function get(): Response {
   return new Response(`<!doctype html>${page.value}`, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
-export { get };
+function post(): Response {
+  // 暫定処理
+  return new Response(null, { status: 302, headers: { Location: "/home" } });
+}
+
+export { get, post };
