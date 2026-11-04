@@ -1,32 +1,31 @@
-function get(): Response {
-  const page = (
-    <html lang="ja">
-      <head>
-        <meta charset="utf-8" />
-        <title>ログイン</title>
-      </head>
-      <body>
-        <h1>ログイン</h1>
-        <form method="post" action="/login">
-          <p>
-            <label>
-              ユーザー <input name="username" autocomplete="username" required />
-            </label>
-          </p>
-          <p>
-            <label>
-              パスワード <input type="password" name="password" autocomplete="current-password" required />
-            </label>
-          </p>
-          <p>
-            <button type="submit">ログイン</button>
-          </p>
-        </form>
-      </body>
-    </html>
-  );
+import { page } from "../../web/html-document.tsx";
 
-  return new Response(`<!doctype html>${page.value}`, { headers: { "content-type": "text/html; charset=utf-8" } });
+function get() {
+  return page({
+    title: "ログイン",
+    slots: {
+      main: (
+        <main>
+          <h1>ログイン</h1>
+          <form method="post" action="/login">
+            <p>
+              <label>
+                ユーザー <input name="username" autocomplete="username" required />
+              </label>
+            </p>
+            <p>
+              <label>
+                パスワード <input type="password" name="password" autocomplete="current-password" required />
+              </label>
+            </p>
+            <p>
+              <button type="submit">ログイン</button>
+            </p>
+          </form>
+        </main>
+      ),
+    },
+  });
 }
 
 function post(): Response {

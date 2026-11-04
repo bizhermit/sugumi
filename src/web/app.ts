@@ -1,11 +1,18 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Method, Middleware, RouteHandler, RouteMap } from "./routes.ts";
 import { Readable } from "node:stream";
+import { htmlDocument, Page } from "./html-document.tsx";
 
 function run(middleware: readonly Middleware[], handler: RouteHandler, req: Request): Promise<Response> {
   async function dispatch(index: number): Promise<Response> {
     const fn = middleware[index];
-    if (fn == null) return await handler(req);
+    if (fn == null) {
+      const result = await handler(req);
+      if (result instanceof Page) {
+        return htmlDocument(result);
+      }
+      return result;
+    }
     return await fn(req, () => dispatch(index + 1));
   }
   return dispatch(0);
@@ -31,8 +38,9 @@ async function handle(routes: RouteMap, req: IncomingMessage, res: ServerRespons
   const url = new URL(req.url ?? "/", "http://localhost");
   const method = req.method ?? "GET";
   const route = routes[url.pathname];
+
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  const handler = routes[url.pathname]?.[method === "HEAD" ? "GET" : (method as Method)];
+  const handler = route?.[method === "HEAD" ? "GET" : (method as Method)];
 
   const response =
     route == null || handler == null
