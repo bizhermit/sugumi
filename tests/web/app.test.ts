@@ -3,13 +3,24 @@ import { after, before, describe, it } from "node:test";
 import { createApp } from "../../src/web/app.ts";
 import assert from "node:assert/strict";
 import { routes } from "../../src/routes.ts";
+import { createLogger } from "../../src/lib/logger.ts";
 
 describe("createApp", () => {
   let server: Server;
   let baseUrl: string;
 
   before(async () => {
-    server = createServer(createApp(routes));
+    server = createServer(
+      createApp(routes, {
+        logger: createLogger({
+          level: "error",
+          format: "json",
+          write: () => {
+            // テストのため出力しない
+          },
+        }),
+      }),
+    );
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     assert.ok(address !== null && typeof address === "object");

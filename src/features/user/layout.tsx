@@ -7,6 +7,9 @@ const wrapper: Layout = {
       <nav>
         <ul>
           <li>
+            <a href="/home">ホーム</a>
+          </li>
+          <li>
             <a href="/user">ユーザー</a>
           </li>
           <li>

@@ -20,7 +20,7 @@ function main() {
   const config = loadConfigOrExit();
   const logger = createLogger(config.log);
 
-  const server = createServer(createApp(routes));
+  const server = createServer(createApp(routes, { logger }));
   server.on("error", (err) => {
     logger.error("サーバーの起動に失敗しました。", { err });
     process.exit(1);
