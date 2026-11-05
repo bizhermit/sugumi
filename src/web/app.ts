@@ -36,9 +36,12 @@ function toRequest(req: IncomingMessage, url: URL): Request {
 }
 
 async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, res: ServerResponse) {
+  const start = performance.now();
   const url = new URL(req.url ?? "/", "http://localhost");
   const method = req.method ?? "GET";
   const route = routes[url.pathname];
+  const requestId = crypto.randomUUID();
+  const logger = app.logger.child({ requestId });
 
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion
   const handler = route?.[method === "HEAD" ? "GET" : (method as Method)];
@@ -49,16 +52,24 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
       response = new Response("Not Found", { status: 404 });
     } else {
       const request = toRequest(req, url);
-      appSlot.set(request, app);
+      appSlot.set(request, { ...app, logger });
       response = await run(route.middleware ?? [], handler, request);
     }
   } catch (err) {
-    app.logger.error("リクエストの処理に失敗しました。", { err, method, path: url.pathname });
+    logger.error("リクエストの処理に失敗しました。", { err, method, url: `${url.pathname}${url.search}` });
     response = new Response("Internal Server Error", { status: 500 });
   }
 
   res.writeHead(response.status, Object.fromEntries(response.headers));
   res.end(Buffer.from(await response.arrayBuffer()));
+
+  logger.info("access", {
+    method,
+    path: url.pathname,
+    query: [...url.searchParams.keys()],
+    status: response.status,
+    durationMs: Math.round((performance.now() - start) * 10) / 10,
+  });
 }
 
 export function createApp(routes: RouteMap, app: AppContext) {
