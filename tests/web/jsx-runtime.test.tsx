@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { classNames, jsx, withAssets, type Html } from "#jsx/jsx-runtime";
+import { jsx, withAssets, type Html } from "#jsx/jsx-runtime";
 
 // withAssets のテスト用の部品。
 const FORM = { styles: ["/_assets/form.css"], scripts: ["/_assets/form.js"] };
@@ -40,7 +40,7 @@ describe("jsx", () => {
     assert.equal((<p title={'<"&>'}>{"<a&b>"}</p>).value, '<p title="&lt;&quot;&amp;&gt;">&lt;a&amp;b&gt;</p>');
   });
 
-  it("Html はエスケープせずそのまま埋め込む", () => {
+  it("Htmlはエスケープせずそのまま埋め込む", () => {
     const inner = <b>x</b>;
     assert.equal((<p>{inner}</p>).value, "<p><b>x</b></p>");
   });
@@ -50,7 +50,7 @@ describe("jsx", () => {
     assert.equal((<p aria-busy={true} aria-hidden={false}></p>).value, '<p aria-busy="true" aria-hidden="false"></p>');
   });
 
-  it("null・undefined の属性は出さない", () => {
+  it("null/undefinedの属性は出さない", () => {
     // 型では null を許していないので、ランタイムを直接呼ぶ。
     assert.equal(jsx("p", { id: null, title: undefined }).value, "<p></p>");
   });
@@ -78,15 +78,15 @@ describe("jsx", () => {
 });
 
 describe("className", () => {
-  it("文字列はそのまま class にする", () => {
+  it("文字列はそのままclassにする", () => {
     assert.equal((<p className="hoge fuga"></p>).value, '<p class="hoge fuga"></p>');
   });
 
-  it("配列は空白でつなぎ、false・null・undefined は飛ばす", () => {
+  it("配列は空白でつなぎ、false・null・undefinedは含まれない", () => {
     assert.equal((<p className={["hoge", false, null, undefined, "fuga"]}></p>).value, '<p class="hoge fuga"></p>');
   });
 
-  it("空なら属性ごと出さない", () => {
+  it("空なら属性ごと設定しない", () => {
     assert.equal((<p className=""></p>).value, "<p></p>");
     assert.equal((<p className={[false, undefined]}></p>).value, "<p></p>");
     assert.equal(jsx("p", { className: undefined }).value, "<p></p>");
@@ -96,8 +96,11 @@ describe("className", () => {
     assert.equal((<p className={['a"b']}></p>).value, '<p class="a&quot;b"></p>');
   });
 
-  it("classNames は配列を 1 段ほどく", () => {
-    assert.equal((<p className={classNames("a", ["b", false, "c"], undefined)}></p>).value, '<p class="a b c"></p>');
+  it("classNameは入れ子配列に対応する", () => {
+    assert.equal(
+      (<p className={["a", ["b", false, "c", ["d", "e"]], undefined]}></p>).value,
+      '<p class="a b c d e"></p>',
+    );
   });
 
   it("文字列以外は例外", () => {
@@ -108,7 +111,7 @@ describe("className", () => {
 });
 
 describe("withAssets", () => {
-  it("使ったコンポーネントの Assets が親に集まる", () => {
+  it("使用しているコンポーネントのアセットが設定される", () => {
     const html = (
       <div>
         <Form />
@@ -117,12 +120,12 @@ describe("withAssets", () => {
     assert.deepEqual(html.assets, [FORM]);
   });
 
-  it("使わなければ集まらない", () => {
+  it("使用しないコンポーネントのアセットは設定されない", () => {
     assert.deepEqual(maybeForm(false).assets, []);
     assert.deepEqual(maybeForm(true).assets, [FORM]);
   });
 
-  it("同じコンポーネントを何度使っても 1 つ", () => {
+  it("同一コンポーネントのアセットの重複設定を防ぐ", () => {
     const html = (
       <div>
         <Form />
@@ -132,11 +135,11 @@ describe("withAssets", () => {
     assert.deepEqual(html.assets, [FORM]);
   });
 
-  it("親の Assets が先、子の Assets が後", () => {
+  it("親コンポーネントと子コンポーネントのアセットの順番（親→子の順）", () => {
     assert.deepEqual((<Outer />).assets, [FORM, FIELD]);
   });
 
-  it("フラグメントと配列を通しても集まる", () => {
+  it("フラグメントと配列を通してもアセットが設定される", () => {
     const html = (
       <>
         {[<Field />]}

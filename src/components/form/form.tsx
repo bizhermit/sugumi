@@ -1,4 +1,4 @@
-import { classNames, withAssets, type Html } from "#jsx/jsx-runtime";
+import { withAssets, type Html } from "#jsx/jsx-runtime";
 import { asset } from "../../web/assets.ts";
 import type { HtmlElements } from "../../web/html-attributes.ts";
 
@@ -10,5 +10,5 @@ const ASSETS = {
 };
 
 export function Form({ className, ...props }: Props): Html {
-  return withAssets(<form {...props} className={classNames("form", className)} />, ASSETS);
+  return withAssets(<form {...props} className={["form", className]} />, ASSETS);
 }

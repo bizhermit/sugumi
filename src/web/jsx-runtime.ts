@@ -1,5 +1,5 @@
 import type { Assets } from "./assets.ts";
-import type { HtmlClassNames, HtmlElements } from "./html-attributes.ts";
+import type { HtmlElements } from "./html-attributes.ts";
 
 const NO_ASSETS: readonly Assets[] = [];
 
@@ -111,27 +111,22 @@ function renderChildren(value: unknown, assets: Assets[]): string {
   }
 }
 
-export function classNames(...value: (string | false | null | undefined | HtmlClassNames)[]) {
-  return value.flat(1);
+function joinClassNames(result: string, value: unknown): string {
+  if (!value) return result;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      result = joinClassNames(result, item);
+    }
+    return result;
+  }
+  if (typeof value !== "string") {
+    throw new TypeError(`属性"className"に使用できない値です: ${typeName(value)}`);
+  }
+  return result === "" ? value : `${result} ${value}`;
 }
 
 function renderClass(className: unknown): string {
-  if (!className) return "";
-  if (!Array.isArray(className)) {
-    if (typeof className !== "string") {
-      throw new TypeError(`属性"className"に使用できない値です: ${typeName(className)}`);
-    }
-    return ` class="${escapeHtml(className)}"`;
-  }
-
-  let result = "";
-  for (const value of className) {
-    if (!value) continue;
-    if (typeof value !== "string") {
-      throw new TypeError(`属性"className"に使用できない値です: ${typeName(value)}`);
-    }
-    result = result === "" ? value : `${result} ${value}`;
-  }
+  const result = joinClassNames("", className);
   return result === "" ? "" : ` class="${escapeHtml(result)}"`;
 }
 

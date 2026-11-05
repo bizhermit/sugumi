@@ -14,7 +14,7 @@ function get() {
       main: (
         <main>
           <h1>ログイン</h1>
-          <Form method="post" action="/login">
+          <Form method="post" action="/login" className="login-form">
             <p>
               <label>
                 ユーザー <input name="username" autocomplete="username" required />
