@@ -1,0 +1,7 @@
+form {
+  margin-inline: auto;
+}
+
+form label + button[aria-pressed] {
+  margin-inline-start: 0.5rem;
+}

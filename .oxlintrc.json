@@ -34,6 +34,7 @@
       "error",
       { "object": "process", "property": "env", "message": "環境変数はloadConfigを通して参照してください" }
     ],
+    "unicorn/no-empty-file": "off",
     "typescript/no-explicit-any": "error",
     "typescript/no-unsafe-argument": "error",
     "typescript/no-unsafe-assignment": "error",
@@ -66,7 +67,7 @@
       }
     },
     {
-      "files": ["**/*.test.ts"],
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
       "rules": {
         "typescript/no-explicit-any": "off",
         "typescript/no-floating-promises": [

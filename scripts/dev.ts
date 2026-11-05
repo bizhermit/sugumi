@@ -1,20 +1,24 @@
-// 開発サーバー。src/ の変更を検知して tsc で dist/ に出力し、node --watch が dist/ の変更でサーバーを再起動する。
-// tsc --watch を使わないのは、この環境で変更を拾わなくなることがあったため。検知は Node の fs.watch で行う。
 import { spawn, spawnSync } from "node:child_process";
 import { watch } from "node:fs";
 
-const TSC = ["node_modules/.bin/tsc", "-p", "tsconfig.build.json"] as const;
+const BUILDS = [
+  ["node_modules/.bin/tsc", "-p", "tsconfig.build.json"],
+  ["node", "scripts/build-assets.ts"],
+] as const;
 
 function build(): boolean {
-  const result = spawnSync(TSC[0], TSC.slice(1), { stdio: "inherit" });
-  return result.status === 0;
+  for (const [command, ...args] of BUILDS) {
+    const result = spawnSync(command, args, { stdio: "inherit" });
+    if (result.status !== 0) return false;
+  }
+  return true;
 }
 
 if (!build()) {
   process.exit(1);
 }
 
-const server = spawn("node", ["--watch", "dist/src/main.js"], { stdio: "inherit" });
+const server = spawn("node", ["--watch-path=dist", "dist/src/main.js"], { stdio: "inherit" });
 
 // 保存は短い間隔で複数のイベントを出すので、少し待ってからまとめてビルドする。
 let timer: NodeJS.Timeout | undefined;
@@ -27,7 +31,7 @@ function rebuild() {
     return;
   }
   building = true;
-  console.log(`${new Date().toLocaleTimeString()} - src/ の変更を検知しました。ビルドします。`);
+  console.log(`${new Date().toLocaleTimeString()} - ファイルの変更を検知しました。ビルドします。`);
   build();
   building = false;
   if (pending) {

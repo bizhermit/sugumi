@@ -6,9 +6,10 @@ import * as authMiddleware from "./features/auth/middleware.ts";
 import * as home from "./features/user/home.tsx";
 import * as settings from "./features/user/settings.tsx";
 import * as user from "./features/user/index.tsx";
-import * as userLayout from "./features/user/layout.tsx";
+import { userLayout } from "./features/user/layout.tsx";
+import { rootLayout } from "./features/layout.tsx";
 
-export const routes = {
+export const routes = layout(rootLayout, {
   "/": {
     GET: index.get,
   },
@@ -20,7 +21,7 @@ export const routes = {
     POST: login.post,
   },
   ...layout(
-    userLayout.userLayout,
+    userLayout,
     middleware([authMiddleware.requireLogin], {
       "/home": {
         GET: home.get,
@@ -35,6 +36,6 @@ export const routes = {
       }),
     }),
   ),
-} as const satisfies RouteMap;
+}) satisfies RouteMap;
 
 export type RoutePath = keyof typeof routes;

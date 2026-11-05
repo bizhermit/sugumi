@@ -12,9 +12,11 @@
 
 type Num = number | `${number}`;
 
+export type HtmlClassNames = readonly (string | false | null | undefined)[];
+
 type Global = {
   id?: string;
-  class?: string;
+  className?: string | HtmlClassNames; // class
   title?: string;
   lang?: string;
   dir?: "ltr" | "rtl" | "auto";

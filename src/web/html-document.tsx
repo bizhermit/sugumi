@@ -9,15 +9,15 @@ export type Slots = {
 
 export type Layout = {
   readonly title?: HtmlTitle;
-  // readonly styles?: string[]; // TODO
-  // readonly scripts?: string[]; // TODO
+  readonly styles?: string[];
+  readonly scripts?: string[];
   readonly render?: (slots: Slots) => Html;
 };
 
 export type PageOptions = {
   readonly title?: HtmlTitle;
-  // readonly styles?: string[]; // TODO
-  // readonly scripts?: string[]; // TODO
+  readonly styles?: string[];
+  readonly scripts?: string[];
   readonly slots: Slots;
   readonly status?: number;
   readonly headers?: Readonly<Record<string, string>>;
@@ -53,11 +53,25 @@ function applyTitle(outer: string | undefined, title: HtmlTitle | undefined): st
 
 function compose(target: Page) {
   const { layouts, options } = target;
+
   let title: string | undefined;
+  const styles = new Set<string>();
+  const scripts = new Set<string>();
+
   for (let i = 0, il = layouts.length; i < il; i++) {
-    title = applyTitle(title, layouts[i]?.title);
+    const layout = layouts[i];
+    if (layout == null) continue;
+    title = applyTitle(title, layout.title);
+    for (const href of layout.styles ?? []) {
+      styles.add(href);
+    }
+    for (const src of layout.scripts ?? []) {
+      scripts.add(src);
+    }
   }
+
   title = applyTitle(title, options.title);
+
   const current = { ...options.slots };
   for (let i = layouts.length - 1; i >= 0; i--) {
     const render = layouts[i]?.render;
@@ -65,14 +79,31 @@ function compose(target: Page) {
     current.main = render(current);
   }
 
+  for (const used of current.main.assets) {
+    for (const href of used.styles ?? []) {
+      styles.add(href);
+    }
+    for (const src of used.scripts ?? []) {
+      scripts.add(src);
+    }
+  }
+  for (const href of options.styles ?? []) {
+    styles.add(href);
+  }
+  for (const src of options.scripts ?? []) {
+    scripts.add(src);
+  }
+
   return {
     title,
     elements: current.main,
+    styles: [...styles],
+    scripts: [...scripts],
   } as const;
 }
 
 export function htmlDocument(target: Page): Response {
-  const { title, elements } = compose(target);
+  const { title, elements, styles, scripts } = compose(target);
 
   const html = (
     <html lang="ja">
@@ -80,6 +111,12 @@ export function htmlDocument(target: Page): Response {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title}</title>
+        {styles.map((href) => (
+          <link rel="stylesheet" href={href} />
+        ))}
+        {scripts.map((src) => (
+          <script type="module" src={src}></script>
+        ))}
       </head>
       <body>{elements}</body>
     </html>

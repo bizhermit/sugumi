@@ -1,6 +1,6 @@
 import type { Layout } from "../../web/html-document.tsx";
 
-const wrapper: Layout = {
+const userLayout: Layout = {
   title: "ユーザー",
   render: (slots) => (
     <>
@@ -22,4 +22,4 @@ const wrapper: Layout = {
   ),
 };
 
-export { wrapper as userLayout };
+export { userLayout };

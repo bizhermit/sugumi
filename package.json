@@ -15,18 +15,20 @@
   },
   "scripts": {
     "dev": "node scripts/dev.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && npm run build:assets",
+    "build:assets": "node scripts/build-assets.ts",
     "start": "node dist/src/main.js",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && tsc -p tsconfig.client.json",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "build:image": "node scripts/build-image.ts",
-    "test": "tsc && node --test dist/tests/"
+    "test": "tsc && npm run build:assets && node --test dist/tests/"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "esbuild": "0.28.2",
     "oxfmt": "0.75.0",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",

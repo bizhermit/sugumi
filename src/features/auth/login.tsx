@@ -1,13 +1,20 @@
+import { Form } from "../../components/form/form.tsx";
+import { asset } from "../../web/assets.ts";
 import { page } from "../../web/html-document.tsx";
+
+const styles = [asset(import.meta.resolve("./_assets/login.css"))];
+const scripts = [asset(import.meta.resolve("./_assets/login.ts"))];
 
 function get() {
   return page({
     title: "ログイン",
+    styles,
+    scripts,
     slots: {
       main: (
         <main>
           <h1>ログイン</h1>
-          <form method="post" action="/login">
+          <Form method="post" action="/login">
             <p>
               <label>
                 ユーザー <input name="username" autocomplete="username" required />
@@ -21,7 +28,7 @@ function get() {
             <p>
               <button type="submit">ログイン</button>
             </p>
-          </form>
+          </Form>
         </main>
       ),
     },

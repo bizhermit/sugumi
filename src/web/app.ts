@@ -3,6 +3,7 @@ import type { Method, Middleware, RouteHandler, RouteMap } from "./routes.ts";
 import { Readable } from "node:stream";
 import { htmlDocument, Page } from "./html-document.tsx";
 import { appSlot, type AppContext } from "./context.ts";
+import { ASSETS_PREFIX, serveAsset } from "./assets.ts";
 
 function run(middleware: readonly Middleware[], handler: RouteHandler, req: Request): Promise<Response> {
   async function dispatch(index: number): Promise<Response> {
@@ -48,7 +49,9 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
 
   let response: Response;
   try {
-    if (route == null || handler == null) {
+    if (url.pathname.startsWith(ASSETS_PREFIX)) {
+      response = serveAsset(toRequest(req, url), url);
+    } else if (route == null || handler == null) {
       response = new Response("Not Found", { status: 404 });
     } else {
       const request = toRequest(req, url);
@@ -60,7 +63,12 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
     response = new Response("Internal Server Error", { status: 500 });
   }
 
-  res.writeHead(response.status, Object.fromEntries(response.headers));
+  const headers: Record<string, string | string[]> = Object.fromEntries(response.headers);
+  const cookies = response.headers.getSetCookie();
+  if (cookies.length > 0) {
+    headers["set-cookie"] = cookies;
+  }
+  res.writeHead(response.status, headers);
   res.end(Buffer.from(await response.arrayBuffer()));
 
   logger.info("access", {

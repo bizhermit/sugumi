@@ -8,8 +8,12 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
 COPY src/ ./src/
+COPY scripts/build-assets.ts ./scripts/
 # dependenciesが空だとnode_modules/が作られず、後のCOPYが失敗するため、空でも作っておく。
-RUN npx tsc -p tsconfig.build.json && npm prune --omit=dev && mkdir -p node_modules
+RUN npx tsc -p tsconfig.build.json \
+    && node scripts/build-assets.ts \
+    && npm prune --omit=dev \
+    && mkdir -p node_modules
 
 # 実行用
 # - ENTRYPOINT: node
@@ -23,6 +27,7 @@ COPY --from=build /app/node_modules/ ./node_modules/
 # package.json は imports（#jsx）の解決に要る。
 COPY package.json ./
 COPY --from=build /app/dist/src/ ./dist/src/
+COPY --from=build /app/dist/public/ ./dist/public/
 
 EXPOSE 3000
 
