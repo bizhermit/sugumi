@@ -18,7 +18,7 @@ if (!build()) {
   process.exit(1);
 }
 
-const server = spawn("node", ["--watch-path=dist", "dist/src/main.js"], { stdio: "inherit" });
+const server = spawn("node", ["--watch-path=dist", "--watch-path=static", "dist/src/main.js"], { stdio: "inherit" });
 
 // 保存は短い間隔で複数のイベントを出すので、少し待ってからまとめてビルドする。
 let timer: NodeJS.Timeout | undefined;

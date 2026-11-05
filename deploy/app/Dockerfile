@@ -28,6 +28,7 @@ COPY --from=build /app/node_modules/ ./node_modules/
 COPY package.json ./
 COPY --from=build /app/dist/src/ ./dist/src/
 COPY --from=build /app/dist/public/ ./dist/public/
+COPY static/ ./static/
 
 EXPOSE 3000
 

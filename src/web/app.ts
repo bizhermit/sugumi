@@ -4,6 +4,7 @@ import { Readable } from "node:stream";
 import { htmlDocument, Page } from "./html-document.tsx";
 import { appSlot, type AppContext } from "./context.ts";
 import { ASSETS_PREFIX, serveAsset } from "./assets.ts";
+import { serveStatic, staticPaths } from "./static.ts";
 
 function run(middleware: readonly Middleware[], handler: RouteHandler, req: Request): Promise<Response> {
   async function dispatch(index: number): Promise<Response> {
@@ -51,7 +52,9 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
   try {
     if (url.pathname.startsWith(ASSETS_PREFIX)) {
       response = serveAsset(toRequest(req, url), url);
-    } else if (route == null || handler == null) {
+    } else if (route == null) {
+      response = serveStatic(toRequest(req, url), url) ?? new Response("Not Found", { status: 404 });
+    } else if (handler == null) {
       response = new Response("Not Found", { status: 404 });
     } else {
       const request = toRequest(req, url);
@@ -81,6 +84,11 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
 }
 
 export function createApp(routes: RouteMap, app: AppContext) {
+  for (const path of staticPaths()) {
+    if (routes[path] != null) {
+      throw new Error(`static${path}とルートの${path}が重複しています。`);
+    }
+  }
   return (req: IncomingMessage, res: ServerResponse) => {
     void handle(routes, app, req, res);
   };
