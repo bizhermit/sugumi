@@ -5,6 +5,7 @@ import { htmlDocument, Page } from "./html-document.tsx";
 import { appSlot, type AppContext } from "./context.ts";
 import { ASSETS_PREFIX, serveAsset } from "./assets.ts";
 import { serveStatic, staticPaths } from "./static.ts";
+import { applySecurityHeaders } from "./security-headers.ts";
 
 function run(middleware: readonly Middleware[], handler: RouteHandler, req: Request): Promise<Response> {
   async function dispatch(index: number): Promise<Response> {
@@ -66,12 +67,14 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
     response = new Response("Internal Server Error", { status: 500 });
   }
 
-  const headers: Record<string, string | string[]> = Object.fromEntries(response.headers);
-  const cookies = response.headers.getSetCookie();
+  const headers = new Headers(response.headers);
+  applySecurityHeaders(headers);
+  const record: Record<string, string | string[]> = Object.fromEntries(headers);
+  const cookies = headers.getSetCookie();
   if (cookies.length > 0) {
-    headers["set-cookie"] = cookies;
+    record["set-cookie"] = cookies;
   }
-  res.writeHead(response.status, headers);
+  res.writeHead(response.status, record);
   res.end(Buffer.from(await response.arrayBuffer()));
 
   logger.info("access", {
