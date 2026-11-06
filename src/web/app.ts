@@ -6,6 +6,7 @@ import { appSlot, type AppContext } from "./context.ts";
 import { ASSETS_PREFIX, serveAsset } from "./assets.ts";
 import { serveStatic, staticPaths } from "./static.ts";
 import { applySecurityHeaders } from "./security-headers.ts";
+import { pipeline } from "node:stream/promises";
 
 function run(middleware: readonly Middleware[], handler: RouteHandler, req: Request): Promise<Response> {
   async function dispatch(index: number): Promise<Response> {
@@ -36,6 +37,10 @@ function toRequest(req: IncomingMessage, url: URL): Request {
     body,
     duplex: "half",
   });
+}
+
+function isPrematureClose(err: unknown): boolean {
+  return err instanceof Error && "code" in err && err.code === "ERR_STREAM_PREMATURE_CLOSE";
 }
 
 async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, res: ServerResponse) {
@@ -75,7 +80,20 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
     record["set-cookie"] = cookies;
   }
   res.writeHead(response.status, record);
-  res.end(Buffer.from(await response.arrayBuffer()));
+
+  try {
+    if (response.body == null || method === "HEAD") {
+      await response.body?.cancel();
+      res.end();
+    } else {
+      await pipeline(Readable.fromWeb(response.body), res);
+    }
+  } catch (err) {
+    if (!isPrematureClose(err)) {
+      logger.error("レスポンスの送信に失敗しました。", { err, method, url: `${url.pathname}${url.search}` });
+    }
+    res.destroy();
+  }
 
   logger.info("access", {
     method,
