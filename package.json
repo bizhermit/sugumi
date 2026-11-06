@@ -23,8 +23,8 @@
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "build:image": "node scripts/build-image.ts",
-    "test": "tsc && npm run build:assets && node --test dist/tests/"
+    "test": "tsc && npm run build:assets && node --test dist/tests/",
+    "build:image": "node scripts/build-image.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

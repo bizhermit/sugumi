@@ -1,3 +1,9 @@
+/**
+ * 全レスポンスに付けるセキュリティヘッダ
+ * 外部のスクリプト・スタイル・iframe を使わない前提で、許可を最小にしている。
+ * 緩めたい画面は、そのレスポンスに同じ名前のヘッダを付ける。ここでは同名のヘッダがあれば触らない。
+ */
+
 export type CspDirectives = Readonly<Record<string, readonly string[]>>;
 
 const DEFAULT_CSP: CspDirectives = {
