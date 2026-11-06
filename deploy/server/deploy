@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+APP_NAME=myapp
+
+ask() {
+  local answer
+  read -r -p "$1 [y/N]: " answer
+  [ "$answer" = y ] || [ "$answer" = Y ]
+}
+
+files=()
+for file in "$APP_NAME"-*.tar.gz; do
+  [ -e "$file" ] || continue
+  tag=${file#"$APP_NAME"-}
+  tag=${tag%.tar.gz}
+  if ! docker image inspect "$APP_NAME/app:$tag" > /dev/null 2>&1; then
+    files+=("$file")
+  fi
+done
+if [ ${#files[@]} -eq 0 ]; then
+  echo "読み込んでいないイメージファイルはありません。"
+  exit 0
+fi
+
+echo "読み込むイメージファイルを番号で選んでください: "
+select file in "${files[@]}"; do
+  [ -n "$file" ] && break
+done
+if [ -z "${file:-}" ]; then
+  exit 1
+fi
+tag=${file#"$APP_NAME"-}
+tag=${tag%.tar.gz}
+
+if ! ask "「$file」を読み込みます。よろしいですか？"; then
+  exit 0
+fi
+
+docker load --input "$file"
+docker image inspect "$APP_NAME/app:$tag" "$APP_NAME/lb:$tag" > /dev/null
+
+current=$(sed -n 's/^IMAGE_TAG=//p' .env 2> /dev/null || true)
+if [ "$current" != "$tag" ] && ask "IMAGE_TAGを「${current:-（なし）}」から「$tag」に変更しますか？"; then
+  # .env にはほかの値も入るので、IMAGE_TAG の行だけ書き換える。
+  if grep -q '^IMAGE_TAG=' .env 2> /dev/null; then
+    sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$tag|" .env
+  else
+    if [ -s .env ] && [ "$(tail -c 1 .env)" != "" ]; then
+      echo >> .env
+    fi
+    echo "IMAGE_TAG=$tag" >> .env
+  fi
+  echo "IMAGE_TAGを「$tag」に変更しました。"
+fi
+
+if ask "コンテナを起動しますか？"; then
+  docker compose up -d
+  docker compose ps
+fi

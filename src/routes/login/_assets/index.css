@@ -1,4 +1,0 @@
-/* index.ts が追加する、パスワードを表示するボタン。 */
-form label + button[aria-pressed] {
-  margin-inline-start: 0.5rem;
-}
