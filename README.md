@@ -64,13 +64,7 @@ Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレー�
 ```
 
 - 依存の向きは `features → components → web → lib` の一方向のみ許可。逆向きにimportしない。featuresからweb,lib、componentsからlibの直接使用も可。
-- `web/`はテンプレートが提供するアプリの土台。要件機能は置かない。ただし要件によって変更や追加は可能。要件機能は`features/`と`components/`に置く。
-- ブラウザで動くコードは`_assets/`の中にだけ置く。`src/features/**/_assets/`と`src/components/**/_assets/`の直下にある`.ts`/`.css`がビルドの入口で、その中のディレクトリは入口から import する部品。
-- `_assets/`は`src/`からの相対パスから`_assets/`を除いたURLで配信される。`asset()`はモジュールの先頭で呼び、起動時に解決させる。
-  - `src/features/auth/login.tsx` で `asset(import.meta.resolve("./_assets/login.css"))` → `/_assets/features/auth/login.css?v=<ハッシュ>`
-  - `src/features/auth/login.tsx` で `asset(import.meta.resolve("./_assets/login.ts"))` → `/_assets/features/auth/login.js?v=<ハッシュ>`
-- 画面部品が使用するCSS/ClientJSは`withAssets()`で宣言する。その部品を描画する画面にだけ、`<link>`/`<script>`が追加される。
-- `static/`は`favicon.ico`や`robots.txt`のようにURLが外部の取り決めで決まるファイルの置き場。
+- `asset()`はモジュールの先頭で呼び、起動時に解決させる。
 
 ## 規約
 
@@ -87,14 +81,14 @@ Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレー�
   - 関数のコメントに書く理由は、その関数自身についてのもののみ
 - 処理の流れの説明や変更の経緯は書かない。経緯はコミットメッセージに残す
 
+### セキュリティ
+
+- 状態を変える処理をGETに置かない。CSRFの検証（[`src/web/csrf.ts`](src/web/csrf.ts)）はGET/HEAD/OPTIONSでは行われない。
+
 ### ログ
 
-- アクセスログにはクエリ文字列のキー名だけを記録し、値は記録しない。トークンやパスワードをGETのクエリに入れない。
-- 処理に失敗したときのエラーログには、原因を調べられるようクエリ文字列の値も記録する。
-- ログの保持期間と閲覧権限はデプロイ先で決める。
+- トークンやパスワードをGETのクエリに入れない。アクセスログには残らないが、エラーログにはクエリの値も記録される。
 
 ### HTML/JS/CSS
 
-- HTMLはJSXで記述する。属性の型は[`src/web/html-attributes.ts`](src/web/html-attributes.ts)で定義する
 - クライアントサイドでのJSは段階的な機能拡張に使用する。JSが無効でもフォームの送信や画面の移動といった基本的な操作は可能であるようにする
-- クライアントサイドで使用するJSおよびCSSは、アセットとして`src/(features|components)/**/_assets/`直下に配置し、`layout`/`page`またはコンポーネントで設定する

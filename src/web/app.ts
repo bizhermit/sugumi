@@ -6,7 +6,18 @@ import { appSlot, type AppContext } from "./context.ts";
 import { ASSETS_PREFIX, serveAsset } from "./assets.ts";
 import { serveStatic, staticPaths } from "./static.ts";
 import { applySecurityHeaders } from "./security-headers.ts";
+import {
+  createCsrfToken,
+  isSafeMethod,
+  isSameOrigin,
+  readCsrfToken,
+  createCsrfCookie,
+  verifyCsrfToken,
+  csrfSlot,
+} from "./csrf.ts";
+import { HttpError, STATUS_TEXTS } from "./http-error.ts";
 import { pipeline } from "node:stream/promises";
+import { formSlot, readForm } from "./form.ts";
 
 function run(middleware: readonly Middleware[], handler: RouteHandler, req: Request): Promise<Response> {
   async function dispatch(index: number): Promise<Response> {
@@ -43,6 +54,10 @@ function isPrematureClose(err: unknown): boolean {
   return err instanceof Error && "code" in err && err.code === "ERR_STREAM_PREMATURE_CLOSE";
 }
 
+function createErrorResponse(status: number): Response {
+  return new Response(STATUS_TEXTS[status] ?? "Error", { status });
+}
+
 async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, res: ServerResponse) {
   const start = performance.now();
   const url = new URL(req.url ?? "/", "http://localhost");
@@ -55,25 +70,50 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
   const handler = route?.[method === "HEAD" ? "GET" : (method as Method)];
 
   let response: Response;
+  let setCookie: string | undefined;
   try {
     if (url.pathname.startsWith(ASSETS_PREFIX)) {
       response = serveAsset(toRequest(req, url), url);
     } else if (route == null) {
-      response = serveStatic(toRequest(req, url), url) ?? new Response("Not Found", { status: 404 });
+      response = serveStatic(toRequest(req, url), url) ?? createErrorResponse(404);
     } else if (handler == null) {
-      response = new Response("Not Found", { status: 404 });
+      response = createErrorResponse(404);
     } else {
       const request = toRequest(req, url);
+      if (!isSameOrigin(request)) {
+        throw new HttpError(403, "同一オリジンからのリクエストではありません。");
+      }
+      let token = readCsrfToken(request);
+      if (!isSafeMethod(method)) {
+        const form = await readForm(request);
+        if (!verifyCsrfToken(form, token)) {
+          throw new HttpError(403, "CSRFトークンが一致しません。");
+        }
+        formSlot.set(request, form);
+      }
+      if (token == null) {
+        token = createCsrfToken();
+        setCookie = createCsrfCookie(token);
+      }
+      csrfSlot.set(request, token);
       appSlot.set(request, { ...app, logger });
       response = await run(route.middleware ?? [], handler, request);
     }
   } catch (err) {
-    logger.error("リクエストの処理に失敗しました。", { err, method, url: `${url.pathname}${url.search}` });
-    response = new Response("Internal Server Error", { status: 500 });
+    if (err instanceof HttpError) {
+      logger.warn(err.message, { status: err.status, method, url: `${url.pathname}${url.search}` });
+      response = createErrorResponse(err.status);
+    } else {
+      logger.error("リクエストの処理に失敗しました。", { err, method, url: `${url.pathname}${url.search}` });
+      response = createErrorResponse(500);
+    }
   }
 
   const headers = new Headers(response.headers);
   applySecurityHeaders(headers);
+  if (setCookie != null) {
+    headers.append("set-cookie", setCookie);
+  }
   const record: Record<string, string | string[]> = Object.fromEntries(headers);
   const cookies = headers.getSetCookie();
   if (cookies.length > 0) {
