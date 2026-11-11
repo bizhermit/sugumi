@@ -11,7 +11,7 @@ export type Layout = {
   readonly title?: HtmlTitle;
   readonly styles?: string[];
   readonly scripts?: string[];
-  readonly render?: (slots: Slots) => Html;
+  readonly render?: (req: Request, slots: Slots) => Html;
 };
 
 export type PageOptions = {
@@ -19,7 +19,7 @@ export type PageOptions = {
   readonly styles?: string[];
   readonly scripts?: string[];
   readonly slots: Slots;
-  readonly status?: number;
+  readonly status?: number | undefined;
   readonly headers?: Readonly<Record<string, string>>;
 };
 
@@ -51,7 +51,7 @@ function applyTitle(outer: string | undefined, title: HtmlTitle | undefined): st
   return title(outer);
 }
 
-function compose(target: Page) {
+function compose(req: Request, target: Page) {
   const { layouts, options } = target;
 
   let title: string | undefined;
@@ -76,7 +76,7 @@ function compose(target: Page) {
   for (let i = layouts.length - 1; i >= 0; i--) {
     const render = layouts[i]?.render;
     if (render == null) continue;
-    current.main = render(current);
+    current.main = render(req, current);
   }
 
   for (const used of current.main.assets) {
@@ -102,8 +102,8 @@ function compose(target: Page) {
   } as const;
 }
 
-export function htmlDocument(target: Page): Response {
-  const { title, elements, styles, scripts } = compose(target);
+export function htmlDocument(req: Request, target: Page): Response {
+  const { title, elements, styles, scripts } = compose(req, target);
 
   const html = (
     <html lang="ja">

@@ -8,6 +8,7 @@ import * as settings from "./features/user/settings.tsx";
 import * as user from "./features/user/index.tsx";
 import { userLayout } from "./features/user/layout.tsx";
 import { rootLayout } from "./features/layout.tsx";
+import * as logout from "./features/auth/logout.tsx";
 
 export const routes = layout(rootLayout, {
   "/": {
@@ -23,6 +24,10 @@ export const routes = layout(rootLayout, {
   ...layout(
     userLayout,
     middleware([authMiddleware.requireLogin], {
+      "/logout": {
+        GET: logout.get,
+        POST: logout.post,
+      },
       "/home": {
         GET: home.get,
       },

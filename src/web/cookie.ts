@@ -26,3 +26,7 @@ export function hostCookie(name: string, value: string, options: CookieOptions =
   }
   return cookie;
 }
+
+export function clearHostCookie(name: string): string {
+  return hostCookie(name, "", { maxAge: 0 });
+}

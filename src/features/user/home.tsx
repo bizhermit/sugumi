@@ -11,9 +11,7 @@ function get(req: Request) {
         <>
           <h1>ホーム</h1>
           <p>
-            <span>
-              {loginAccount.id} | {loginAccount.name}
-            </span>
+            <span>{loginAccount.displayName}</span>
           </p>
         </>
       ),

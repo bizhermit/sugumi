@@ -1,12 +1,20 @@
 import { appSlot } from "../../web/context.ts";
+import { HttpError } from "../../web/http-error.ts";
 import type { Middleware } from "../../web/routes.ts";
 import { loginAccountSlot } from "./login-account.ts";
+import { findSession, sessionSlot } from "./session.ts";
 
 const requireLogin: Middleware = async (req, next) => {
-  const { logger } = appSlot.get(req);
-  // TODO: 暫定処理。セッション実装時に認証確認する。
-  logger.debug("login auth middleware");
-  loginAccountSlot.set(req, { id: "1", name: "Slotテストユーザー" });
+  const { db } = appSlot.get(req);
+  const session = await findSession(db, req);
+  if (session == null) {
+    if (req.method === "GET" || req.method === "HEAD") {
+      return new Response(null, { status: 303, headers: { Location: "/login" } });
+    }
+    throw new HttpError(403, "ログインしてください。");
+  }
+  sessionSlot.set(req, session);
+  loginAccountSlot.set(req, session.account);
   return await next();
 };
 

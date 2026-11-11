@@ -25,7 +25,7 @@ function run(middleware: readonly Middleware[], handler: RouteHandler, req: Requ
     if (fn == null) {
       const result = await handler(req);
       if (result instanceof Page) {
-        return htmlDocument(result);
+        return htmlDocument(req, result);
       }
       return result;
     }
