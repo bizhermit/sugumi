@@ -40,7 +40,7 @@ if ! ask "「$file」を読み込みます。よろしいですか？"; then
 fi
 
 docker load --input "$file"
-docker image inspect "$APP_NAME/app:$tag" "$APP_NAME/lb:$tag" > /dev/null
+docker image inspect "$APP_NAME/app:$tag" "$APP_NAME/lb:$tag" "$APP_NAME/db:$tag" > /dev/null
 
 current=$(sed -n 's/^IMAGE_TAG=//p' .env 2> /dev/null || true)
 if [ "$current" != "$tag" ] && ask "IMAGE_TAGを「${current:-（なし）}」から「$tag」に変更しますか？"; then

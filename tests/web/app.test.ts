@@ -4,21 +4,25 @@ import { createApp } from "../../src/web/app.ts";
 import assert from "node:assert/strict";
 import { routes } from "../../src/routes.ts";
 import { createLogger } from "../../src/lib/logger.ts";
+import { createDb } from "../../src/lib/db.ts";
 
 describe("createApp", () => {
   let server: Server;
   let baseUrl: string;
 
   before(async () => {
+    const logger = createLogger({
+      level: "error",
+      format: "json",
+      write: () => {
+        // テストのため出力しない
+      },
+    });
+    const db = createDb("postgres://localhost/unused", logger);
     server = createServer(
       createApp(routes, {
-        logger: createLogger({
-          level: "error",
-          format: "json",
-          write: () => {
-            // テストのため出力しない
-          },
-        }),
+        logger,
+        db,
       }),
     );
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

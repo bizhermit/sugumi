@@ -12,6 +12,7 @@ export type LogFormat = (typeof LOG_FORMATS)[number];
 export interface Config {
   readonly env: Env;
   readonly port: number;
+  readonly databaseUrl: string;
   readonly log: {
     readonly level: LogLevel;
     readonly format: LogFormat;
@@ -74,6 +75,32 @@ function integer(
   return parsed;
 }
 
+function databaseUrl(envValues: NodeJS.ProcessEnv, name: EnvName, errors: string[]): string {
+  const value = readEnvValue(envValues, name);
+  if (value === undefined) {
+    errors.push(`${name}: DB接続用URLを設定してください（postgres://ユーザー:パスワード@ホスト:ポート/DB名）。`);
+    return "";
+  }
+  if (!URL.canParse(value) || !/^postgres(?:ql)?:$/.test(new URL(value).protocol)) {
+    errors.push(`${name}: DB接続用URLの形式が不正です（postgres://ユーザー:パスワード@ホスト:ポート/DB名）。`);
+    return "";
+  }
+  return value;
+}
+
+export interface MigrationConfig {
+  readonly databaseUrl: string;
+}
+
+export function loadMigrationConfig(envValues: NodeJS.ProcessEnv = process.env): MigrationConfig {
+  const errors: string[] = [];
+  const url = databaseUrl(envValues, "APP_MIGRATION_DATABASE_URL", errors);
+  if (errors.length > 0) {
+    throw new ConfigError(errors);
+  }
+  return Object.freeze<MigrationConfig>({ databaseUrl: url });
+}
+
 export function loadConfig(envValues: NodeJS.ProcessEnv = process.env): Config {
   const errors: string[] = [];
 
@@ -82,6 +109,7 @@ export function loadConfig(envValues: NodeJS.ProcessEnv = process.env): Config {
   const port = integer(envValues, "APP_PORT", 3000, { min: 1, max: 65535 }, errors);
   const logLevel = oneOf(envValues, "APP_LOG_LEVEL", LOG_LEVELS, isProduction ? "info" : "debug", errors);
   const logFormat = oneOf(envValues, "APP_LOG_FORMAT", LOG_FORMATS, isProduction ? "json" : "pretty", errors);
+  const dbUrl = databaseUrl(envValues, "APP_DATABASE_URL", errors);
 
   if (errors.length > 0) {
     throw new ConfigError(errors);
@@ -90,6 +118,7 @@ export function loadConfig(envValues: NodeJS.ProcessEnv = process.env): Config {
   return Object.freeze<Config>({
     env,
     port,
+    databaseUrl: dbUrl,
     log: Object.freeze<Config["log"]>({
       level: logLevel,
       format: logFormat,

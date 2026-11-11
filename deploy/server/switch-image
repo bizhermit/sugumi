@@ -16,8 +16,7 @@ tags=()
 for tag in $(docker images "$APP_NAME/app" --format '{{.Tag}}'); do
   [ "$tag" = "<none>" ] && continue
   [ "$tag" = "$current" ] && continue
-  # app と lb の両方がそろっているタグだけを候補にする。
-  docker image inspect "$APP_NAME/lb:$tag" > /dev/null 2>&1 || continue
+  docker image inspect "$APP_NAME/lb:$tag" "$APP_NAME/db:$tag" > /dev/null 2>&1 || continue
   tags+=("$tag")
 done
 if [ ${#tags[@]} -eq 0 ]; then

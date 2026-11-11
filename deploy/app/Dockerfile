@@ -29,6 +29,7 @@ COPY package.json ./
 COPY --from=build /app/dist/src/ ./dist/src/
 COPY --from=build /app/dist/public/ ./dist/public/
 COPY static/ ./static/
+COPY db/ ./db/
 
 EXPOSE 3000
 

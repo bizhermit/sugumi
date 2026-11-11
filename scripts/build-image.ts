@@ -14,7 +14,7 @@ import { createGzip } from "node:zlib";
 
 const COMPOSE_FILE = "deploy/server/compose.yaml";
 const APP_NAME = "myapp";
-const IMAGES = [`${APP_NAME}/app`, `${APP_NAME}/lb`];
+const IMAGES = [`${APP_NAME}/app`, `${APP_NAME}/lb`, `${APP_NAME}/db`];
 const OUTPUT_DIR = "dist/server-images";
 const TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 

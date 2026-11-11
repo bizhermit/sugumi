@@ -39,6 +39,10 @@ jobs:
     timeout-minutes: 10
     env:
       IMAGE_TAG: ci
+      # deploy/server/compose.yamlが要求する値。CIの中だけで使う。
+      DB_ADMIN_PASSWORD: ci
+      DB_APP_PASSWORD: ci
+      DB_MIGRATOR_PASSWORD: ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,7 +52,7 @@ jobs:
       - name: コンテナを起動し、ロードバランサー経由でヘルスチェックに応答することを確認する
         run: |
           docker compose -f deploy/server/compose.yaml up -d
-          for i in $(seq 1 10); do
+          for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1/healthz; then
               exit 0
             fi

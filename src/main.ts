@@ -3,6 +3,7 @@ import { createApp } from "./web/app.ts";
 import { ConfigError, loadConfig } from "./lib/config.ts";
 import { createLogger } from "./lib/logger.ts";
 import { routes } from "./routes.ts";
+import { createDb } from "./lib/db.ts";
 
 function loadConfigOrExit() {
   try {
@@ -16,11 +17,19 @@ function loadConfigOrExit() {
   }
 }
 
-function main() {
+async function main() {
   const config = loadConfigOrExit();
   const logger = createLogger(config.log);
 
-  const server = createServer(createApp(routes, { logger }));
+  const db = createDb(config.databaseUrl, logger);
+  try {
+    await db.query("SELECT 1");
+  } catch (err) {
+    logger.error("DBに接続できません。", { err });
+    process.exit(1);
+  }
+
+  const server = createServer(createApp(routes, { logger, db }));
   server.on("error", (err) => {
     logger.error("サーバーの起動に失敗しました。", { err });
     process.exit(1);
@@ -29,17 +38,42 @@ function main() {
     logger.info("サーバーを起動しました。", { env: config.env, port: config.port });
   });
 
+  async function shutdown() {
+    let failed = false;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve();
+        });
+      });
+    } catch (err) {
+      logger.error("サーバーの停止に失敗しました。", { err });
+      failed = true;
+    }
+
+    try {
+      await db.end();
+      logger.info("DBの接続を終了しました。");
+    } catch (err) {
+      logger.error("DBの切断に失敗しました。", { err });
+      failed = true;
+    }
+
+    if (failed) {
+      process.exitCode = 1;
+      return;
+    }
+    logger.info("サーバーを停止しました。");
+  }
+
   process.on("SIGTERM", () => {
     logger.info("SIGTERMを受信しました。サーバーを停止します。");
-    server.close((err) => {
-      if (err) {
-        logger.error("サーバーの停止に失敗しました。", { err });
-        process.exitCode = 1;
-        return;
-      }
-      logger.info("サーバーを停止しました。");
-    });
+    void shutdown();
   });
 }
 
-main();
+await main();

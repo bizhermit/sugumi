@@ -3,6 +3,11 @@ services:
     env_file:
       - path: .env
         required: true
+    environment:
+      APP_DATABASE_URL: ${APP_DATABASE_URL:-postgres://app:app@db:5432/app}
+      APP_MIGRATION_DATABASE_URL: ${APP_MIGRATION_DATABASE_URL:-postgres://migrator:migrator@db:5432/app}
+      APP_TEST_DATABASE_URL: ${APP_TEST_DATABASE_URL:-postgres://app:app@db-test:5432/app}
+      APP_TEST_MIGRATION_DATABASE_URL: ${APP_TEST_MIGRATION_DATABASE_URL:-postgres://migrator:migrator@db-test:5432/app}
     build:
       context: .
       args:
@@ -16,8 +21,34 @@ services:
       - ..:/workspace
       - claude-config:/home/dev/.claude
       - gh-config:/home/dev/.config/gh
+    depends_on:
+      - db
+      - db-test
     command: sleep infinity
+
+  db:
+    build: ../deploy/db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: app
+      DB_APP_PASSWORD: app
+      DB_MIGRATOR_PASSWORD: migrator
+    volumes:
+      - db-data:/var/lib/postgresql
+
+  db-test:
+    build: ../deploy/db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: app
+      DB_APP_PASSWORD: app
+      DB_MIGRATOR_PASSWORD: migrator
+    tmpfs:
+      - /var/lib/postgresql
 
 volumes:
   claude-config:
   gh-config:
+  db-data:

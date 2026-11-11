@@ -5,4 +5,5 @@
 !tsconfig.build.json
 !src/
 !static/
+!db/
 !scripts/build-assets.ts
