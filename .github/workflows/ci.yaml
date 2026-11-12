@@ -16,6 +16,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # テスト用DB。.devcontainer/compose.yamlのdb-testと同じロールとパスワード。
+      APP_TEST_DATABASE_URL: postgres://app:app@127.0.0.1:5432/app
+      APP_TEST_MIGRATION_DATABASE_URL: postgres://migrator:migrator@127.0.0.1:5432/app
     steps:
       # actionsはタグではなくコミットで固定する。
       # 更新時はコミットを取得して置き換える。
@@ -29,6 +33,23 @@ jobs:
           node-version: 26.13.0
           cache: npm
       - run: npm ci
+      - name: テスト用DBを本番と同じイメージで起動する
+        run: |
+          docker build -t myapp/db:ci deploy/db
+          docker run -d --name db-test -p 127.0.0.1:5432:5432 \
+            -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=admin -e POSTGRES_DB=app \
+            -e DB_APP_PASSWORD=app -e DB_MIGRATOR_PASSWORD=migrator \
+            myapp/db:ci
+          # 初期化中は一時サーバーがソケットだけで応答するので、TCPで確かめる。
+          for i in $(seq 1 30); do
+            if docker exec db-test pg_isready -h 127.0.0.1 -U admin -d app; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "テスト用DBが起動しませんでした。" >&2
+          docker logs db-test >&2
+          exit 1
       - run: npm run check
       - run: npm run lint -- --deny-warnings
       - run: npm run format:check

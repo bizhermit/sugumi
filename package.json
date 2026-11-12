@@ -24,7 +24,10 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "migrate": "node src/migrate.ts",
-    "test": "tsc && npm run build:assets && node --test dist/tests/",
+    "clean:dist": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\"",
+    "test": "npm run clean:dist && tsc && npm run build:assets && node --test dist/tests/",
+    "test:unit": "npm run clean:dist && tsc && node --test dist/tests/unit/",
+    "test:integration": "npm run clean:dist && tsc && npm run build:assets && node --test dist/tests/integration/",
     "build:image": "node scripts/build-image.ts"
   },
   "devDependencies": {

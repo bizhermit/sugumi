@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createLogger, type LoggerOptions } from "../../src/lib/logger.ts";
+import { createLogger, type LoggerOptions } from "../../../src/lib/logger.ts";
 import { describe, it } from "node:test";
 
 const FIXED_TIME = new Date("2026-11-02T01:02:03.456Z");

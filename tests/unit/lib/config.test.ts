@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ConfigError, loadConfig } from "../../src/lib/config.ts";
+import { ConfigError, loadConfig } from "../../../src/lib/config.ts";
 
 describe("loadConfig", () => {
   it("開発環境向け既定値", () => {
