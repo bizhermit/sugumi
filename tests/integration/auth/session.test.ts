@@ -10,12 +10,13 @@ import {
 } from "../../../src/features/auth/session.ts";
 import type { DataBase } from "../../../src/lib/db.ts";
 import { deleteAccounts, prepareTestDb } from "../helpers/db.ts";
+import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/return-to.ts";
 
 const PREFIX = "test-session-";
 const MINUTE_MS = 60 * 1000;
 
 function requestWithSession(token: string): Request {
-  return new Request("http://localhost/home", { headers: { cookie: `__Host-session=${token}` } });
+  return new Request(`http://localhost${DEFAULT_RETURN_PATH}`, { headers: { cookie: `__Host-session=${token}` } });
 }
 
 describe("session", () => {
@@ -71,7 +72,7 @@ describe("session", () => {
   });
 
   it("Cookieが無い、または形式が違えばundefined", async () => {
-    assert.equal(await findSession(db, new Request("http://localhost/home")), undefined);
+    assert.equal(await findSession(db, new Request(`http://localhost${DEFAULT_RETURN_PATH}`)), undefined);
     assert.equal(await findSession(db, requestWithSession("x".repeat(43))), undefined);
     assert.equal(await findSession(db, requestWithSession("short")), undefined);
   });
