@@ -5,7 +5,7 @@ import type { DataBase } from "../../../src/lib/db.ts";
 import { deleteAccounts, deleteAddressFailures, prepareTestDb } from "../helpers/db.ts";
 import { TEST_LOGIN_LIMITS } from "../helpers/limits.ts";
 
-// 試行は順番に行う必要があるので、ループの中で待つ。
+// 試行は順番に行う必要があるため、ループの中で待つ。
 /* oxlint-disable no-await-in-loop */
 
 const PREFIX = "test-limits-";

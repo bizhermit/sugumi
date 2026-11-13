@@ -1,11 +1,11 @@
 #!/bin/sh
-# アプリが使うDBユーザーとスキーマappを作る。
+# アプリが使用するDBユーザーとスキーマappを作る。
 # - migrator: スキーマとテーブルを持ち、マイグレーション（src/migrate.ts）を実行する。
 # - app: アプリが接続するユーザー。テーブルの読み書きだけができ、テーブルや関数を作ったり消したりできない。
 #   アプリを乗っ取られても、データの読み書きより先へ進めないようにするため。
 # 管理者（POSTGRES_USER）はDBの運用にだけ使い、アプリからは接続しない。
 # パスワードはDB_APP_PASSWORDとDB_MIGRATOR_PASSWORDで渡す。
-# このスクリプトは再実行されないので、パスワードを後から変えるときは管理者でALTER ROLE ... PASSWORDを実行する。
+# このスクリプトは再実行されないため、パスワードを後から変えるときは管理者でALTER ROLE ... PASSWORDを実行する。
 set -eu
 
 if [ -z "${DB_APP_PASSWORD:-}" ] || [ -z "${DB_MIGRATOR_PASSWORD:-}" ]; then

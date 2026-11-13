@@ -3,7 +3,7 @@ import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 /**
  * パスワードのハッシュ化。
  * ハッシュは `scrypt$N$r$p$ソルト$ハッシュ`（ソルトとハッシュはbase64url）の形で保存する。
- * パラメータも一緒に保存するので、PARAMSを強くしても既存のハッシュはそのまま検証できる。
+ * パラメータも一緒に保存するため、PARAMSを強くしても既存のハッシュはそのまま検証できる。
  */
 
 const PARAMS = { N: 2 ** 15, r: 8, p: 3 };

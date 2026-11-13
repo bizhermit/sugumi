@@ -19,7 +19,7 @@ export function toReturnPath(value: string | null | undefined): string | undefin
   if (url.origin !== "http://localhost") {
     return undefined;
   }
-  // `..`の除去で`/..//evil.example`が`//evil.example`（スキーム相対URL）になるので、正規化後の値で確かめる。
+  // `..`の除去で`/..//evil.example`が`//evil.example`（スキーム相対URL）になるため、正規化後の値で確かめる。
   if (url.pathname.startsWith("//") || url.pathname.startsWith("/\\")) {
     return undefined;
   }

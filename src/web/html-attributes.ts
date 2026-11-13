@@ -1,9 +1,9 @@
 /**
- * JSX で属性を型チェックするタグと、その属性。jsx-runtime.ts の JSX.IntrinsicElements で使う。
+ * JSX で属性を型チェックするタグとその属性。jsx-runtime.ts の JSX.IntrinsicElements で使用する。
  * ここにないタグには、どの属性でも書ける。ここにあるタグに属性が足りなければ、仕様を確かめて足す。
  *
- * TypeScript は `-` を含む属性名（data-*・aria-* など）をチェックしないので、ここには書かない。
- * on* と style は CSP で使えないので、型に入れず、書くとエラーになるようにしている。
+ * TypeScript は `-` を含む属性名（data-*・aria-* など）をチェックしないため、ここには書かない。
+ * on* と style は CSP で使えないため型に入れず、書いた場合はエラーとする。
  * 各型は Record<string, unknown> に代入できるよう、interface ではなく type で書く。
  *
  * Chrome・Firefox・Safari のどれかが対応していれば入れ、対応していないブラウザは行末の「未対応：」に書く。
@@ -66,7 +66,6 @@ type ReferrerPolicy =
 type FormMethod = "get" | "post" | "dialog";
 type FormEnctype = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
 
-// section-*・home・work などの接頭辞は、使うときに足す。
 type AutofillField =
   | "name"
   | "honorific-prefix"

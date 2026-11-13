@@ -56,7 +56,7 @@ export class ConfigError extends Error {
 
 function readEnvValue(envValues: NodeJS.ProcessEnv, name: EnvName) {
   const value = envValues[name]?.trim();
-  if (value === undefined || value === "") {
+  if (value == null || value === "") {
     return undefined;
   }
   return value;
@@ -70,11 +70,11 @@ function oneOf<const T extends readonly string[]>(
   errors: string[],
 ): T[number] {
   const value = readEnvValue(envValues, name);
-  if (value === undefined) {
+  if (value == null) {
     return fallbackValue;
   }
   const found = validValues.find((choice) => choice === value);
-  if (found === undefined) {
+  if (found == null) {
     errors.push(`${name}: ${validValues.join(" | ")} のいずれかを指定してください（指定値: ${value}）`);
     return fallbackValue;
   }
@@ -89,7 +89,7 @@ function integer(
   errors: string[],
 ): number {
   const value = readEnvValue(envValues, name);
-  if (value === undefined) {
+  if (value == null) {
     return fallbackValue;
   }
   const parsed = Number(value);
@@ -102,7 +102,7 @@ function integer(
 
 function boolean(envValues: NodeJS.ProcessEnv, name: EnvName, fallbackValue: boolean, errors: string[]): boolean {
   const value = readEnvValue(envValues, name);
-  if (value === undefined) {
+  if (value == null) {
     return fallbackValue;
   }
   if (value !== "true" && value !== "false") {
@@ -114,7 +114,7 @@ function boolean(envValues: NodeJS.ProcessEnv, name: EnvName, fallbackValue: boo
 
 function databaseUrl(envValues: NodeJS.ProcessEnv, name: EnvName, errors: string[]): string {
   const value = readEnvValue(envValues, name);
-  if (value === undefined) {
+  if (value == null) {
     errors.push(`${name}: DB接続用URLを設定してください（postgres://ユーザー:パスワード@ホスト:ポート/DB名）。`);
     return "";
   }

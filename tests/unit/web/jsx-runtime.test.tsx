@@ -51,7 +51,7 @@ describe("jsx", () => {
   });
 
   it("null/undefinedの属性は出さない", () => {
-    // 型では null を許していないので、ランタイムを直接呼ぶ。
+    // 型では null を許していないため、ランタイムを直接呼ぶ。
     assert.equal(jsx("p", { id: null, title: undefined }).value, "<p></p>");
   });
 
@@ -60,7 +60,7 @@ describe("jsx", () => {
   });
 
   it("コンポーネントの戻り値が文字列ならエスケープする", () => {
-    // 型では Html 以外を返すコンポーネントを許していないので、ランタイムを直接呼ぶ。
+    // 型では Html 以外を返すコンポーネントを許していないため、ランタイムを直接呼ぶ。
     assert.equal(jsx(() => "<b>x</b>", {}).value, "&lt;b&gt;x&lt;/b&gt;");
   });
 

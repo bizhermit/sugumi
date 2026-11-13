@@ -3,9 +3,9 @@ import { createDb, type DataBase } from "../../../src/lib/db.ts";
 import { createTestLogger } from "./logger.ts";
 
 /**
- * DBを使うテストの共通処理。
+ * DBを使用するテストの共通処理。
  * テスト用DBは環境変数APP_TEST_DATABASE_URL（appロール）とAPP_TEST_MIGRATION_DATABASE_URL（migratorロール）で指定する。
- * テストファイルは並列に実行されるので、各ファイルは自分のprefixで始まるユーザー名だけを作り、消すこと。
+ * テストファイルは並列に実行されるため、各ファイルは自分のprefixで始まるユーザー名だけを作成／削除する。
  */
 
 function requireEnv(name: string): string {

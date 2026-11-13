@@ -60,10 +60,10 @@ function serializeError(error: Error, depth = 0): SerializedError {
     name: error.name,
     message: error.message,
   };
-  if (error.stack !== undefined) {
+  if (error.stack != null) {
     serialized.stack = error.stack;
   }
-  if (error.cause !== undefined && depth < 3) {
+  if (error.cause != null && depth < 3) {
     if (error.cause instanceof Error) {
       serialized.cause = serializeError(error.cause, depth + 1);
     } else {

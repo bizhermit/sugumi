@@ -83,7 +83,7 @@ export function serveAsset(req: Request, url: URL): Response {
   }
 
   const headers = new Headers({ "content-type": found.contentType, etag: `"${found.hash}"` });
-  // asset()のURLは内容が変わるとvの値も変わるので、キャッシュを破棄させる必要はない。
+  // asset()のURLは内容が変わるとvの値も変わるため、キャッシュを破棄させる必要はない。
   // vがなければ毎回ETagで確かめさせる。
   headers.set(
     "cache-control",

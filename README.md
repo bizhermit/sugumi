@@ -47,7 +47,7 @@ Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレー�
 │   │   ├── security-headers.ts 全レスポンスに付けるセキュリティヘッダ
 │   │   ├── slot.ts             middlewareから下層へ値を渡す仕組み
 │   │   └── context.ts          AppContext（loggerなど、全体で共有するもの）
-│   ├── components/     画面部品。featureをまたいで使うJSXの部品
+│   ├── components/     画面部品。featureをまたいで使用するJSXの部品
 │   │   └── form/
 │   │       ├── form.tsx
 │   │       └── _assets/        部品のCSS/ClientJS

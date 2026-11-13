@@ -20,7 +20,7 @@ if (!build()) {
 
 const server = spawn("node", ["--watch-path=dist", "--watch-path=static", "dist/src/main.js"], { stdio: "inherit" });
 
-// 保存は短い間隔で複数のイベントを出すので、少し待ってからまとめてビルドする。
+// 保存は短い間隔で複数のイベントを出すため、少し待ってからまとめてビルドする。
 let timer: NodeJS.Timeout | undefined;
 let building = false;
 let pending = false;

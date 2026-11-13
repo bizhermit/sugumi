@@ -56,7 +56,7 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   // ログイン後の画面が共有PCのブラウザやプロキシに残らないよう、デフォルトではキャッシュさせない。
   // キャッシュしてよいレスポンス（アセットなど）は自分でcache-controlを付ける。
   "cache-control": "no-store",
-  // HTTPSで配信する前提。ブラウザはHTTPで受け取ったHSTSを無視するので、開発中の"http://localhost"には影響しない。
+  // HTTPSで配信する前提。ブラウザはHTTPで受け取ったHSTSを無視するため、開発中の"http://localhost"には影響しない。
   "strict-transport-security": "max-age=31536000; includeSubDomains",
   // "no-referrer"にすると同一オリジンへのPOSTでもOriginがnullになり、OriginによるCSRF対策ができない。
   "referrer-policy": "same-origin",
@@ -66,7 +66,7 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   "cross-origin-opener-policy": "same-origin",
   "cross-origin-embedder-policy": "require-corp",
   "cross-origin-resource-policy": "same-origin",
-  // ブラウザの機能をすべて使わせない。使う画面は自分で付け直す。
+  // ブラウザの機能をすべて使わせない。使用する画面は自分で付け直す。
   "permissions-policy": PERMISSIONS.map((feature) => `${feature}=()`).join(", "),
 };
 

@@ -44,7 +44,7 @@ docker image inspect "$APP_NAME/app:$tag" "$APP_NAME/lb:$tag" "$APP_NAME/db:$tag
 
 current=$(sed -n 's/^IMAGE_TAG=//p' .env 2> /dev/null || true)
 if [ "$current" != "$tag" ] && ask "IMAGE_TAGを「${current:-（なし）}」から「$tag」に変更しますか？"; then
-  # .env にはほかの値も入るので、IMAGE_TAG の行だけ書き換える。
+  # .env にはほかの値も入るため、IMAGE_TAG の行だけ書き換える。
   if grep -q '^IMAGE_TAG=' .env 2> /dev/null; then
     sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=$tag|" .env
   else

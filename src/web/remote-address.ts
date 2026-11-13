@@ -4,9 +4,9 @@ export const remoteAddressSlot = slot<string | undefined>("remoteAddress");
 
 /**
  * 接続元のIPアドレスを返す。
- * trustProxyがtrueなら、リバースプロキシが付けたX-Forwarded-Forの右端の値を使う。
- * nginxは接続元で上書きし（値は1つ）、AWSのALBは右端に追記するので、どちらも右端が本当の接続元になる。
- * X-Forwarded-Forは利用者も送れるので、プロキシを通らずに届く構成ではtrueにしてはならない。
+ * trustProxyがtrueなら、リバースプロキシが付けたX-Forwarded-Forの右端の値を使用する。
+ * nginxは接続元で上書きし（値は1つ）、AWSのALBは右端に追記するため、どちらも右端が本当の接続元になる。
+ * X-Forwarded-Forは利用者も送れるため、プロキシを通らずに届く構成ではtrueにしてはならない。
  */
 export function resolveRemoteAddress(
   headers: Headers,

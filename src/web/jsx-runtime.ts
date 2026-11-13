@@ -83,6 +83,9 @@ function escapeHtml(value: string): string {
 }
 
 function renderChildren(value: unknown, assets: Assets[]): string {
+  if (value == null) {
+    return "";
+  }
   if (value instanceof Html) {
     collectAssets(assets, value.assets);
     return value.value;
@@ -94,9 +97,6 @@ function renderChildren(value: unknown, assets: Assets[]): string {
     }
     return html;
   }
-  if (value === null) {
-    return "";
-  }
   switch (typeof value) {
     case "string":
       return escapeHtml(value);
@@ -104,7 +104,6 @@ function renderChildren(value: unknown, assets: Assets[]): string {
     case "bigint":
       return String(value);
     case "boolean":
-    case "undefined":
       return "";
     default:
       throw new TypeError(`JSXに埋め込めない値です: ${typeName(value)}`);
@@ -134,11 +133,11 @@ function renderAttr(name: string, value: unknown): string {
   if (INVALID_ATTR_NAME.test(name)) {
     throw new TypeError(`属性名に使用できません: ${name}`);
   }
+  if (value == null) {
+    return "";
+  }
   if (name === "className") {
     return renderClass(value);
-  }
-  if (value === null) {
-    return "";
   }
   switch (typeof value) {
     case "string":
@@ -146,13 +145,11 @@ function renderAttr(name: string, value: unknown): string {
     case "bigint":
       return ` ${name}="${escapeHtml(String(value))}"`;
     case "boolean":
-      // aria-* は値のない形を true として扱わないので、true・false を文字列で出す。
+      // aria-* は値のない形を true として扱わないため、true・false を文字列で出す。
       if (name.startsWith("aria-")) {
         return ` ${name}="${value}"`;
       }
       return value ? ` ${name}` : "";
-    case "undefined":
-      return "";
     default:
       throw new TypeError(`属性"${name}"に使用できない値です: ${typeName(value)}`);
   }

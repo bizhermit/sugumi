@@ -1,7 +1,7 @@
 /**
  * アカウントを作成する。
  *   node scripts/create-account.ts <ユーザー名> <表示名>
- * パスワードは標準入力から読む（画面に表示されるので、人に見られない場所で実行する）。
+ * パスワードは標準入力から読む（画面に表示されるため、人に見られない場所で実行する）。
  */
 import { createInterface } from "node:readline/promises";
 import { createAccount, USERNAME_MAX_LENGTH } from "../src/features/auth/accounts.ts";
