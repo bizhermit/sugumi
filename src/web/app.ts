@@ -18,6 +18,7 @@ import {
 import { HttpError, STATUS_TEXTS } from "./http-error.ts";
 import { pipeline } from "node:stream/promises";
 import { formSlot, readForm } from "./form.ts";
+import { remoteAddressSlot, resolveRemoteAddress } from "./remote-address.ts";
 
 function run(middleware: readonly Middleware[], handler: RouteHandler, req: Request): Promise<Response> {
   async function dispatch(index: number): Promise<Response> {
@@ -96,6 +97,7 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
         setCookie = createCsrfCookie(token);
       }
       csrfSlot.set(request, token);
+      remoteAddressSlot.set(request, resolveRemoteAddress(request.headers, req.socket.remoteAddress, app.trustProxy));
       appSlot.set(request, { ...app, logger });
       response = await run(route.middleware ?? [], handler, request);
     }

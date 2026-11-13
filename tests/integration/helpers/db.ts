@@ -29,3 +29,7 @@ export function prepareTestDb(): DataBase {
 export async function deleteAccounts(db: DataBase, prefix: string): Promise<void> {
   await db.query("DELETE FROM accounts WHERE username LIKE $1", [`${prefix}%`]);
 }
+
+export async function deleteAddressFailures(db: DataBase, address: string): Promise<void> {
+  await db.query("DELETE FROM login_throttles WHERE address = $1", [address]);
+}

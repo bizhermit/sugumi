@@ -9,6 +9,19 @@ describe("loadConfig", () => {
       env: "development",
       port: 3000,
       databaseUrl: "postgres://app:app@db:5432/app",
+      trustProxy: false,
+      login: {
+        maxFailedAttempts: 5,
+        lockoutMs: 15 * 60 * 1000,
+        addressMaxFailedAttempts: 20,
+        addressWindowMs: 15 * 60 * 1000,
+        addressBlockMs: 15 * 60 * 1000,
+        deviceLifetimeMs: 90 * 24 * 60 * 60 * 1000,
+      },
+      session: {
+        idleTimeoutMs: 30 * 60 * 1000,
+        absoluteTimeoutMs: 12 * 60 * 60 * 1000,
+      },
       log: {
         level: "debug",
         format: "pretty",
@@ -22,6 +35,19 @@ describe("loadConfig", () => {
       env: "production",
       port: 3000,
       databaseUrl: "postgres://app:app@db:5432/app",
+      trustProxy: false,
+      login: {
+        maxFailedAttempts: 5,
+        lockoutMs: 15 * 60 * 1000,
+        addressMaxFailedAttempts: 20,
+        addressWindowMs: 15 * 60 * 1000,
+        addressBlockMs: 15 * 60 * 1000,
+        deviceLifetimeMs: 90 * 24 * 60 * 60 * 1000,
+      },
+      session: {
+        idleTimeoutMs: 30 * 60 * 1000,
+        absoluteTimeoutMs: 12 * 60 * 60 * 1000,
+      },
       log: {
         level: "info",
         format: "json",
@@ -41,6 +67,19 @@ describe("loadConfig", () => {
       env: "test",
       port: 3003,
       databaseUrl: "postgres://app:app@db:5432/app",
+      trustProxy: false,
+      login: {
+        maxFailedAttempts: 5,
+        lockoutMs: 15 * 60 * 1000,
+        addressMaxFailedAttempts: 20,
+        addressWindowMs: 15 * 60 * 1000,
+        addressBlockMs: 15 * 60 * 1000,
+        deviceLifetimeMs: 90 * 24 * 60 * 60 * 1000,
+      },
+      session: {
+        idleTimeoutMs: 30 * 60 * 1000,
+        absoluteTimeoutMs: 12 * 60 * 60 * 1000,
+      },
       log: {
         level: "warn",
         format: "json",
@@ -60,6 +99,19 @@ describe("loadConfig", () => {
       env: "development",
       port: 3000,
       databaseUrl: "postgres://app:app@db:5432/app",
+      trustProxy: false,
+      login: {
+        maxFailedAttempts: 5,
+        lockoutMs: 15 * 60 * 1000,
+        addressMaxFailedAttempts: 20,
+        addressWindowMs: 15 * 60 * 1000,
+        addressBlockMs: 15 * 60 * 1000,
+        deviceLifetimeMs: 90 * 24 * 60 * 60 * 1000,
+      },
+      session: {
+        idleTimeoutMs: 30 * 60 * 1000,
+        absoluteTimeoutMs: 12 * 60 * 60 * 1000,
+      },
       log: {
         level: "debug",
         format: "pretty",
@@ -109,9 +161,58 @@ describe("loadConfig", () => {
     });
   }
 
+  it("APP_TRUST_PROXY", () => {
+    const base = { APP_DATABASE_URL: "postgres://app:app@db:5432/app" };
+    assert.equal(loadConfig({ ...base, APP_TRUST_PROXY: "true" }).trustProxy, true);
+    assert.equal(loadConfig({ ...base, APP_TRUST_PROXY: "false" }).trustProxy, false);
+    assert.throws(() => loadConfig({ ...base, APP_TRUST_PROXY: "yes" }), ConfigError);
+  });
+
+  it("ログインとセッションの制限値", () => {
+    const config = loadConfig({
+      APP_DATABASE_URL: "postgres://app:app@db:5432/app",
+      APP_LOGIN_MAX_FAILED_ATTEMPTS: "3",
+      APP_LOGIN_LOCKOUT_MINUTES: "10",
+      APP_LOGIN_ADDRESS_MAX_FAILED_ATTEMPTS: "50",
+      APP_LOGIN_ADDRESS_WINDOW_MINUTES: "5",
+      APP_LOGIN_ADDRESS_BLOCK_MINUTES: "60",
+      APP_LOGIN_DEVICE_DAYS: "30",
+      APP_SESSION_IDLE_MINUTES: "20",
+      APP_SESSION_ABSOLUTE_HOURS: "8",
+    });
+    assert.deepEqual(config.login, {
+      maxFailedAttempts: 3,
+      lockoutMs: 10 * 60 * 1000,
+      addressMaxFailedAttempts: 50,
+      addressWindowMs: 5 * 60 * 1000,
+      addressBlockMs: 60 * 60 * 1000,
+      deviceLifetimeMs: 30 * 24 * 60 * 60 * 1000,
+    });
+    assert.deepEqual(config.session, { idleTimeoutMs: 20 * 60 * 1000, absoluteTimeoutMs: 8 * 60 * 60 * 1000 });
+  });
+
+  for (const name of [
+    "APP_LOGIN_MAX_FAILED_ATTEMPTS",
+    "APP_LOGIN_LOCKOUT_MINUTES",
+    "APP_LOGIN_ADDRESS_MAX_FAILED_ATTEMPTS",
+    "APP_LOGIN_ADDRESS_WINDOW_MINUTES",
+    "APP_LOGIN_ADDRESS_BLOCK_MINUTES",
+    "APP_LOGIN_DEVICE_DAYS",
+    "APP_SESSION_IDLE_MINUTES",
+    "APP_SESSION_ABSOLUTE_HOURS",
+  ] as const) {
+    it(`制限値は1以上の整数: ${name}`, () => {
+      const base = { APP_DATABASE_URL: "postgres://app:app@db:5432/app" };
+      assert.throws(() => loadConfig({ ...base, [name]: "0" }), ConfigError);
+      assert.throws(() => loadConfig({ ...base, [name]: "1.5" }), ConfigError);
+    });
+  }
+
   it("設定オブジェクトの変更禁止", () => {
     const config = loadConfig({ APP_DATABASE_URL: "postgres://app:app@db:5432/app" });
     assert.ok(Object.isFrozen(config));
     assert.ok(Object.isFrozen(config.log));
+    assert.ok(Object.isFrozen(config.login));
+    assert.ok(Object.isFrozen(config.session));
   });
 });

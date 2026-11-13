@@ -9,15 +9,40 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 const LOG_FORMATS = ["json", "pretty"] as const;
 export type LogFormat = (typeof LOG_FORMATS)[number];
 
+export interface LoginLimits {
+  readonly maxFailedAttempts: number;
+  readonly lockoutMs: number;
+  readonly addressMaxFailedAttempts: number;
+  readonly addressWindowMs: number;
+  readonly addressBlockMs: number;
+  readonly deviceLifetimeMs: number;
+}
+
+export interface SessionLimits {
+  readonly idleTimeoutMs: number;
+  readonly absoluteTimeoutMs: number;
+}
+
 export interface Config {
   readonly env: Env;
   readonly port: number;
   readonly databaseUrl: string;
+  readonly trustProxy: boolean;
+  readonly login: LoginLimits;
+  readonly session: SessionLimits;
   readonly log: {
     readonly level: LogLevel;
     readonly format: LogFormat;
   };
 }
+
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const ATTEMPTS_RANGE = { min: 1, max: 1000 };
+const MINUTES_RANGE = { min: 1, max: 365 * 24 * 60 };
+const HOURS_RANGE = { min: 1, max: 365 * 24 };
+const DAYS_RANGE = { min: 1, max: 3650 };
 
 export class ConfigError extends Error {
   readonly errors: readonly string[];
@@ -75,6 +100,18 @@ function integer(
   return parsed;
 }
 
+function boolean(envValues: NodeJS.ProcessEnv, name: EnvName, fallbackValue: boolean, errors: string[]): boolean {
+  const value = readEnvValue(envValues, name);
+  if (value === undefined) {
+    return fallbackValue;
+  }
+  if (value !== "true" && value !== "false") {
+    errors.push(`${name}: true|falseのいずれかを指定してください（指定値: ${value}）`);
+    return fallbackValue;
+  }
+  return value === "true";
+}
+
 function databaseUrl(envValues: NodeJS.ProcessEnv, name: EnvName, errors: string[]): string {
   const value = readEnvValue(envValues, name);
   if (value === undefined) {
@@ -110,6 +147,19 @@ export function loadConfig(envValues: NodeJS.ProcessEnv = process.env): Config {
   const logLevel = oneOf(envValues, "APP_LOG_LEVEL", LOG_LEVELS, isProduction ? "info" : "debug", errors);
   const logFormat = oneOf(envValues, "APP_LOG_FORMAT", LOG_FORMATS, isProduction ? "json" : "pretty", errors);
   const dbUrl = databaseUrl(envValues, "APP_DATABASE_URL", errors);
+  const trustProxy = boolean(envValues, "APP_TRUST_PROXY", false, errors);
+  const login: LoginLimits = {
+    maxFailedAttempts: integer(envValues, "APP_LOGIN_MAX_FAILED_ATTEMPTS", 5, ATTEMPTS_RANGE, errors),
+    lockoutMs: integer(envValues, "APP_LOGIN_LOCKOUT_MINUTES", 15, MINUTES_RANGE, errors) * MINUTE_MS,
+    addressMaxFailedAttempts: integer(envValues, "APP_LOGIN_ADDRESS_MAX_FAILED_ATTEMPTS", 20, ATTEMPTS_RANGE, errors),
+    addressWindowMs: integer(envValues, "APP_LOGIN_ADDRESS_WINDOW_MINUTES", 15, MINUTES_RANGE, errors) * MINUTE_MS,
+    addressBlockMs: integer(envValues, "APP_LOGIN_ADDRESS_BLOCK_MINUTES", 15, MINUTES_RANGE, errors) * MINUTE_MS,
+    deviceLifetimeMs: integer(envValues, "APP_LOGIN_DEVICE_DAYS", 90, DAYS_RANGE, errors) * DAY_MS,
+  };
+  const session: SessionLimits = {
+    idleTimeoutMs: integer(envValues, "APP_SESSION_IDLE_MINUTES", 30, MINUTES_RANGE, errors) * MINUTE_MS,
+    absoluteTimeoutMs: integer(envValues, "APP_SESSION_ABSOLUTE_HOURS", 12, HOURS_RANGE, errors) * HOUR_MS,
+  };
 
   if (errors.length > 0) {
     throw new ConfigError(errors);
@@ -119,6 +169,9 @@ export function loadConfig(envValues: NodeJS.ProcessEnv = process.env): Config {
     env,
     port,
     databaseUrl: dbUrl,
+    trustProxy,
+    login: Object.freeze(login),
+    session: Object.freeze(session),
     log: Object.freeze<Config["log"]>({
       level: logLevel,
       format: logFormat,

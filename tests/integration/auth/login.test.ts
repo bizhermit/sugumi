@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { createAccount } from "../../../src/features/auth/accounts.ts";
 import type { DataBase } from "../../../src/lib/db.ts";
-import { deleteAccounts, prepareTestDb } from "../helpers/db.ts";
+import { deleteAccounts, deleteAddressFailures, prepareTestDb } from "../helpers/db.ts";
 import { startTestServer, type TestServer } from "../helpers/server.ts";
 import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/return-to.ts";
 
 const PREFIX = "test-login-";
 const USERNAME = `${PREFIX}user1`;
 const PASSWORD = "correct-pass";
+const ADDRESS = "203.0.113.1"; // 接続元ごとの制限に他のテストの失敗が混ざらないように、このファイル専用の接続元を固定
 
 function cookieValue(res: Response, name: string): string | undefined {
   const prefix = `__Host-${name}=`;
@@ -23,6 +24,7 @@ describe("login", () => {
   before(async () => {
     db = prepareTestDb();
     await deleteAccounts(db, PREFIX);
+    await deleteAddressFailures(db, ADDRESS);
     await createAccount(db, USERNAME, "テストユーザー１", PASSWORD);
     server = await startTestServer(db);
   });
@@ -46,6 +48,7 @@ describe("login", () => {
       redirect: "manual",
       headers: {
         "sec-fetch-site": "same-origin",
+        "x-forwarded-for": ADDRESS,
         cookie: Object.entries(cookies)
           .map(([name, value]) => `__Host-${name}=${value}`)
           .join("; "),
@@ -102,6 +105,22 @@ describe("login", () => {
     const newCsrf = cookieValue(res, "csrf");
     assert.ok(newCsrf != null);
     assert.notEqual(newCsrf, csrf);
+    assert.match(cookieValue(res, "device") ?? "", /^[A-Za-z0-9_-]{43}$/);
+  });
+
+  it("記録済みの端末からログインすると同じ端末トークンが返る", async () => {
+    const csrf = await getCsrfToken();
+    const first = await post("/login", { csrf }, { _csrf: csrf, username: USERNAME, password: PASSWORD });
+    const device = cookieValue(first, "device");
+    assert.ok(device != null);
+    const csrf2 = cookieValue(first, "csrf") ?? csrf;
+    const second = await post(
+      "/login",
+      { csrf: csrf2, device },
+      { _csrf: csrf2, username: USERNAME, password: PASSWORD },
+    );
+    assert.equal(second.status, 303);
+    assert.equal(cookieValue(second, "device"), device);
   });
 
   it("ログイン前のセッションはログイン時に削除する", async () => {

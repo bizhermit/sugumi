@@ -5,7 +5,9 @@ import { createCsrfCookie, createCsrfToken } from "../../web/csrf.ts";
 import { formSlot } from "../../web/form.ts";
 import { Page, page } from "../../web/html-document.tsx";
 import { STATUS_TEXTS } from "../../web/http-error.ts";
+import { remoteAddressSlot } from "../../web/remote-address.ts";
 import { authenticate, USERNAME_MAX_LENGTH } from "./accounts.ts";
+import { deviceCookie, readDeviceToken, readUserAgent } from "./login-devices.ts";
 import { PASSWORD_MAX_LENGTH } from "./password.ts";
 import { DEFAULT_RETURN_PATH, RETURN_TO_PARAM_NAME, toReturnPath } from "./return-to.ts";
 import { createSession, deleteSession, findSession, sessionCookie } from "./session.ts";
@@ -73,7 +75,7 @@ function get(req: Request): Page {
 }
 
 async function post(req: Request): Promise<Response | Page> {
-  const { db } = appSlot.get(req);
+  const { db, logger, login, session } = appSlot.get(req);
   const form = formSlot.get(req);
   const username = form.get("username");
   const password = form.get("password");
@@ -83,8 +85,24 @@ async function post(req: Request): Promise<Response | Page> {
   }
   const returnTo = toReturnPath(typeof returnToValue === "string" ? returnToValue : undefined);
 
-  const account = await authenticate(db, username, password);
-  if (account == null) {
+  const remoteAddress = remoteAddressSlot.get(req);
+  const result = await authenticate(db, login, {
+    username,
+    password,
+    remoteAddress,
+    deviceToken: readDeviceToken(req),
+    userAgent: readUserAgent(req),
+  });
+  if (result.status !== "ok") {
+    // 失敗の種類は画面に出さず、ログに残す。ロックと遮断の開始は運用で気付けるようwarnにする。
+    const accountId = "accountId" in result ? result.accountId : undefined;
+    logger.info("ログインに失敗しました。", { reason: result.status, accountId, remoteAddress });
+    if (result.status === "wrong_password" && result.locksAccount) {
+      logger.warn("アカウントをロックしました。", { accountId });
+    }
+    if (result.status === "address_blocked" && result.blocksAddress) {
+      logger.warn("接続元からのログインを遮断しました。", { remoteAddress });
+    }
     return loginPage(req, {
       status: 401,
       username,
@@ -93,13 +111,16 @@ async function post(req: Request): Promise<Response | Page> {
     });
   }
 
-  const previous = await findSession(db, req);
+  const previous = await findSession(db, session, req);
   if (previous != null) {
     await deleteSession(db, previous.token);
   }
-  const token = await createSession(db, account.id);
+  const { account, device } = result;
+  const token = await createSession(db, session, account.id);
+  logger.info("ログインしました。", { accountId: account.id, newDevice: device.isNew, remoteAddress });
   const headers = new Headers({ Location: returnTo ?? DEFAULT_RETURN_PATH });
   headers.append("set-cookie", sessionCookie(token));
+  headers.append("set-cookie", deviceCookie(login, device.token));
   headers.append("set-cookie", createCsrfCookie(createCsrfToken()));
   return new Response(null, { status: 303, headers });
 }

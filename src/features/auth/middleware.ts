@@ -6,8 +6,8 @@ import { loginPathWithReturnTo } from "./return-to.ts";
 import { findSession, sessionSlot } from "./session.ts";
 
 const requireLogin: Middleware = async (req, next) => {
-  const { db } = appSlot.get(req);
-  const session = await findSession(db, req);
+  const { db, session: SessionLimits } = appSlot.get(req);
+  const session = await findSession(db, SessionLimits, req);
   if (session == null) {
     if (req.method === "GET" || req.method === "HEAD") {
       return new Response(null, { status: 303, headers: { Location: loginPathWithReturnTo(new URL(req.url)) } });

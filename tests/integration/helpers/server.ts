@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { routes } from "../../../src/routes.ts";
 import { createApp } from "../../../src/web/app.ts";
 import type { DataBase } from "../../../src/lib/db.ts";
+import { TEST_LOGIN_LIMITS, TEST_SESSION_LIMITS } from "./limits.ts";
 import { createTestLogger } from "./logger.ts";
 
 export type TestServer = {
@@ -11,7 +12,15 @@ export type TestServer = {
 
 /** アプリを空いているポートで起動する。 */
 export async function startTestServer(db: DataBase): Promise<TestServer> {
-  const server = createServer(createApp(routes, { logger: createTestLogger(), db }));
+  const server = createServer(
+    createApp(routes, {
+      logger: createTestLogger(),
+      db,
+      trustProxy: true,
+      login: TEST_LOGIN_LIMITS,
+      session: TEST_SESSION_LIMITS,
+    }),
+  );
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   if (address == null || typeof address !== "object") {

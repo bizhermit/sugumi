@@ -10,6 +10,7 @@ import {
 } from "../../../src/features/auth/session.ts";
 import type { DataBase } from "../../../src/lib/db.ts";
 import { deleteAccounts, prepareTestDb } from "../helpers/db.ts";
+import { TEST_SESSION_LIMITS } from "../helpers/limits.ts";
 import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/return-to.ts";
 
 const PREFIX = "test-session-";
@@ -37,7 +38,7 @@ describe("session", () => {
   /** このアカウントのセッションを全部消してから1つ作る。時刻はDBの行を直接書き換えて動かす。 */
   async function createSessionAt(minutesAgo: { created?: number; lastAccess?: number }): Promise<string> {
     await db.query("DELETE FROM sessions WHERE account_id = $1", [accountId]);
-    const token = await createSession(db, accountId);
+    const token = await createSession(db, TEST_SESSION_LIMITS, accountId);
     const now = Date.now();
     await db.query(
       "UPDATE sessions SET created_at = coalesce($2, created_at), last_access_at = coalesce($3, last_access_at) WHERE account_id = $1",
@@ -59,9 +60,9 @@ describe("session", () => {
   }
 
   it("作ったセッションをCookieから引ける", async () => {
-    const token = await createSession(db, accountId);
+    const token = await createSession(db, TEST_SESSION_LIMITS, accountId);
     assert.match(token, /^[A-Za-z0-9_-]{43}$/);
-    const session = await findSession(db, requestWithSession(token));
+    const session = await findSession(db, TEST_SESSION_LIMITS, requestWithSession(token));
     assert.ok(session != null);
     assert.equal(session.token, token);
     assert.deepEqual(session.account, {
@@ -72,43 +73,46 @@ describe("session", () => {
   });
 
   it("Cookieが無い、または形式が違えばundefined", async () => {
-    assert.equal(await findSession(db, new Request(`http://localhost${DEFAULT_RETURN_PATH}`)), undefined);
-    assert.equal(await findSession(db, requestWithSession("x".repeat(43))), undefined);
-    assert.equal(await findSession(db, requestWithSession("short")), undefined);
+    assert.equal(
+      await findSession(db, TEST_SESSION_LIMITS, new Request(`http://localhost${DEFAULT_RETURN_PATH}`)),
+      undefined,
+    );
+    assert.equal(await findSession(db, TEST_SESSION_LIMITS, requestWithSession("x".repeat(43))), undefined);
+    assert.equal(await findSession(db, TEST_SESSION_LIMITS, requestWithSession("short")), undefined);
   });
 
   it("削除したセッションは引けない", async () => {
-    const token = await createSession(db, accountId);
+    const token = await createSession(db, TEST_SESSION_LIMITS, accountId);
     await deleteSession(db, token);
-    assert.equal(await findSession(db, requestWithSession(token)), undefined);
+    assert.equal(await findSession(db, TEST_SESSION_LIMITS, requestWithSession(token)), undefined);
   });
 
   it("無操作30分で期限切れになり、行も消える", async () => {
     const token = await createSessionAt({ lastAccess: 31 });
-    assert.equal(await findSession(db, requestWithSession(token)), undefined);
+    assert.equal(await findSession(db, TEST_SESSION_LIMITS, requestWithSession(token)), undefined);
     assert.equal((await sessionRows()).length, 0);
   });
 
   it("作成から12時間で期限切れになる", async () => {
     const token = await createSessionAt({ created: 12 * 60 + 1 });
-    assert.equal(await findSession(db, requestWithSession(token)), undefined);
+    assert.equal(await findSession(db, TEST_SESSION_LIMITS, requestWithSession(token)), undefined);
   });
 
   it("最終アクセス時刻は1分以上経ったときだけ更新する", async () => {
     const token = await createSessionAt({ lastAccess: 2 });
     const touchedBefore = (await sessionRows())[0]?.last_access_at;
     assert.ok(touchedBefore != null);
-    assert.ok(await findSession(db, requestWithSession(token)));
+    assert.ok(await findSession(db, TEST_SESSION_LIMITS, requestWithSession(token)));
     const touchedAfter = (await sessionRows())[0]?.last_access_at;
     assert.ok(touchedAfter != null);
     assert.ok(touchedAfter.getTime() > touchedBefore.getTime());
-    assert.ok(await findSession(db, requestWithSession(token)));
+    assert.ok(await findSession(db, TEST_SESSION_LIMITS, requestWithSession(token)));
     assert.equal((await sessionRows())[0]?.last_access_at.getTime(), touchedAfter.getTime());
   });
 
   it("セッションを作るとき、期限切れの行をまとめて消す", async () => {
     await createSessionAt({ lastAccess: 31 });
-    await createSession(db, accountId);
+    await createSession(db, TEST_SESSION_LIMITS, accountId);
     assert.equal((await sessionRows()).length, 1);
   });
 

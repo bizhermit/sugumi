@@ -29,7 +29,9 @@ async function main() {
     process.exit(1);
   }
 
-  const server = createServer(createApp(routes, { logger, db }));
+  const server = createServer(
+    createApp(routes, { logger, db, trustProxy: config.trustProxy, login: config.login, session: config.session }),
+  );
   server.on("error", (err) => {
     logger.error("サーバーの起動に失敗しました。", { err });
     process.exit(1);

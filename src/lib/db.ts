@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import type { Logger } from "./logger.ts";
 
 export type DataBase = Pool;
@@ -16,4 +16,19 @@ export function createDb(databaseUrl: string, logger: Logger): DataBase {
     logger.error("DB接続が切れました。", { err });
   });
   return db;
+}
+
+export async function transaction<T>(db: DataBase, fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
