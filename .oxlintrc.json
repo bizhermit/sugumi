@@ -1,0 +1,100 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "options": {
+    "typeAware": true
+  },
+  "plugins": ["typescript", "unicorn", "oxc", "node", "promise"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn"
+  },
+  "rules": {
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-control-regex": "off",
+    "no-empty": "warn",
+    "no-empty-pattern": "warn",
+    "no-fallthrough": "warn",
+    "no-var": "error",
+    "no-unused-expressions": "warn",
+    "no-unused-vars": [
+      "warn",
+      {
+        "args": "after-used",
+        "argsIgnorePattern": "^_",
+        "caughtErrors": "none",
+        "destructuredArrayIgnorePattern": "^_",
+        "ignoreRestSiblings": true,
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "prefer-const": "warn",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-restricted-properties": [
+      "error",
+      { "object": "process", "property": "env", "message": "環境変数はloadConfigを通して参照してください" }
+    ],
+    "unicorn/no-empty-file": "off",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": ["error", { "allowThrowingUnknown": true }],
+    "typescript/prefer-nullish-coalescing": "warn",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }]
+  },
+  "env": {
+    "node": true
+  },
+  "ignorePatterns": ["**/*.min.{js,mjs,cjs}"],
+  "overrides": [
+    {
+      "files": ["src/lib/config.ts"],
+      "rules": {
+        "no-restricted-properties": "off"
+      }
+    },
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        "no-console": "off",
+        "no-restricted-properties": "off"
+      }
+    },
+    {
+      "files": ["src/migrate.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["tests/integration/helpers/db.ts"],
+      "rules": {
+        "no-restricted-properties": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "typescript/no-explicit-any": "off",
+        "typescript/no-floating-promises": [
+          "error",
+          {
+            "allowForKnownSafeCalls": [
+              {
+                "from": "package",
+                "package": "node:test",
+                "name": ["describe", "it", "test", "suite", "before", "after", "beforeEach", "afterEach"]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

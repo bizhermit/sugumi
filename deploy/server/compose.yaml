@@ -1,0 +1,60 @@
+name: myapp
+
+services:
+  lb:
+    image: myapp/lb:${IMAGE_TAG:?.envにIMAGE_TAGを設定してください}
+    build: ../lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+  app:
+    image: myapp/app:${IMAGE_TAG:?.envにIMAGE_TAGを設定してください}
+    build:
+      context: ../..
+      dockerfile: deploy/app/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_DATABASE_URL: postgres://app:${DB_APP_PASSWORD:?.envにDB_APP_PASSWORDを設定してください}@db:5432/app
+      APP_TRUST_PROXY: "true"
+      APP_LOGIN_MAX_FAILED_ATTEMPTS: ${APP_LOGIN_MAX_FAILED_ATTEMPTS:-}
+      APP_LOGIN_LOCKOUT_MINUTES: ${APP_LOGIN_LOCKOUT_MINUTES:-}
+      APP_LOGIN_ADDRESS_MAX_FAILED_ATTEMPTS: ${APP_LOGIN_ADDRESS_MAX_FAILED_ATTEMPTS:-}
+      APP_LOGIN_ADDRESS_WINDOW_MINUTES: ${APP_LOGIN_ADDRESS_WINDOW_MINUTES:-}
+      APP_LOGIN_ADDRESS_BLOCK_MINUTES: ${APP_LOGIN_ADDRESS_BLOCK_MINUTES:-}
+      APP_LOGIN_DEVICE_DAYS: ${APP_LOGIN_DEVICE_DAYS:-}
+      APP_SESSION_IDLE_MINUTES: ${APP_SESSION_IDLE_MINUTES:-}
+      APP_SESSION_ABSOLUTE_HOURS: ${APP_SESSION_ABSOLUTE_HOURS:-}
+    depends_on:
+      db:
+        condition: service_healthy
+  migrate:
+    image: myapp/app:${IMAGE_TAG:?.envにIMAGE_TAGを設定してください}
+    profiles: [tools]
+    command: dist/src/migrate.js
+    environment:
+      APP_MIGRATION_DATABASE_URL: postgres://migrator:${DB_MIGRATOR_PASSWORD:?.envにDB_MIGRATOR_PASSWORDを設定してください}@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: myapp/db:${IMAGE_TAG:?.envにIMAGE_TAGを設定してください}
+    build: ../db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?.envにDB_ADMIN_PASSWORDを設定してください}
+      POSTGRES_DB: app
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?.envにDB_APP_PASSWORDを設定してください}
+      DB_MIGRATOR_PASSWORD: ${DB_MIGRATOR_PASSWORD:?.envにDB_MIGRATOR_PASSWORDを設定してください}
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username", "admin", "--dbname", "app"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  db-data:

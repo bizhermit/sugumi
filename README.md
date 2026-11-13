@@ -1,85 +1,94 @@
-# SUGUMI
+# Sugumi
 
-外部依存を最小にしたWebアプリケーションテンプレート
-
-- Deno + TypeScript + PostgreSQL
-- フレームワーク・ライブラリ不使用（外部サービスに接続するためのライブラリおよびテスト用ライブラリは例外）
-- SSRを基本とし、クライアントサイドのJavaScriptは段階的な機能拡張を担う
-
-## テンプレートから作る方法
-
-アプリの名前が必要なところ（イメージの保存先・ボリューム・手順書の例など）には `myapp` と書いてある。
-コピーした後に、アプリの名前（英小文字・数字・`-`）へ一括で置き換える。
-
-```sh
-git grep -lz myapp | xargs -0 sed -i 's/myapp/<アプリの名前>/g'
-```
-
-置き換えた後に、この README の見出しを書き換え、この節を削除する。
+Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレート
 
 ## 開発
 
-- DevContainer の用意と使い方は [.devcontainer/README.md](.devcontainer/README.md) を参照。
-- DevContainer では、開発用とテスト用の PostgreSQL が別のコンテナで起動する。
-  - 接続先は、環境変数 `DATABASE_URL`（開発用）と `TEST_DATABASE_URL`（テスト用）に設定される。
-  - マイグレーションの接続先（スキーマを持つ DB ユーザー `migrator`）は、`MIGRATION_DATABASE_URL` と `TEST_MIGRATION_DATABASE_URL` に設定される。
-  - テスト用 DB はテストのたびに空にする。コンテナを止めると、データは消える。
-- DevContainer の外で動かすときは、`DATABASE_URL`・`TEST_DATABASE_URL`・`MIGRATION_DATABASE_URL`・`TEST_MIGRATION_DATABASE_URL` に接続先を設定する。
-  - 例：`postgres://user:password@host:5432/dbname`
-  - DB ユーザーとスキーマは、[docker/db/init/10-app-role.sh](docker/db/init/10-app-role.sh) と同じように作る。
-  - 開発用とテスト用は別の DB にし、テスト用 DB には管理者で使い捨ての印を付ける（`COMMENT ON DATABASE <DB の名前> IS 'disposable'`）。
-    テストは、印のない DB を空にしない。
+環境構築は[DevContainer](.devcontainer/README.md)を参照。
 
-```sh
-deno task dev       # 開発サーバーを起動（ファイル監視あり、APP_MODE=DEV。先に deno task migrate が必要）
-deno task dev:mock  # 開発サーバーを APP_MODE=MOCK で起動（routes の *.mock.* を使う）
-deno task dev:prod  # 開発サーバーを APP_MODE=PROD で起動
-deno task build  # クライアントコードをバンドル
-deno task gen  # ルートの型（src/routes.gen.ts）と SCHEMA_VERSION（src/lib/schema-version.gen.ts）を生成
-deno task migrate  # 開発用 DB にマイグレーション（docker/db/migrations/）を適用し、SCHEMA_VERSION を生成（MIGRATION_DATABASE_URL の DB を使う。psql が必要）
-deno task migrate:test  # テスト用 DB にマイグレーションを適用（TEST_MIGRATION_DATABASE_URL の DB を使う。psql が必要。DevContainer は起動のたびに実行する）
-deno task start  # サーバー起動（先に deno task build と deno task migrate が必要）
-deno task account:add <ユーザー名> <表示名>  # アカウントを追加（パスワードは入力を求める）
-deno task account:unlock <アカウントの id>  # ロックしたアカウントを解除
-deno task check:imports  # サーバー・クライアント間の import の取り決めを確認
-deno task check:bundle   # バンドルにサーバーのコードが入っていないかを確認（build でも実行される）
-deno task check:schema-version  # SCHEMA_VERSION を生成し忘れていないかを確認（build でも実行される）
-deno task test   # テストを実行（TEST_DATABASE_URL の DB を使う。先に deno task build と deno task migrate:test が必要）
+| コマンド              | 説明                                                                          |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `npm run dev`         | 開発サーバーを起動する。                                                      |
+| `npm run build`       | ソースをビルドする。（サーバーサイド: `tsc`, クライアントサイド: `esbuild`）  |
+| `npm run start`       | サーバーを起動する。（事前にビルドする必要あり）                              |
+| `npm run check`       | 型チェック（tsc）を実行する。                                                 |
+| `npm run lint`        | lint（oxlint）を実行する。`npm run lint:fix`で自動修正を実行する。            |
+| `npm run format`      | フォーマット（oxfmt）を実行する。チェックのみの場合は`npm run format:check`。 |
+| `npm run test`        | テストを実行する。                                                            |
+| `npm run build:image` | 本番イメージを作成する。手順は[サーバー](deploy/server/README.md)を参照       |
+
+## ディレクトリ構成
+
+```
+.
+├── .devcontainer/      開発環境（VSCode DevContainers）
+├── .github/
+│   └── workflows/      CI
+├── deploy/             デプロイ
+│   ├── app/            アプリのDockerイメージ
+│   ├── lb/             リバースプロキシ（nginx）のDockerイメージ
+│   └── server/         自前サーバーでの運用手順とcompose
+├── scripts/            開発・ビルド用スクリプト
+│   ├── dev.ts          開発サーバー（変更を検知してビルドと再起動）
+│   ├── build-assets.ts ブラウザ側のビルド（esbuild）
+│   └── build-image.ts  本番イメージの作成
+├── src/
+│   ├── main.ts         起動コード。設定とロガーを作ってサーバーを立てる
+│   ├── routes.ts       URLとハンドラの対応表。全ルートをここに明示する
+│   ├── lib/            HTTPに依存しない共通処理（config, logger）
+│   ├── web/            HTTPの仕組み。アプリ固有の処理は置かない
+│   │   ├── app.ts              リクエストの受付、ルーティング、アクセスログ、エラー処理
+│   │   ├── routes.ts           ルート表の型とprefix/middleware/layout
+│   │   ├── html-document.tsx   Page/LayoutとHTML文書の生成
+│   │   ├── jsx-runtime.ts      JSXをHTMLへ文字列変換（エスケープ、className、Assetsの収集）
+│   │   ├── html-attributes.ts  HTML要素の属性の型
+│   │   ├── assets.ts           アセット（_assets/）のビルド結果の配信と設定
+│   │   ├── static.ts           静的リソース（static/）の配信
+│   │   ├── security-headers.ts 全レスポンスに付けるセキュリティヘッダ
+│   │   ├── slot.ts             middlewareから下層へ値を渡す仕組み
+│   │   └── context.ts          AppContext（loggerなど、全体で共有するもの）
+│   ├── components/     画面部品。featureをまたいで使うJSXの部品
+│   │   └── form/
+│   │       ├── form.tsx
+│   │       └── _assets/        部品のCSS/ClientJS
+│   └── features/       機能部品。機能ごとにディレクトリを切る
+│       ├── layout.tsx          全画面共通のレイアウト
+│       ├── _assets/            全画面共通のCSS/ClientJS
+│       ├── auth/               認証関連
+│       └── user/               認証後の画面
+├── static/             静的リソース（favicon.ico, robots.txt）
+├── tests/              テスト。src/と同じ構成にする
+└── dist/               ビルド結果（git 管理外）
+    ├── src/            tscの出力
+    └── public/         esbuildの出力
 ```
 
-## 本番
+- 依存の向きは `features → components → web → lib` の一方向のみ許可。逆向きにimportしない。featuresからweb,lib、componentsからlibの直接使用も可。
+- `asset()`はモジュールの先頭で呼び、起動時に解決させる。
 
-ビルドサーバーで [docker/bake.hcl](docker/bake.hcl) からイメージをビルドしてレジストリに置き、各サーバーで取得して起動する。
+## 規約
 
-- ロードバランサー（[docker/lb/](docker/lb/)）：HTTPS を受け、アプリサーバーへ振り分ける。1 つ。
-- アプリサーバー（[compose.yaml](compose.yaml)）：アプリ（[docker/app/](docker/app/)）とログの転送役（[docker/log-forwarder/](docker/log-forwarder/)）。1 台以上。
-- DB サーバー（[docker/db/](docker/db/)）：アプリサーバーから TLS で接続する。接続は転送役（[docker/db-proxy/](docker/db-proxy/)）が受け、外へ通信できない DB に流す。1 つ。
+### コメント
 
-1 台にまとめてもよい。ログは転送役が、CloudWatch Logs か、別のサーバーに置いたログ用サーバー（[docker/log-server/](docker/log-server/)）へ送る。
-手順は [docker/README/index.md](docker/README/index.md) を参照。
+- 設計書は書かない。コードとコメントで説明する
+  - コードの外に書くと、コードを直したときに更新されず陳腐化しやすいため
+  - 仕組みはコードを読めばわかるように書き、読んでもわからないことだけをコメントにする
+- 関数・型・ファイル先頭のコメントには、次のどちらかだけを記述する
+  - 使い方: 引数・戻り値の意味、呼び出し側が留意する点
+  - コードの補完説明: そうしている理由、制約、他ファイルや外部との取り決め
+- 理由のコメントは、その判断をしているコードのそばに記述する
+  - 呼び出し側の判断の理由は、呼び出し・分岐の直前に書く。呼ばれる関数側には書かない。
+  - 関数のコメントに書く理由は、その関数自身についてのもののみ
+- 処理の流れの説明や変更の経緯は書かない。経緯はコミットメッセージに残す
 
-```mermaid
-flowchart TB
-  user(["ユーザー"]) -->|"HTTPS"| lb
+### セキュリティ
 
-  subgraph lbserver["ロードバランサー"]
-    lb["lb（nginx）<br>docker/lb/compose.yaml"]
-  end
+- 状態を変える処理をGETに置かない。CSRFの検証（[`src/web/csrf.ts`](src/web/csrf.ts)）はGET/HEAD/OPTIONSでは行われない。
 
-  lb -->|"HTTP<br>X-Forwarded-For"| app
+### ログ
 
-  subgraph appserver["アプリサーバー × n"]
-    app["app<br>compose.yaml"]
-    app -.->|"標準出力・標準エラー<br>（Docker の fluentd ログドライバー）"| fwd["log-forwarder<br>ボリューム log-buffer"]
-  end
+- トークンやパスワードをGETのクエリに入れない。アクセスログには残らないが、エラーログにはクエリの値も記録される。
 
-  app -->|"TLS"| dbproxy
-  fwd ~~~ dbproxy
+### HTML/JS/CSS
 
-  subgraph dbserver["DB サーバー"]
-    dbproxy["db-proxy（nginx）<br>docker/db/compose.yaml"] -->|"TLS（そのまま流す）"| db[("db<br>ボリューム db-data")]
-  end
-
-  fwd -->|"LOG_DESTINATION=cloudwatch"| cw[("CloudWatch Logs")]
-  fwd -->|"LOG_DESTINATION=internal<br>TLS・共有鍵"| logserver[("ログ用サーバー<br>docker/log-server/compose.yaml<br>ボリューム logs")]
-```
+- クライアントサイドでのJSは段階的な機能拡張に使用する。JSが無効でもフォームの送信や画面の移動といった基本的な操作は可能であるようにする
