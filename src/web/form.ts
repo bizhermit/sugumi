@@ -1,34 +1,206 @@
+import {
+  BooleanSchema,
+  ConfigurableSchema,
+  DateSchema,
+  DateTimeSchema,
+  TimeSchema,
+  formatIssue,
+  jaFormMessages,
+  NumberSchema,
+  StringSchema,
+  walk,
+  type InferShape,
+  type Issue,
+  type MessageDictionary,
+  type ObjectSchema,
+  type RequiredOption,
+  type Shape,
+} from "../lib/schema/index.ts";
+import { toDateTimeInputValue, toTimeInputValue } from "../lib/date.ts";
+import { CSRF_FIELD_NAME } from "./csrf.ts";
+import type { HtmlElements } from "./html-attributes.ts";
+import { HttpError } from "./http-error.ts";
+import { slot } from "./slot.ts";
+
 /**
- * フォームのリクエストボディをパースする。CSRF の検証（csrf.tsx）とページの ctx.form() は、同じパース結果を使う。
+ * readForm() の上限の既定値
+ * ファイルを受け取るフォームは options.maxBytes で広げる。
  */
+export const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
 
 const FORM_TYPE = /^(?:application\/x-www-form-urlencoded|multipart\/form-data)\b/i;
 
-// キーは、app.ts がリクエストボディを読み込んだあとの Request。リクエストが終われば、Request と一緒に消える。
-const parsed = new WeakMap<Request, Promise<FormData | undefined>>();
+export const formSlot = slot<FormData>("form");
 
-/** フォームをパースできないときに ctx.form() が投げる。app.ts が受けて 400 を返す。 */
-export class InvalidFormError extends Error {}
+export type ReadFormOptions = {
+  readonly maxBytes?: number;
+};
 
-/**
- * フォームのリクエストボディをパースして返す。同じ req は 1 回だけパースする。
- * Content-Type がフォームでないか、パースできなければ undefined を返す。
- * req をクローンして読むので、ページは req.formData() など標準の API でもリクエストボディを読める。
- */
-export function parseForm(req: Request): Promise<FormData | undefined> {
-  let form = parsed.get(req);
-  if (form === undefined) {
-    form = readForm(req);
-    parsed.set(req, form);
-  }
-  return form;
+async function readBody(req: Request, maxBytes: number): Promise<Uint8Array> {
+  if (req.body == null) return new Uint8Array(0);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  // write() で投げると pipeTo() がその例外で失敗し、読み込みも中断される。
+  await req.body.pipeTo(
+    new WritableStream<Uint8Array>({
+      write(chunk) {
+        size += chunk.byteLength;
+        if (size > maxBytes) {
+          throw new HttpError(413, "リクエストボディが上限を超えています。");
+        }
+        chunks.push(chunk);
+      },
+    }),
+  );
+  return Buffer.concat(chunks);
 }
 
-async function readForm(req: Request): Promise<FormData | undefined> {
-  if (!FORM_TYPE.test(req.headers.get("content-type") ?? "")) return undefined;
-  try {
-    return await req.clone().formData();
-  } catch {
-    return undefined;
+export async function readForm(req: Request, options: ReadFormOptions = {}): Promise<FormData> {
+  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const contentType = req.headers.get("content-type") ?? "";
+  if (!FORM_TYPE.test(contentType)) {
+    throw new HttpError(415, `フォームではないContent-Typeです: ${contentType}`);
   }
+  if (Number(req.headers.get("content-length")) > maxBytes) {
+    throw new HttpError(413, "リクエストボディが上限を超えています。");
+  }
+  const body = await readBody(req, maxBytes);
+  try {
+    return await new Response(body, { headers: { "content-type": contentType } }).formData();
+  } catch (err) {
+    throw new HttpError(400, "フォームを解析できません。", { cause: err });
+  }
+}
+
+/** 項目名ごとの文言。項目に紐づかないもの（objectのrefineなど）はキー""に入る。 */
+export type FormErrors = Readonly<Record<string, readonly string[]>>;
+export type FormValues = Readonly<Record<string, string>>;
+
+export type FormResult<T> =
+  | { readonly ok: true; readonly data: T; readonly warnings: readonly Issue[] }
+  | {
+      readonly ok: false;
+      readonly errors: FormErrors;
+      readonly values: FormValues;
+      readonly warnings: readonly Issue[];
+    };
+
+function setOwn(target: Record<string, unknown>, key: string, value: unknown): void {
+  Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true });
+}
+
+export function formToObject<S extends Shape, R extends RequiredOption>(
+  schema: ObjectSchema<S, R>,
+  form: FormData,
+): Record<string, unknown> {
+  const arrayKeys = new Set(
+    walk(schema)
+      .filter((field) => field.path.length === 1 && field.typeName === "array")
+      .map((field) => String(field.path[0])),
+  );
+  const values: Record<string, unknown> = {};
+  for (const key of new Set(form.keys())) {
+    if (key === CSRF_FIELD_NAME) continue;
+    const all = form.getAll(key);
+    setOwn(values, key, arrayKeys.has(key) || all.length > 1 ? all : all[0]);
+  }
+  return values;
+}
+
+export function validateForm<S extends Shape, R extends RequiredOption>(
+  schema: ObjectSchema<S, R>,
+  form: FormData,
+  messages: MessageDictionary = jaFormMessages,
+): FormResult<InferShape<S>> {
+  const input = formToObject(schema, form);
+  const result = schema.safeParse(input);
+  if (result.success) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 入力は常にオブジェクトのためundefined/nullにはならない。
+    return { ok: true, data: result.data as InferShape<S>, warnings: result.issues ?? [] };
+  }
+  const errors: Record<string, string[]> = {};
+  const warnings: Issue[] = [];
+  for (const issue of result.error.issues) {
+    if (issue.type !== "error") {
+      warnings.push(issue);
+      continue;
+    }
+    // pathはスキーマのshapeのキーであるため、入力由来のキーは入らない。
+    (errors[issue.path.join(".")] ??= []).push(formatIssue(issue, messages));
+  }
+  const values: Record<string, string> = {};
+  for (const key of Object.keys(schema.shape)) {
+    const value = input[key];
+    if (typeof value === "string") values[key] = value;
+  }
+  return { ok: false, errors, values, warnings };
+}
+
+export type InputAttributes = Pick<
+  HtmlElements["input"],
+  "type" | "required" | "minlength" | "maxlength" | "min" | "max" | "step"
+>;
+
+export function inputAttributes<S extends Shape, R extends RequiredOption>(
+  schema: ObjectSchema<S, R>,
+  name: keyof S & string,
+): InputAttributes {
+  const field = schema.shape[name];
+  if (field == null) {
+    throw new Error(`スキーマに項目がありません: ${name}`);
+  }
+  if (field instanceof StringSchema) {
+    const o = field.options;
+    return {
+      ...(o.type == null ? {} : { type: o.type }),
+      ...(field.required ? { required: true } : {}),
+      ...(o.minLength == null ? {} : { minlength: o.minLength }),
+      ...(o.maxLength == null ? {} : { maxlength: o.maxLength }),
+    };
+  }
+  if (field instanceof NumberSchema) {
+    const o = field.options;
+    return {
+      type: "number",
+      ...(field.required ? { required: true } : {}),
+      ...(o.min == null ? {} : { min: o.min }),
+      ...(o.max == null ? {} : { max: o.max }),
+      step: o.type === "int" ? 1 : o.decimals == null ? "any" : 10 ** -o.decimals,
+    };
+  }
+  if (field instanceof DateSchema) {
+    const o = field.options;
+    return {
+      type: "date",
+      ...(field.required ? { required: true } : {}),
+      ...(o.min == null ? {} : { min: o.min.toString() }),
+      ...(o.max == null ? {} : { max: o.max.toString() }),
+    };
+  }
+  if (field instanceof DateTimeSchema) {
+    const o = field.options;
+    return {
+      type: "datetime-local",
+      ...(field.required ? { required: true } : {}),
+      ...(o.min == null ? {} : { min: toDateTimeInputValue(o.min.withTimeZone(field.timeZone)) }),
+      ...(o.max == null ? {} : { max: toDateTimeInputValue(o.max.withTimeZone(field.timeZone)) }),
+    };
+  }
+  if (field instanceof TimeSchema) {
+    const o = field.options;
+    return {
+      type: "time",
+      ...(field.required ? { required: true } : {}),
+      ...(o.min == null ? {} : { min: toTimeInputValue(o.min) }),
+      ...(o.max == null ? {} : { max: toTimeInputValue(o.max) }),
+    };
+  }
+  if (field instanceof BooleanSchema) {
+    // チェックボックスのrequiredは「チェック済み」の意味なので、falseも拒否する指定のときだけ付ける。
+    return field.disallowFalse ? { required: true } : {};
+  }
+  if (field instanceof ConfigurableSchema) {
+    return field.required ? { required: true } : {};
+  }
+  return {};
 }

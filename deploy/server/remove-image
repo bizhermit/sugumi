@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+APP_NAME=myapp
+
+ask() {
+  local answer
+  read -r -p "$1 [y/N]: " answer
+  [ "$answer" = y ] || [ "$answer" = Y ]
+}
+
+current=$(sed -n 's/^IMAGE_TAG=//p' .env 2> /dev/null || true)
+tags=()
+for tag in $(docker images "$APP_NAME/app" --format '{{.Tag}}'); do
+  [ "$tag" = "<none>" ] && continue
+  [ "$tag" = "$current" ] && continue
+  tags+=("$tag")
+done
+if [ ${#tags[@]} -eq 0 ]; then
+  echo "削除できるイメージはありません。"
+  exit 0
+fi
+
+echo "削除するタグを番号で選んでください（現在: ${current:-（なし）}）:"
+select tag in "${tags[@]}"; do
+  [ -n "$tag" ] && break
+done
+if [ -z "${tag:-}" ]; then
+  exit 1
+fi
+
+if ! ask "「$tag」を削除します。よろしいですか？"; then
+  exit 0
+fi
+for image in "$APP_NAME/app:$tag" "$APP_NAME/lb:$tag"; do
+  if docker image inspect "$image" > /dev/null 2>&1; then
+    docker rmi "$image"
+  fi
+done
+
+file="$APP_NAME-$tag.tar.gz"
+if [ -f "$file" ] && ask "イメージファイル「$file」が残っています。削除しますか？"; then
+  rm "$file"
+fi

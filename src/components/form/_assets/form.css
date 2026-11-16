@@ -1,0 +1,9 @@
+form {
+  display: flex;
+  flex-flow: column nowrap;
+}
+
+.form-error {
+  display: block;
+  color: #b00020;
+}

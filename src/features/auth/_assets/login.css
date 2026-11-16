@@ -1,0 +1,9 @@
+.login-form {
+  border: 1px solid #888;
+  border-radius: 2rem;
+  padding: 2rem;
+}
+
+form label + button[aria-pressed] {
+  margin-inline-start: 0.5rem;
+}

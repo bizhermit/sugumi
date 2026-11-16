@@ -5,6 +5,7 @@
   "workspaceFolder": "/workspace",
   "remoteUser": "dev",
   "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
       "moby": false
     }
@@ -17,26 +18,31 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "Anthropic.claude-code",
-        "ms-azuretools.vscode-docker",
-        "eamodio.gitlens",
-        "mhutchie.git-graph",
         "EditorConfig.EditorConfig",
         "redhat.vscode-yaml",
-        "hediet.vscode-drawio",
-        "denoland.vscode-deno",
-        "ms-python.python",
-        "humao.rest-client"
+        "ms-azuretools.vscode-docker",
+        "Anthropic.claude-code",
+        "oxc.oxc-vscode"
       ],
       "settings": {
-        "terminal.integrated.cwd": "/workspace",
         "files.exclude": {
           "**/.git": true,
           "**/.svn": true,
           "**/.hg": true,
           "**/.DS_Store": true,
           "**/Thumbs.db": true
-        }
+        },
+        "editor.formatOnSave": true,
+        "[javascript]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        "[javascriptreact]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        "[typescript]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        "[typescriptreact]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        "[json]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        "[jsonc]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        "[css]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        "[html]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        "[markdown]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        "[yaml]": { "editor.defaultFormatter": "oxc.oxc-vscode" }
       }
     }
   }
