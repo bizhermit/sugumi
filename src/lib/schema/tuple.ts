@@ -13,8 +13,11 @@ export class TupleSchema<T extends Elements, const R extends RequiredOption = fa
   readonly typeName = "tuple";
   readonly elements: T;
 
+  readonly options: CommonOptions<TupleOutput<T>, R>;
+
   constructor(elements: T, options: CommonOptions<TupleOutput<T>, R> = {}) {
-    super(options);
+    super();
+    this.options = options;
     this.elements = elements;
   }
 

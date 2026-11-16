@@ -15,8 +15,11 @@ export class IntersectionSchema<T extends Members, const R extends RequiredOptio
   readonly members: T;
   private readonly merged: ObjectSchema<Shape, true>;
 
+  readonly options: CommonOptions<IntersectionOutput<T>, R>;
+
   constructor(members: T, options: CommonOptions<IntersectionOutput<T>, R> = {}) {
-    super(options);
+    super();
+    this.options = options;
     this.members = members;
     this.merged = new ObjectSchema(Object.assign({}, ...members.map((member) => member.shape)) as Shape, {
       required: true,

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { LoginLimits } from "../../lib/config.ts";
 import { transaction, type DataBase } from "../../lib/db.ts";
 import type { LoginAccount } from "./login-account.ts";
+import { graphemeLength } from "../../lib/schema/index.ts";
 import { hashPassword, PASSWORD_MAX_LENGTH, verifyPassword } from "./password.ts";
 import { recordDeviceLogin, reserveDeviceAttempt, sweepDevices, type DeviceLogin } from "./login-devices.ts";
 import { refundAddressAttempt, reserveAddressAttempt, sweepAddressFailures } from "./login-throttle.ts";
@@ -114,7 +115,7 @@ WHERE
 
 export async function authenticate(db: DataBase, limits: LoginLimits, input: AuthInput): Promise<AuthResult> {
   const { username, password, remoteAddress, deviceToken, userAgent } = input;
-  if (password.length > PASSWORD_MAX_LENGTH) {
+  if (graphemeLength(password) > PASSWORD_MAX_LENGTH) {
     throw new Error(`パスワードが上限（${PASSWORD_MAX_LENGTH}文字）を超えています。`);
   }
   const now = new Date();

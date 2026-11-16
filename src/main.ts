@@ -4,6 +4,7 @@ import { ConfigError, loadConfig } from "./lib/config.ts";
 import { createLogger } from "./lib/logger.ts";
 import { routes } from "./routes.ts";
 import { createDb } from "./lib/db.ts";
+import { jaMessages, setDefaultMessages } from "./lib/schema/message.ts";
 
 function loadConfigOrExit() {
   try {
@@ -20,6 +21,7 @@ function loadConfigOrExit() {
 async function main() {
   const config = loadConfigOrExit();
   const logger = createLogger(config.log);
+  setDefaultMessages(jaMessages);
 
   const db = createDb(config.databaseUrl, logger);
   try {

@@ -59,11 +59,10 @@ describe("object", () => {
     assert.deepEqual(base.partial().options, { required: true, label: "ユーザー" });
   });
 
-  it("partial()後もbooleanのdisallowFalseは有効（出力型がtrueのままのため）", () => {
+  it("partial()でrequiredが外れると、booleanのdisallowFalseも外れる", () => {
     const patch = s.object({ agree: s.boolean({ required: { disallowFalse: true } }) }).partial();
     assert.deepEqual(patch.parse({}), {});
-    assert.equal(patch.safeParse({ agree: false }).success, false);
-    assert.deepEqual(patch.parse({ agree: true }), { agree: true });
+    assert.deepEqual(patch.parse({ agree: false }), { agree: false });
   });
 
   it("partial()はrequiredとdefaultを外し、型固有の制約は残す", () => {

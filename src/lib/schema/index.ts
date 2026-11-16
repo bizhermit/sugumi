@@ -50,6 +50,7 @@ export {
   AnySchema,
   UnknownSchema,
   parseDateString,
+  graphemeLength,
 } from "./primitives.ts";
 export type { StringOptions, StringType, NumberOptions, BooleanRequiredOption, DateOptions } from "./primitives.ts";
 export { SchemaError, hasErrorSeverity } from "./error.ts";

@@ -13,3 +13,7 @@ addEventListener("pageshow", (e) => {
     form.removeAttribute("aria-busy");
   }
 });
+
+document.querySelectorAll("form").forEach((elem) => {
+  elem.noValidate = true;
+});

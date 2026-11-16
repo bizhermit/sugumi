@@ -9,8 +9,11 @@ export class EnumSchema<
   readonly typeName = "enum";
   readonly values: T;
 
+  readonly options: CommonOptions<T[number], R>;
+
   constructor(values: T, options: CommonOptions<T[number], R> = {}) {
-    super(options);
+    super();
+    this.options = options;
     this.values = values;
   }
 

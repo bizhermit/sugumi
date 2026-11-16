@@ -26,8 +26,11 @@ export class ObjectSchema<S extends Shape, const R extends RequiredOption = fals
   readonly typeName = "object";
   readonly shape: S;
 
+  readonly options: CommonOptions<InferShape<S>, R>;
+
   constructor(shape: S, options: CommonOptions<InferShape<S>, R> = {}) {
-    super(options);
+    super();
+    this.options = options;
     this.shape = shape;
   }
 

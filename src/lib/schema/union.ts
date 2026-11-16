@@ -12,8 +12,11 @@ export class UnionSchema<T extends Members, const R extends RequiredOption = fal
   readonly typeName = "union";
   readonly members: T;
 
+  readonly options: CommonOptions<UnionOutput<T>, R>;
+
   constructor(members: T, options: CommonOptions<UnionOutput<T>, R> = {}) {
-    super(options);
+    super();
+    this.options = options;
     this.members = members;
   }
 

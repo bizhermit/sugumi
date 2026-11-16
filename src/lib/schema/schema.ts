@@ -51,38 +51,27 @@ export interface CommonOptions<T, R extends RequiredOption> {
 }
 
 export abstract class ConfigurableSchema<T, R extends RequiredOption> extends Schema<Nullish<T, R>> {
-  private readonly commonOptions: CommonOptions<T, R>;
-
-  constructor(commonOptions: CommonOptions<T, R>) {
-    super();
-    this.commonOptions = commonOptions;
-  }
-
   abstract readonly typeName: string;
+  abstract readonly options: Readonly<CommonOptions<T, R>>;
 
-  get options(): Readonly<CommonOptions<T, R>> {
-    return this.commonOptions;
+  get required(): boolean {
+    return isRequired(this.options.required);
   }
 
   protected abstract _parseValue(value: unknown, ctx: ParseContext): InternalResult<T>;
 
   withOptions<const R2 extends RequiredOption = R>(patch: Partial<CommonOptions<T, R2>>): ConfigurableSchema<T, R2> {
-    return this.replaceOptions({ ...this.commonOptions, ...patch } as CommonOptions<T, R2>);
+    return this.replaceOptions({ ...this.options, ...patch } as CommonOptions<T, R2>);
   }
 
   optional(): ConfigurableSchema<T, false> {
-    const { default: _default, ...rest } = this.commonOptions;
+    const { default: _default, ...rest } = this.options;
     return this.replaceOptions({ ...rest, required: false });
   }
 
   private replaceOptions<R2 extends RequiredOption>(merged: CommonOptions<T, R2>): ConfigurableSchema<T, R2> {
-    const clone = Object.create(Object.getPrototypeOf(this)) as Record<string, unknown>;
-    Object.assign(clone, this);
-    // サブクラスの型固有オプション（stringOptionsなど）はcommonOptionsと同じオブジェクトを指しているため、同じ参照のフィールドを全部差し替える。
-    for (const key of Object.keys(clone)) {
-      if (clone[key] === this.commonOptions) clone[key] = merged;
-    }
-    return clone as unknown as ConfigurableSchema<T, R2>;
+    const clone = Object.create(Object.getPrototypeOf(this)) as ConfigurableSchema<T, R2>;
+    return Object.assign(clone, this, { options: merged });
   }
 
   protected _preprocess(value: unknown): unknown {
@@ -94,14 +83,14 @@ export abstract class ConfigurableSchema<T, R extends RequiredOption> extends Sc
   }
 
   private withLabel(issue: Issue, ctx: ParseContext): Issue {
-    const label = this.commonOptions.label;
+    const label = this.options.label;
     if (label == null || issue.path.length !== ctx.path.length) return issue;
     // pathが長いissueは子から上がってきたものであるため、子のlabelを親のlabelで上書きしない。
     return { ...issue, params: { ...issue.params, label } };
   }
 
   _parse(input: unknown, ctx: ParseContext): InternalResult<Nullish<T, R>> {
-    const o = this.commonOptions;
+    const o = this.options;
     let value = o.strict ? input : this._preprocess(input);
 
     if (typeof value === "string" && value.trim() === "" && !this.acceptsEmptyString()) {

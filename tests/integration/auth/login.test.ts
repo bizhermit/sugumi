@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { createAccount } from "../../../src/features/auth/accounts.ts";
+import { createAccount, USERNAME_MAX_LENGTH } from "../../../src/features/auth/accounts.ts";
+import { PASSWORD_MAX_LENGTH } from "../../../src/features/auth/password.ts";
 import type { DataBase } from "../../../src/lib/db.ts";
 import { deleteAccounts, deleteAddressFailures, prepareTestDb } from "../helpers/db.ts";
 import { startTestServer, type TestServer } from "../helpers/server.ts";
@@ -8,6 +9,8 @@ import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/return-to.ts";
 
 const PREFIX = "test-login-";
 const USERNAME = `${PREFIX}user1`;
+const LENGTH_CHECK_USERNAME = `${PREFIX}user2`;
+const LENGTH_CHECK_ADDRESS = "203.0.113.2";
 const PASSWORD = "correct-pass";
 const ADDRESS = "203.0.113.1"; // 接続元ごとの制限に他のテストの失敗が混ざらないように、このファイル専用の接続元を固定
 
@@ -25,7 +28,9 @@ describe("login", () => {
     db = prepareTestDb();
     await deleteAccounts(db, PREFIX);
     await deleteAddressFailures(db, ADDRESS);
+    await deleteAddressFailures(db, LENGTH_CHECK_ADDRESS);
     await createAccount(db, USERNAME, "テストユーザー１", PASSWORD);
+    await createAccount(db, LENGTH_CHECK_USERNAME, "テストユーザー２", PASSWORD);
     server = await startTestServer(db);
   });
 
@@ -42,13 +47,18 @@ describe("login", () => {
     return token;
   }
 
-  function post(path: string, cookies: Record<string, string>, fields: Record<string, string>): Promise<Response> {
+  function post(
+    path: string,
+    cookies: Record<string, string>,
+    fields: Record<string, string>,
+    address: string = ADDRESS,
+  ): Promise<Response> {
     return fetch(`${server.baseUrl}${path}`, {
       method: "POST",
       redirect: "manual",
       headers: {
         "sec-fetch-site": "same-origin",
-        "x-forwarded-for": ADDRESS,
+        "x-forwarded-for": address,
         cookie: Object.entries(cookies)
           .map(([name, value]) => `__Host-${name}=${value}`)
           .join("; "),
@@ -88,6 +98,34 @@ describe("login", () => {
     assert.match(html, /ユーザー名またはパスワードが違います。/);
     assert.match(html, new RegExp(`value="${USERNAME}"`));
     assert.equal(cookieValue(res, "session"), undefined);
+  });
+
+  for (const [label, fields] of [
+    ["ユーザー名が空", { username: "", password: PASSWORD }],
+    ["ユーザー名が最大文字数を超える", { username: "u".repeat(USERNAME_MAX_LENGTH + 1), password: PASSWORD }],
+    ["パスワードが空", { username: USERNAME, password: "" }],
+    ["パスワードが最大文字数を超える", { username: USERNAME, password: "p".repeat(PASSWORD_MAX_LENGTH + 1) }],
+  ] as const) {
+    it(`${label}なら400を返し、文言付きでログイン画面を表示する`, async () => {
+      const csrf = await getCsrfToken();
+      const res = await post("/login", { csrf }, { _csrf: csrf, ...fields, to: "/settings" });
+      assert.equal(res.status, 400);
+      const html = await res.text();
+      assert.match(html, /class="form-error"/);
+      assert.match(html, /name="to" value="\/settings"/);
+      assert.equal(cookieValue(res, "session"), undefined);
+    });
+  }
+
+  it("書記素で上限以内なら、lengthで上限を超えるパスワードでも500にならず401を返す", async () => {
+    const csrf = await getCsrfToken();
+    const res = await post(
+      "/login",
+      { csrf },
+      { _csrf: csrf, username: LENGTH_CHECK_USERNAME, password: "👨‍👩‍👧‍👦".repeat(PASSWORD_MAX_LENGTH) },
+      LENGTH_CHECK_ADDRESS,
+    );
+    assert.equal(res.status, 401);
   });
 
   it("ユーザーが存在しない場合に401を返し、ログイン画面を表示する", async () => {

@@ -12,12 +12,12 @@ export interface ArrayOptions<T, R extends RequiredOption> extends CommonOptions
 export class ArraySchema<T, const R extends RequiredOption = false> extends ConfigurableSchema<T[], R> {
   readonly typeName = "array";
   readonly element: Schema<T>;
-  private readonly arrayOptions: ArrayOptions<T, R>;
+  readonly options: ArrayOptions<T, R>;
 
-  constructor(element: Schema<T>, arrayOptions: ArrayOptions<T, R> = {}) {
-    super(arrayOptions);
+  constructor(element: Schema<T>, options: ArrayOptions<T, R> = {}) {
+    super();
+    this.options = options;
     this.element = element;
-    this.arrayOptions = arrayOptions;
   }
 
   protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<T[]> {
@@ -33,7 +33,7 @@ export class ArraySchema<T, const R extends RequiredOption = false> extends Conf
       ]);
     }
 
-    const o = this.arrayOptions;
+    const o = this.options;
     const lengthIssues: Issue[] = [];
 
     if (o.length != null && value.length !== o.length) {

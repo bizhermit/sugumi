@@ -177,8 +177,7 @@ describe("boolean", () => {
 
   it("required: { disallowFalse: true }はfalseも拒否する（同意のチェックボックス）", () => {
     const agreed = s.boolean({ required: { disallowFalse: true } });
-    const ok: true = agreed.parse("on");
-    assert.equal(ok, true);
+    assert.equal(agreed.parse("on"), true);
     for (const input of [false, "off", undefined, ""]) {
       const result = agreed.safeParse(input);
       assert.ok(!result.success, String(input));

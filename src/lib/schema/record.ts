@@ -12,12 +12,12 @@ export interface RecordOptions<T, R extends RequiredOption> extends CommonOption
 export class RecordSchema<T, const R extends RequiredOption = false> extends ConfigurableSchema<Record<string, T>, R> {
   readonly typeName = "record";
   readonly element: Schema<T>;
-  private readonly recordOptions: RecordOptions<T, R>;
+  readonly options: RecordOptions<T, R>;
 
-  constructor(element: Schema<T>, recordOptions: RecordOptions<T, R> = {}) {
-    super(recordOptions);
+  constructor(element: Schema<T>, options: RecordOptions<T, R> = {}) {
+    super();
+    this.options = options;
     this.element = element;
-    this.recordOptions = recordOptions;
   }
 
   protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<Record<string, T>> {
@@ -35,7 +35,7 @@ export class RecordSchema<T, const R extends RequiredOption = false> extends Con
 
     const input = value as Record<string, unknown>;
     const keys = Object.keys(input);
-    const o = this.recordOptions;
+    const o = this.options;
     const lengthIssues: Issue[] = [];
 
     if (o.length != null && keys.length !== o.length) {
