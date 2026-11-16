@@ -1,4 +1,7 @@
-import { Pool, type PoolClient } from "pg";
+import pg, { Pool, type PoolClient } from "pg";
+
+pg.types.setTypeParser(pg.types.builtins.DATE, (value) => Temporal.PlainDate.from(value));
+pg.types.setTypeParser(pg.types.builtins.TIME, (value) => Temporal.PlainTime.from(value));
 import type { Logger } from "./logger.ts";
 
 export type DataBase = Pool;

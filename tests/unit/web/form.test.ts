@@ -119,7 +119,9 @@ describe("inputAttributes", () => {
     note: s.string(),
     count: s.number({ required: true, type: "int", min: 0, max: 10 }),
     price: s.number({ decimals: 2 }),
-    birthday: s.date({ max: new Date(2024, 11, 31) }),
+    birthday: s.date({ max: Temporal.PlainDate.from("2024-12-31") }),
+    startsAt: s.datetime({ required: true, min: Temporal.ZonedDateTime.from("2024-01-15T00:00[UTC]") }),
+    opensAt: s.time({ min: Temporal.PlainTime.from("09:00"), max: Temporal.PlainTime.from("18:00") }),
     agree: s.boolean({ required: { disallowFalse: true } }),
     flag: s.boolean({ required: true }),
     role: s.enum(["admin", "user"], { required: true }),
@@ -135,8 +137,14 @@ describe("inputAttributes", () => {
     assert.deepEqual(inputAttributes(schema, "price"), { type: "number", step: 0.01 });
   });
 
-  it("dateはtype=dateとmin/max（YYYY-MM-DD）", () => {
+  it("date/datetime/timeはそれぞれのtypeと、inputのvalueの形式のmin/max", () => {
     assert.deepEqual(inputAttributes(schema, "birthday"), { type: "date", max: "2024-12-31" });
+    assert.deepEqual(inputAttributes(schema, "startsAt"), {
+      type: "datetime-local",
+      required: true,
+      min: "2024-01-15T09:00",
+    });
+    assert.deepEqual(inputAttributes(schema, "opensAt"), { type: "time", min: "09:00", max: "18:00" });
   });
 
   it("booleanはdisallowFalseのときだけrequired（チェック済みが必須）", () => {

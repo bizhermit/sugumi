@@ -39,6 +39,18 @@ export const jaFormMessages: MessageDictionary = {
   "date.min": (p) => `${subject(p)}は${p.min}以降の日付で入力してください`,
   "date.max": (p) => `${subject(p)}は${p.max}以前の日付で入力してください`,
 
+  "datetime.required": enterValue,
+  "datetime.custom": enterCorrectValue,
+  "datetime.invalid_type": enterCorrectFormat,
+  "datetime.min": (p) => `${subject(p)}は${p.min}以降の日時で入力してください`,
+  "datetime.max": (p) => `${subject(p)}は${p.max}以前の日時で入力してください`,
+
+  "time.required": enterValue,
+  "time.custom": enterCorrectValue,
+  "time.invalid_type": enterCorrectFormat,
+  "time.min": (p) => `${subject(p)}は${p.min}以降の時刻で入力してください`,
+  "time.max": (p) => `${subject(p)}は${p.max}以前の時刻で入力してください`,
+
   "literal.required": enterValue,
   "literal.custom": enterCorrectValue,
   "literal.invalid_literal": enterCorrectValue,

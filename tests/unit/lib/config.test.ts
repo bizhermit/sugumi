@@ -10,6 +10,7 @@ describe("loadConfig", () => {
       port: 3000,
       databaseUrl: "postgres://app:app@db:5432/app",
       trustProxy: false,
+      timeZone: "Asia/Tokyo",
       login: {
         maxFailedAttempts: 5,
         lockoutMs: 15 * 60 * 1000,
@@ -36,6 +37,7 @@ describe("loadConfig", () => {
       port: 3000,
       databaseUrl: "postgres://app:app@db:5432/app",
       trustProxy: false,
+      timeZone: "Asia/Tokyo",
       login: {
         maxFailedAttempts: 5,
         lockoutMs: 15 * 60 * 1000,
@@ -68,6 +70,7 @@ describe("loadConfig", () => {
       port: 3003,
       databaseUrl: "postgres://app:app@db:5432/app",
       trustProxy: false,
+      timeZone: "Asia/Tokyo",
       login: {
         maxFailedAttempts: 5,
         lockoutMs: 15 * 60 * 1000,
@@ -100,6 +103,7 @@ describe("loadConfig", () => {
       port: 3000,
       databaseUrl: "postgres://app:app@db:5432/app",
       trustProxy: false,
+      timeZone: "Asia/Tokyo",
       login: {
         maxFailedAttempts: 5,
         lockoutMs: 15 * 60 * 1000,
@@ -166,6 +170,12 @@ describe("loadConfig", () => {
     assert.equal(loadConfig({ ...base, APP_TRUST_PROXY: "true" }).trustProxy, true);
     assert.equal(loadConfig({ ...base, APP_TRUST_PROXY: "false" }).trustProxy, false);
     assert.throws(() => loadConfig({ ...base, APP_TRUST_PROXY: "yes" }), ConfigError);
+  });
+
+  it("APP_TIMEZONE", () => {
+    const base = { APP_DATABASE_URL: "postgres://app:app@db:5432/app" };
+    assert.equal(loadConfig({ ...base, APP_TIMEZONE: "UTC" }).timeZone, "UTC");
+    assert.throws(() => loadConfig({ ...base, APP_TIMEZONE: "Tokyo" }), ConfigError);
   });
 
   it("ログインとセッションの制限値", () => {

@@ -38,6 +38,18 @@ export const jaMessages: MessageDictionary = {
   "date.min": (p) => `日付は ${p.min} 以降である必要があります`,
   "date.max": (p) => `日付は ${p.max} 以前である必要があります`,
 
+  "datetime.required": required,
+  "datetime.custom": invalidValue,
+  "datetime.invalid_type": invalidType,
+  "datetime.min": (p) => `日時は ${p.min} 以降である必要があります`,
+  "datetime.max": (p) => `日時は ${p.max} 以前である必要があります`,
+
+  "time.required": required,
+  "time.custom": invalidValue,
+  "time.invalid_type": invalidType,
+  "time.min": (p) => `時刻は ${p.min} 以降である必要があります`,
+  "time.max": (p) => `時刻は ${p.max} 以前である必要があります`,
+
   "literal.required": required,
   "literal.custom": invalidValue,
   "literal.invalid_literal": (p) => `${JSON.stringify(p.expected)}のいずれかを入力してください`,

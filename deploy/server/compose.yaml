@@ -16,6 +16,7 @@ services:
       dockerfile: deploy/app/Dockerfile
     restart: unless-stopped
     environment:
+      APP_TIMEZONE: ${APP_TIMEZONE:-}
       APP_DATABASE_URL: postgres://app:${DB_APP_PASSWORD:?.envにDB_APP_PASSWORDを設定してください}@db:5432/app
       APP_TRUST_PROXY: "true"
       APP_LOGIN_MAX_FAILED_ATTEMPTS: ${APP_LOGIN_MAX_FAILED_ATTEMPTS:-}

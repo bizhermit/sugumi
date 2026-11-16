@@ -2,6 +2,8 @@ import {
   BooleanSchema,
   ConfigurableSchema,
   DateSchema,
+  DateTimeSchema,
+  TimeSchema,
   formatIssue,
   jaFormMessages,
   NumberSchema,
@@ -14,6 +16,7 @@ import {
   type RequiredOption,
   type Shape,
 } from "../lib/schema/index.ts";
+import { toDateTimeInputValue, toTimeInputValue } from "../lib/date.ts";
 import { CSRF_FIELD_NAME } from "./csrf.ts";
 import type { HtmlElements } from "./html-attributes.ts";
 import { HttpError } from "./http-error.ts";
@@ -138,14 +141,6 @@ export type InputAttributes = Pick<
   "type" | "required" | "minlength" | "maxlength" | "min" | "max" | "step"
 >;
 
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-function toDateValue(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
 export function inputAttributes<S extends Shape, R extends RequiredOption>(
   schema: ObjectSchema<S, R>,
   name: keyof S & string,
@@ -178,8 +173,26 @@ export function inputAttributes<S extends Shape, R extends RequiredOption>(
     return {
       type: "date",
       ...(field.required ? { required: true } : {}),
-      ...(o.min == null ? {} : { min: toDateValue(o.min) }),
-      ...(o.max == null ? {} : { max: toDateValue(o.max) }),
+      ...(o.min == null ? {} : { min: o.min.toString() }),
+      ...(o.max == null ? {} : { max: o.max.toString() }),
+    };
+  }
+  if (field instanceof DateTimeSchema) {
+    const o = field.options;
+    return {
+      type: "datetime-local",
+      ...(field.required ? { required: true } : {}),
+      ...(o.min == null ? {} : { min: toDateTimeInputValue(o.min.withTimeZone(field.timeZone)) }),
+      ...(o.max == null ? {} : { max: toDateTimeInputValue(o.max.withTimeZone(field.timeZone)) }),
+    };
+  }
+  if (field instanceof TimeSchema) {
+    const o = field.options;
+    return {
+      type: "time",
+      ...(field.required ? { required: true } : {}),
+      ...(o.min == null ? {} : { min: toTimeInputValue(o.min) }),
+      ...(o.max == null ? {} : { max: toTimeInputValue(o.max) }),
     };
   }
   if (field instanceof BooleanSchema) {

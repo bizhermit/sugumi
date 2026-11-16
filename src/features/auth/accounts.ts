@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { LoginLimits } from "../../lib/config.ts";
 import { transaction, type DataBase } from "../../lib/db.ts";
 import type { LoginAccount } from "./login-account.ts";
-import { graphemeLength } from "../../lib/schema/index.ts";
+import { graphemeLength } from "../../lib/string.ts";
 import { hashPassword, PASSWORD_MAX_LENGTH, verifyPassword } from "./password.ts";
 import { recordDeviceLogin, reserveDeviceAttempt, sweepDevices, type DeviceLogin } from "./login-devices.ts";
 import { refundAddressAttempt, reserveAddressAttempt, sweepAddressFailures } from "./login-throttle.ts";

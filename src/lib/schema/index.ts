@@ -1,4 +1,4 @@
-import { any, boolean, date, literal, number, string, unknown } from "./primitives.ts";
+import { any, boolean, date, datetime, literal, number, string, time, unknown } from "./primitives.ts";
 import { object } from "./object.ts";
 import { array } from "./array.ts";
 import { record } from "./record.ts";
@@ -13,6 +13,8 @@ export const s = {
   number,
   boolean,
   date,
+  datetime,
+  time,
   literal,
   any,
   unknown,
@@ -46,13 +48,21 @@ export {
   NumberSchema,
   BooleanSchema,
   DateSchema,
+  DateTimeSchema,
+  TimeSchema,
   LiteralSchema,
   AnySchema,
   UnknownSchema,
-  parseDateString,
-  graphemeLength,
 } from "./primitives.ts";
-export type { StringOptions, StringType, NumberOptions, BooleanRequiredOption, DateOptions } from "./primitives.ts";
+export type {
+  StringOptions,
+  StringType,
+  NumberOptions,
+  BooleanRequiredOption,
+  DateOptions,
+  DateTimeOptions,
+  TimeOptions,
+} from "./primitives.ts";
 export { SchemaError, hasErrorSeverity } from "./error.ts";
 export type { ParseResult, SuccessResult, FailureResult, InternalResult, FailureIssues } from "./error.ts";
 export type { Issue, IssueSeverity } from "./types.ts";

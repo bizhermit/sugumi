@@ -4,6 +4,7 @@ import { ConfigError, loadConfig } from "./lib/config.ts";
 import { createLogger } from "./lib/logger.ts";
 import { routes } from "./routes.ts";
 import { createDb } from "./lib/db.ts";
+import { setAppTimeZone } from "./lib/date.ts";
 import { jaMessages, setDefaultMessages } from "./lib/schema/message.ts";
 
 function loadConfigOrExit() {
@@ -21,6 +22,7 @@ function loadConfigOrExit() {
 async function main() {
   const config = loadConfigOrExit();
   const logger = createLogger(config.log);
+  setAppTimeZone(config.timeZone);
   setDefaultMessages(jaMessages);
 
   const db = createDb(config.databaseUrl, logger);

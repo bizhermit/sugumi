@@ -28,6 +28,7 @@ export interface Config {
   readonly port: number;
   readonly databaseUrl: string;
   readonly trustProxy: boolean;
+  readonly timeZone: string;
   readonly login: LoginLimits;
   readonly session: SessionLimits;
   readonly log: {
@@ -112,6 +113,19 @@ function boolean(envValues: NodeJS.ProcessEnv, name: EnvName, fallbackValue: boo
   return value === "true";
 }
 
+function timeZone(envValues: NodeJS.ProcessEnv, name: EnvName, fallbackValue: string, errors: string[]): string {
+  const value = readEnvValue(envValues, name);
+  if (value == null) {
+    return fallbackValue;
+  }
+  try {
+    return Temporal.Now.zonedDateTimeISO(value).timeZoneId;
+  } catch {
+    errors.push(`${name}: IANAのタイムゾーンID（Asia/Tokyo等）を指定してください（指定値: ${value}）`);
+    return fallbackValue;
+  }
+}
+
 function databaseUrl(envValues: NodeJS.ProcessEnv, name: EnvName, errors: string[]): string {
   const value = readEnvValue(envValues, name);
   if (value == null) {
@@ -148,6 +162,7 @@ export function loadConfig(envValues: NodeJS.ProcessEnv = process.env): Config {
   const logFormat = oneOf(envValues, "APP_LOG_FORMAT", LOG_FORMATS, isProduction ? "json" : "pretty", errors);
   const dbUrl = databaseUrl(envValues, "APP_DATABASE_URL", errors);
   const trustProxy = boolean(envValues, "APP_TRUST_PROXY", false, errors);
+  const tz = timeZone(envValues, "APP_TIMEZONE", "Asia/Tokyo", errors);
   const login: LoginLimits = {
     maxFailedAttempts: integer(envValues, "APP_LOGIN_MAX_FAILED_ATTEMPTS", 5, ATTEMPTS_RANGE, errors),
     lockoutMs: integer(envValues, "APP_LOGIN_LOCKOUT_MINUTES", 15, MINUTES_RANGE, errors) * MINUTE_MS,
@@ -170,6 +185,7 @@ export function loadConfig(envValues: NodeJS.ProcessEnv = process.env): Config {
     port,
     databaseUrl: dbUrl,
     trustProxy,
+    timeZone: tz,
     login: Object.freeze(login),
     session: Object.freeze(session),
     log: Object.freeze<Config["log"]>({

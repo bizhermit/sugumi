@@ -37,6 +37,18 @@ export const enMessages: MessageDictionary = {
   "date.min": (p) => `Date must be on or after ${p.min}`,
   "date.max": (p) => `Date must be on or before ${p.max}`,
 
+  "datetime.required": required,
+  "datetime.custom": invalidValue,
+  "datetime.invalid_type": invalidType,
+  "datetime.min": (p) => `Date and time must be on or after ${p.min}`,
+  "datetime.max": (p) => `Date and time must be on or before ${p.max}`,
+
+  "time.required": required,
+  "time.custom": invalidValue,
+  "time.invalid_type": invalidType,
+  "time.min": (p) => `Time must be at or after ${p.min}`,
+  "time.max": (p) => `Time must be at or before ${p.max}`,
+
   "literal.required": required,
   "literal.custom": invalidValue,
   "literal.invalid_literal": (p) => `Expected literal value ${JSON.stringify(p.expected)}`,

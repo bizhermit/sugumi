@@ -54,6 +54,10 @@ describe("string", () => {
     assert.throws(() => s.string({ pattern: /^a+$/y }), /g\/yフラグ/);
   });
 
+  it("telは全角を半角に変換して検証し、変換後の値を返す", () => {
+    assert.equal(s.string({ type: "tel" }).parse("０３−１２３４−５６７８"), "03-1234-5678");
+  });
+
   it("typeとpatternは両方効く", () => {
     const corporate = s.string({ type: "email", pattern: /@example\.com$/ });
     assert.equal(corporate.safeParse("a@example.com").success, true);
@@ -131,11 +135,17 @@ describe("number", () => {
     assert.equal(s.number({ decimals: 2 }).safeParse(1.2e-7).success, false);
   });
 
+  it("全角の数字と記号を半角に変換し、桁区切りのカンマを除去する", () => {
+    assert.equal(s.number().parse("１，２３４．５"), 1234.5);
+    assert.equal(s.number().parse("−１"), -1);
+    assert.equal(s.number().parse("ー1"), -1);
+  });
+
   it("10進の数字の文字列だけを数値にする", () => {
     assert.equal(s.number().parse("1"), 1);
     assert.equal(s.number().parse(" -1.5 "), -1.5);
     assert.equal(s.number({ type: "int" }).safeParse("1.5").success, false);
-    for (const text of ["0x10", "1e3", "Infinity", "1,000"]) {
+    for (const text of ["0x10", "1e3", "Infinity", "1 000"]) {
       assert.equal(s.number().safeParse(text).success, false, text);
     }
   });
@@ -191,29 +201,18 @@ describe("boolean", () => {
 });
 
 describe("date", () => {
-  it("Dateを受け付ける", () => {
-    const d = new Date();
+  it("YYYY-MM-DDの文字列をPlainDateにする", () => {
+    assert.equal(s.date().parse("2024-01-15")?.toString(), "2024-01-15");
+    const d = Temporal.PlainDate.from("2024-01-15");
     assert.equal(s.date({ required: true }).parse(d), d);
-    assert.throws(() => s.date({ required: true }).parse("not a date"));
   });
 
-  it("日付の文字列をDateにする", () => {
-    assert.deepEqual(s.date().parse("2024-01-01"), new Date(2024, 0, 1));
-    assert.deepEqual(s.date().parse("2024-01-01T09:30"), new Date(2024, 0, 1, 9, 30));
-    assert.deepEqual(s.date().parse("2024-01-01T00:00:00.000Z"), new Date("2024-01-01T00:00:00.000Z"));
-    assert.deepEqual(s.date().parse("2024-01-01T09:00:00+09:00"), new Date("2024-01-01T00:00:00.000Z"));
-  });
-
-  it("存在しない日付と想定外の形式は拒否する", () => {
-    for (const text of ["2024-02-30", "2024-13-01", "2024-01-01T24:00", "2024/01/01", "Jan 1 2024", "20240101"]) {
+  it("存在しない日付と、日付だけでない形式は拒否する", () => {
+    for (const text of ["2024-02-30", "2024-13-01", "2024-01-15T09:30", "2024/01/15", "Jan 15 2024", "20240115"]) {
       assert.equal(s.date().safeParse(text).success, false, text);
     }
     assert.equal(s.date().safeParse("2000-02-29").success, true);
     assert.equal(s.date().safeParse("1900-02-29").success, false);
-  });
-
-  it("0〜99年も1900年代にずらさない", () => {
-    assert.equal(s.date().parse("0050-01-01")?.getFullYear(), 50);
   });
 
   it("空文字は値が無い（null）として扱う", () => {
@@ -221,14 +220,93 @@ describe("date", () => {
     assert.throws(() => s.date({ required: true }).parse(""), /Required/);
   });
 
-  it("min/max", () => {
-    const schema = s.date({ min: new Date("2024-01-01"), max: new Date("2024-12-31") });
+  it("min/maxは暦の日付で比較する", () => {
+    const schema = s.date({ min: Temporal.PlainDate.from("2024-01-01"), max: Temporal.PlainDate.from("2024-12-31") });
     assert.equal(schema.safeParse("2023-12-31").success, false);
-    assert.equal(schema.safeParse("2024-06-01").success, true);
+    assert.equal(schema.safeParse("2024-01-01").success, true);
+    assert.equal(schema.safeParse("2024-12-31").success, true);
+    assert.equal(schema.safeParse("2025-01-01").success, false);
   });
 
   it("strictなら文字列を拒否する", () => {
-    assert.equal(s.date({ strict: true }).safeParse("2024-01-01").success, false);
+    assert.equal(s.date({ strict: true }).safeParse("2024-01-15").success, false);
+  });
+});
+
+describe("datetime", () => {
+  it("タイムゾーン無しの文字列はアプリのタイムゾーン（既定はAsia/Tokyo）の日時にする", () => {
+    const parsed = s.datetime().parse("2024-01-15T09:30");
+    assert.equal(parsed?.toString(), "2024-01-15T09:30:00+09:00[Asia/Tokyo]");
+    assert.equal(
+      s.datetime({ timeZone: "UTC" }).parse("2024-01-15T09:30")?.toString(),
+      "2024-01-15T09:30:00+00:00[UTC]",
+    );
+  });
+
+  it("Zやオフセット付きの文字列はその時刻として扱い、アプリのタイムゾーンに変換する", () => {
+    assert.equal(s.datetime().parse("2024-01-15T00:00:00Z")?.toString(), "2024-01-15T09:00:00+09:00[Asia/Tokyo]");
+    assert.equal(
+      s.datetime().parse("2024-01-15T09:00:00+09:00")?.epochMilliseconds,
+      Date.parse("2024-01-15T00:00:00Z"),
+    );
+  });
+
+  it("DBのtimestamptz（Date）とInstantも受け付ける", () => {
+    const date = new Date("2024-01-15T00:00:00Z");
+    assert.equal(s.datetime().parse(date)?.toString(), "2024-01-15T09:00:00+09:00[Asia/Tokyo]");
+    assert.equal(s.datetime().parse(Temporal.Instant.from("2024-01-15T00:00:00Z"))?.hour, 9);
+  });
+
+  it("存在しない日時と、日付だけの形式は拒否する", () => {
+    for (const text of ["2024-02-30T00:00", "2024-01-15T24:00", "2024-01-15", "2024/01/15 09:30"]) {
+      assert.equal(s.datetime().safeParse(text).success, false, text);
+    }
+  });
+
+  it("min/max", () => {
+    const schema = s.datetime({ min: Temporal.ZonedDateTime.from("2024-01-15T09:00[Asia/Tokyo]") });
+    assert.equal(schema.safeParse("2024-01-15T08:59").success, false);
+    assert.equal(schema.safeParse("2024-01-15T09:00").success, true);
+    const result = schema.safeParse("2024-01-15T08:59");
+    assert.ok(!result.success);
+    assert.deepEqual(result.error.issues[0]?.params, { min: "2024-01-15T09:00" });
+  });
+
+  it("min/maxで別のタイムゾーンが指定されていた場合でも、メッセージはスキーマのタイムゾーンを出力する", () => {
+    const schema = s.datetime({ min: Temporal.ZonedDateTime.from("2024-01-15T00:00[UTC]") });
+    assert.equal(schema.safeParse("2024-01-15T08:59").success, false);
+    assert.equal(schema.safeParse("2024-01-15T09:00").success, true);
+    const result = schema.safeParse("2024-01-15T08:59");
+    assert.ok(!result.success);
+    assert.deepEqual(result.error.issues[0]?.params, { min: "2024-01-15T09:00" });
+  });
+
+  it("timeZoneに存在しないIDを指定すると、スキーマを作る時点でRangeErrorになる", () => {
+    assert.throws(() => s.datetime({ timeZone: "Tokyo" }), RangeError);
+  });
+
+  it("60秒の指定はエラー", () => {
+    assert.equal(s.datetime().safeParse("2024-01-15T09:30:60").success, false);
+  });
+});
+
+describe("time", () => {
+  it("HH:mm[:ss]の文字列をPlainTimeにする", () => {
+    assert.equal(s.time().parse("09:30")?.toString(), "09:30:00");
+    assert.equal(s.time().parse("09:30:15")?.second, 15);
+  });
+
+  it("存在しない時刻と想定外の形式は拒否する", () => {
+    for (const text of ["24:00", "09:60", "9:30", "0930", "2024-01-15T09:30"]) {
+      assert.equal(s.time().safeParse(text).success, false, text);
+    }
+  });
+
+  it("min/max", () => {
+    const schema = s.time({ min: Temporal.PlainTime.from("09:00"), max: Temporal.PlainTime.from("18:00") });
+    assert.equal(schema.safeParse("08:59").success, false);
+    assert.equal(schema.safeParse("18:00").success, true);
+    assert.equal(schema.safeParse("18:01").success, false);
   });
 });
 

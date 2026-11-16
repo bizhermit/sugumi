@@ -1,15 +1,19 @@
+import {
+  assertTimeZone,
+  getAppTimeZone,
+  fromDate,
+  parseDate,
+  parseDateTime,
+  parseTime,
+  toDateTimeInputValue,
+  toTimeInputValue,
+} from "../date.ts";
+import { parseNumber } from "../number.ts";
+import { graphemeLength, toHalfWidth, toHyphen } from "../string.ts";
 import { fail, ok, type InternalResult } from "./error.ts";
 import { ConfigurableSchema, type CommonOptions, type RequiredOption } from "./schema.ts";
 import type { Issue, ParseContext } from "./types.ts";
 import { typeOf } from "./types.ts";
-
-const segmenter = new Intl.Segmenter();
-
-export function graphemeLength(value: string): number {
-  let count = 0;
-  for (const _ of segmenter.segment(value)) count++;
-  return count;
-}
 
 export type StringType = "email" | "tel" | "url";
 
@@ -151,6 +155,10 @@ export class StringSchema<const R extends RequiredOption = false> extends Config
     if (typeof value === "number" || typeof value === "boolean") {
       return String(value);
     }
+    // 電話番号は全角や長音で入力されることが多いため、半角とハイフンに揃える。
+    if (typeof value === "string" && this.options.type === "tel") {
+      return toHyphen(toHalfWidth(value));
+    }
     return value;
   }
 
@@ -222,8 +230,6 @@ export interface NumberOptions<R extends RequiredOption> extends CommonOptions<n
   readonly decimals?: number;
 }
 
-const DECIMAL_PATTERN = /^[+-]?\d+(?:\.\d+)?$/; // Number()は"0x10"や"1e3"や"Infinity"も数値にするため、10進数のみ許可。
-
 function decimalPlaces(value: number): number {
   if (Number.isInteger(value)) return 0;
   // 1.2e-7のような小さい値はtoString()が指数表記になるため、小数で書いたとき（0.00000012）の桁数に直して数える。
@@ -248,8 +254,7 @@ export class NumberSchema<const R extends RequiredOption = false> extends Config
 
   protected _preprocess(value: unknown): unknown {
     if (typeof value !== "string") return value;
-    const trimmed = value.trim();
-    return DECIMAL_PATTERN.test(trimmed) ? Number(trimmed) : value;
+    return parseNumber(value) ?? value;
   }
 
   protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<number> {
@@ -370,43 +375,12 @@ export function boolean<const R extends BooleanRequiredOption = false>(
   return new BooleanSchema(options);
 }
 
-export interface DateOptions<R extends RequiredOption> extends CommonOptions<Date, R> {
-  readonly min?: Date;
-  readonly max?: Date;
+export interface DateOptions<R extends RequiredOption> extends CommonOptions<Temporal.PlainDate, R> {
+  readonly min?: Temporal.PlainDate;
+  readonly max?: Temporal.PlainDate;
 }
 
-const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|[+-]\d{2}:\d{2})?)?$/;
-
-function daysInMonth(year: number, month: number): number {
-  if (month === 2) return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 29 : 28;
-  return [4, 6, 9, 11].includes(month) ? 30 : 31;
-}
-
-export function parseDateString(text: string): Date | undefined {
-  const match = DATE_PATTERN.exec(text);
-  if (match == null) return undefined;
-  const [, year, month, day, hour, minute, second, millisecond, zone] = match;
-  const y = Number(year);
-  const m = Number(month);
-  const d = Number(day);
-  if (m < 1 || m > 12 || d < 1 || d > daysInMonth(y, m)) return undefined;
-  if (hour != null && (Number(hour) > 23 || Number(minute) > 59 || Number(second ?? "0") > 59)) return undefined;
-  if (zone == null) {
-    const local = new Date(0);
-    local.setFullYear(y, m - 1, d);
-    local.setHours(
-      Number(hour ?? "0"),
-      Number(minute ?? "0"),
-      Number(second ?? "0"),
-      Number((millisecond ?? "0").padEnd(3, "0")),
-    );
-    return local;
-  }
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-}
-
-export class DateSchema<const R extends RequiredOption = false> extends ConfigurableSchema<Date, R> {
+export class DateSchema<const R extends RequiredOption = false> extends ConfigurableSchema<Temporal.PlainDate, R> {
   readonly typeName = "date";
   readonly options: DateOptions<R>;
 
@@ -417,11 +391,11 @@ export class DateSchema<const R extends RequiredOption = false> extends Configur
 
   protected _preprocess(value: unknown): unknown {
     if (typeof value !== "string") return value;
-    return parseDateString(value.trim()) ?? value;
+    return parseDate(value.trim()) ?? value;
   }
 
-  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<Date> {
-    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<Temporal.PlainDate> {
+    if (!(value instanceof Temporal.PlainDate)) {
       return fail([
         {
           path: ctx.path,
@@ -436,23 +410,11 @@ export class DateSchema<const R extends RequiredOption = false> extends Configur
     const o = this.options;
     const issues: Issue[] = [];
 
-    if (o.min != null && value.getTime() < o.min.getTime()) {
-      issues.push({
-        path: ctx.path,
-        type: "error",
-        code: "min",
-        key: "date.min",
-        params: { min: o.min.toISOString() },
-      });
+    if (o.min != null && Temporal.PlainDate.compare(value, o.min) < 0) {
+      issues.push({ path: ctx.path, type: "error", code: "min", key: "date.min", params: { min: o.min.toString() } });
     }
-    if (o.max != null && value.getTime() > o.max.getTime()) {
-      issues.push({
-        path: ctx.path,
-        type: "error",
-        code: "max",
-        key: "date.max",
-        params: { max: o.max.toISOString() },
-      });
+    if (o.max != null && Temporal.PlainDate.compare(value, o.max) > 0) {
+      issues.push({ path: ctx.path, type: "error", code: "max", key: "date.max", params: { max: o.max.toString() } });
     }
 
     if (issues.length > 0) return fail(issues);
@@ -462,6 +424,144 @@ export class DateSchema<const R extends RequiredOption = false> extends Configur
 
 export function date<const R extends RequiredOption = false>(options: DateOptions<R> = {}): DateSchema<R> {
   return new DateSchema(options);
+}
+
+export interface DateTimeOptions<R extends RequiredOption> extends CommonOptions<Temporal.ZonedDateTime, R> {
+  readonly min?: Temporal.ZonedDateTime;
+  readonly max?: Temporal.ZonedDateTime;
+  readonly timeZone?: string;
+}
+
+export class DateTimeSchema<const R extends RequiredOption = false> extends ConfigurableSchema<
+  Temporal.ZonedDateTime,
+  R
+> {
+  readonly typeName = "datetime";
+  readonly options: DateTimeOptions<R>;
+
+  constructor(options: DateTimeOptions<R> = {}) {
+    super();
+    if (options.timeZone != null) assertTimeZone(options.timeZone);
+    this.options = options;
+  }
+
+  get timeZone(): string {
+    return this.options.timeZone ?? getAppTimeZone();
+  }
+
+  protected _preprocess(value: unknown): unknown {
+    const timeZone = this.timeZone;
+    if (typeof value === "string") return parseDateTime(value.trim(), timeZone) ?? value;
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return fromDate(value, timeZone);
+    if (value instanceof Temporal.Instant) return value.toZonedDateTimeISO(timeZone);
+    return value;
+  }
+
+  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<Temporal.ZonedDateTime> {
+    if (!(value instanceof Temporal.ZonedDateTime)) {
+      return fail([
+        {
+          path: ctx.path,
+          type: "error",
+          code: "invalid_type",
+          key: "datetime.invalid_type",
+          params: { expected: "datetime", received: typeOf(value) },
+        },
+      ]);
+    }
+
+    const o = this.options;
+    const issues: Issue[] = [];
+
+    if (o.min != null && Temporal.ZonedDateTime.compare(value, o.min) < 0) {
+      issues.push({
+        path: ctx.path,
+        type: "error",
+        code: "min",
+        key: "datetime.min",
+        params: { min: toDateTimeInputValue(o.min.withTimeZone(this.timeZone)) },
+      });
+    }
+    if (o.max != null && Temporal.ZonedDateTime.compare(value, o.max) > 0) {
+      issues.push({
+        path: ctx.path,
+        type: "error",
+        code: "max",
+        key: "datetime.max",
+        params: { max: toDateTimeInputValue(o.max.withTimeZone(this.timeZone)) },
+      });
+    }
+
+    if (issues.length > 0) return fail(issues);
+    return ok(value);
+  }
+}
+
+export function datetime<const R extends RequiredOption = false>(options: DateTimeOptions<R> = {}): DateTimeSchema<R> {
+  return new DateTimeSchema(options);
+}
+
+export interface TimeOptions<R extends RequiredOption> extends CommonOptions<Temporal.PlainTime, R> {
+  readonly min?: Temporal.PlainTime;
+  readonly max?: Temporal.PlainTime;
+}
+
+export class TimeSchema<const R extends RequiredOption = false> extends ConfigurableSchema<Temporal.PlainTime, R> {
+  readonly typeName = "time";
+  readonly options: TimeOptions<R>;
+
+  constructor(options: TimeOptions<R> = {}) {
+    super();
+    this.options = options;
+  }
+
+  protected _preprocess(value: unknown): unknown {
+    if (typeof value !== "string") return value;
+    return parseTime(value.trim()) ?? value;
+  }
+
+  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<Temporal.PlainTime> {
+    if (!(value instanceof Temporal.PlainTime)) {
+      return fail([
+        {
+          path: ctx.path,
+          type: "error",
+          code: "invalid_type",
+          key: "time.invalid_type",
+          params: { expected: "time", received: typeOf(value) },
+        },
+      ]);
+    }
+
+    const o = this.options;
+    const issues: Issue[] = [];
+
+    if (o.min != null && Temporal.PlainTime.compare(value, o.min) < 0) {
+      issues.push({
+        path: ctx.path,
+        type: "error",
+        code: "min",
+        key: "time.min",
+        params: { min: toTimeInputValue(o.min) },
+      });
+    }
+    if (o.max != null && Temporal.PlainTime.compare(value, o.max) > 0) {
+      issues.push({
+        path: ctx.path,
+        type: "error",
+        code: "max",
+        key: "time.max",
+        params: { max: toTimeInputValue(o.max) },
+      });
+    }
+
+    if (issues.length > 0) return fail(issues);
+    return ok(value);
+  }
+}
+
+export function time<const R extends RequiredOption = false>(options: TimeOptions<R> = {}): TimeSchema<R> {
+  return new TimeSchema(options);
 }
 
 type Literal = string | number | boolean;
