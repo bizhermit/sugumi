@@ -3,14 +3,7 @@ import { IntersectionSchema } from "./intersection.ts";
 import { LazySchema } from "./lazy.ts";
 import { ObjectSchema } from "./object.ts";
 import { RecordSchema } from "./record.ts";
-import {
-  allowsNull,
-  ConfigurableSchema,
-  isRequired,
-  Schema,
-  type CommonOptions,
-  type RequiredOption,
-} from "./schema.ts";
+import { ConfigurableSchema, Schema, type CommonOptions } from "./schema.ts";
 import { TupleSchema } from "./tuple.ts";
 
 export type FieldPath = ReadonlyArray<string | number>;
@@ -18,9 +11,7 @@ export type FieldPath = ReadonlyArray<string | number>;
 export interface FieldInfo {
   readonly path: FieldPath;
   readonly typeName: string;
-  readonly required: boolean;
-  readonly nullable: boolean;
-  readonly options: Readonly<CommonOptions<unknown, RequiredOption>>;
+  readonly options: Readonly<CommonOptions<unknown>>;
 }
 
 export function walk(
@@ -55,11 +46,5 @@ export function walk(
 }
 
 function fieldInfo(schema: ConfigurableSchema<any, any>, path: FieldPath): FieldInfo {
-  return {
-    path,
-    typeName: schema.typeName,
-    required: isRequired(schema.options.required),
-    nullable: allowsNull(schema.options.required),
-    options: schema.options,
-  };
+  return { path, typeName: schema.typeName, options: schema.options };
 }

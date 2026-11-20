@@ -1,4 +1,4 @@
-export const RETURN_TO_PARAM_NAME = "to";
+import { RETURN_TO_PARAM_NAME } from "./_shared/login.ts";
 
 export const DEFAULT_RETURN_PATH = "/home";
 

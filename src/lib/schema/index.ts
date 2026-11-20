@@ -29,7 +29,17 @@ export const s = {
 };
 
 export { Schema, ConfigurableSchema, isRequired, allowsNull } from "./schema.ts";
-export type { Infer, CommonOptions, RequiredOption, Nullish, RefineIssue } from "./schema.ts";
+export type {
+  Infer,
+  CommonOptions,
+  RequiredOption,
+  RequiredOf,
+  Resolved,
+  Options,
+  Nullish,
+  RefineIssue,
+  ParseOptions,
+} from "./schema.ts";
 export { walk } from "./introspect.ts";
 export type { FieldInfo, FieldPath } from "./introspect.ts";
 export { ObjectSchema } from "./object.ts";
@@ -54,10 +64,12 @@ export {
   AnySchema,
   UnknownSchema,
 } from "./primitives.ts";
+export { disallowsFalse } from "./primitives.ts";
 export type {
   StringOptions,
   StringType,
   NumberOptions,
+  BooleanOptions,
   BooleanRequiredOption,
   DateOptions,
   DateTimeOptions,
@@ -65,7 +77,7 @@ export type {
 } from "./primitives.ts";
 export { SchemaError, hasErrorSeverity } from "./error.ts";
 export type { ParseResult, SuccessResult, FailureResult, InternalResult, FailureIssues } from "./error.ts";
-export type { Issue, IssueSeverity } from "./types.ts";
+export type { Issue, IssueSeverity, Dynamic, ParseContext } from "./types.ts";
 export {
   formatIssue,
   formatIssues,

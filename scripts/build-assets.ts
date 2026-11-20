@@ -25,7 +25,12 @@ const result = await build({
   logLevel: "info",
 });
 
-const violations = Object.keys(result.metafile.inputs).filter((input) => !input.includes("/_assets/"));
+// src/libのうち許可するのは、サーバーに依存しないファイルだけ。
+const CLIENT_DIRECTORY = /(^|\/)_(?:assets|shared)\//;
+const CLIENT_LIB = ["src/lib/schema/", "src/lib/string.ts", "src/lib/number.ts", "src/lib/date.ts"];
+const violations = Object.keys(result.metafile.inputs).filter(
+  (input) => !CLIENT_DIRECTORY.test(input) && !CLIENT_LIB.some((path) => input.startsWith(path)),
+);
 
 if (violations.length > 0) {
   console.error(`対象外のファイルがバンドルに含まれています:\n${violations.join("\n")}`);

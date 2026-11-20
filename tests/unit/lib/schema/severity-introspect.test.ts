@@ -44,7 +44,7 @@ function byPath(fields: FieldInfo[], path: (string | number)[]): FieldInfo | und
 }
 
 describe("walk", () => {
-  it("末端の項目のtypeName/required/nullable/optionsを返す", () => {
+  it("末端の項目のtypeNameとoptionsを返す", () => {
     const user = s.object({
       name: s.string({ required: true, label: "名前", minLength: 1, maxLength: 20 }),
     });
@@ -52,8 +52,6 @@ describe("walk", () => {
     assert.equal(fields.length, 1);
     assert.deepEqual(fields[0]?.path, ["name"]);
     assert.equal(fields[0]?.typeName, "string");
-    assert.equal(fields[0]?.required, true);
-    assert.equal(fields[0]?.nullable, false);
     assert.deepEqual(fields[0]?.options, { required: true, label: "名前", minLength: 1, maxLength: 20 });
   });
 
@@ -72,7 +70,6 @@ describe("walk", () => {
     const fields = walk(schema);
     assert.equal(fields.length, 4);
     assert.equal(byPath(fields, ["tags"])?.typeName, "array");
-    assert.equal(byPath(fields, ["tags"])?.required, true);
     assert.deepEqual(byPath(fields, ["tags"])?.options, { required: true, minLength: 1 });
     assert.equal(byPath(fields, ["tags", 0])?.typeName, "string");
     assert.equal(byPath(fields, ["scores"])?.typeName, "record");

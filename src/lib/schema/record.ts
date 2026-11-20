@@ -1,26 +1,29 @@
 import { fail, hasErrorSeverity, ok, type InternalResult } from "./error.ts";
-import { ConfigurableSchema, Schema, type CommonOptions, type RequiredOption } from "./schema.ts";
-import type { Issue, ParseContext } from "./types.ts";
+import { ConfigurableSchema, Schema, type CommonOptions, type Resolved, type Options } from "./schema.ts";
+import type { Dynamic, Issue, ParseContext } from "./types.ts";
 import { typeOf } from "./types.ts";
 
-export interface RecordOptions<T, R extends RequiredOption> extends CommonOptions<Record<string, T>, R> {
-  readonly minLength?: number;
-  readonly maxLength?: number;
-  readonly length?: number;
+export interface RecordOptions<T> extends CommonOptions<Record<string, T>> {
+  readonly minLength?: Dynamic<number>;
+  readonly maxLength?: Dynamic<number>;
+  readonly length?: Dynamic<number>;
 }
 
-export class RecordSchema<T, const R extends RequiredOption = false> extends ConfigurableSchema<Record<string, T>, R> {
+export class RecordSchema<T, const O extends RecordOptions<T> = {}> extends ConfigurableSchema<Record<string, T>, O> {
   readonly typeName = "record";
   readonly element: Schema<T>;
-  readonly options: RecordOptions<T, R>;
+  declare readonly options: Options<O, RecordOptions<T>>;
 
-  constructor(element: Schema<T>, options: RecordOptions<T, R> = {}) {
-    super();
-    this.options = options;
+  constructor(element: Schema<T>, options: O & RecordOptions<T>) {
+    super(options);
     this.element = element;
   }
 
-  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<Record<string, T>> {
+  protected _parseValue(
+    value: unknown,
+    ctx: ParseContext,
+    o: Resolved<RecordOptions<T>>,
+  ): InternalResult<Record<string, T>> {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       return fail([
         {
@@ -35,7 +38,6 @@ export class RecordSchema<T, const R extends RequiredOption = false> extends Con
 
     const input = value as Record<string, unknown>;
     const keys = Object.keys(input);
-    const o = this.options;
     const lengthIssues: Issue[] = [];
 
     if (o.length != null && keys.length !== o.length) {
@@ -71,7 +73,7 @@ export class RecordSchema<T, const R extends RequiredOption = false> extends Con
     const issues: Issue[] = [];
 
     for (const key of keys) {
-      const result = this.element._parse(input[key], { path: [...ctx.path, key] });
+      const result = this.element._parse(input[key], { ...ctx, path: [...ctx.path, key] });
       if (result.success) {
         Object.defineProperty(output, key, {
           value: result.data,
@@ -91,9 +93,9 @@ export class RecordSchema<T, const R extends RequiredOption = false> extends Con
   }
 }
 
-export function record<T, const R extends RequiredOption = false>(
+export function record<T, const O extends RecordOptions<T> = {}>(
   element: Schema<T>,
-  options: RecordOptions<T, R> = {},
-): RecordSchema<T, R> {
+  options: O & RecordOptions<T> = {} as O,
+): RecordSchema<T, O> {
   return new RecordSchema(element, options);
 }

@@ -1,22 +1,20 @@
 import { fail, type InternalResult } from "./error.ts";
-import { ConfigurableSchema, Schema, type CommonOptions, type RequiredOption } from "./schema.ts";
+import { ConfigurableSchema, Schema, type CommonOptions, type Options } from "./schema.ts";
 import type { Issue, ParseContext } from "./types.ts";
 
 type Members = readonly [Schema<any>, ...Schema<any>[]];
 type UnionOutput<T extends Members> = T[number]["_output"];
 
-export class UnionSchema<T extends Members, const R extends RequiredOption = false> extends ConfigurableSchema<
+export class UnionSchema<T extends Members, const O extends CommonOptions<any> = {}> extends ConfigurableSchema<
   UnionOutput<T>,
-  R
+  O
 > {
   readonly typeName = "union";
   readonly members: T;
+  declare readonly options: Options<O, CommonOptions<UnionOutput<T>>>;
 
-  readonly options: CommonOptions<UnionOutput<T>, R>;
-
-  constructor(members: T, options: CommonOptions<UnionOutput<T>, R> = {}) {
-    super();
-    this.options = options;
+  constructor(members: T, options: O & CommonOptions<UnionOutput<T>>) {
+    super(options);
     this.members = members;
   }
 
@@ -40,9 +38,9 @@ export class UnionSchema<T extends Members, const R extends RequiredOption = fal
   }
 }
 
-export function union<T extends Members, const R extends RequiredOption = false>(
+export function union<T extends Members, const O extends CommonOptions<any> = {}>(
   members: T,
-  options: CommonOptions<UnionOutput<T>, R> = {},
-): UnionSchema<T, R> {
+  options: O & CommonOptions<UnionOutput<T>> = {} as O,
+): UnionSchema<T, O> {
   return new UnionSchema(members, options);
 }

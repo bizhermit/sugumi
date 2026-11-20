@@ -1,26 +1,25 @@
 import { fail, hasErrorSeverity, ok, type InternalResult } from "./error.ts";
-import { ConfigurableSchema, Schema, type CommonOptions, type RequiredOption } from "./schema.ts";
-import type { Issue, ParseContext } from "./types.ts";
+import { ConfigurableSchema, Schema, type CommonOptions, type Resolved, type Options } from "./schema.ts";
+import type { Dynamic, Issue, ParseContext } from "./types.ts";
 import { typeOf } from "./types.ts";
 
-export interface ArrayOptions<T, R extends RequiredOption> extends CommonOptions<T[], R> {
-  readonly minLength?: number;
-  readonly maxLength?: number;
-  readonly length?: number;
+export interface ArrayOptions<T> extends CommonOptions<T[]> {
+  readonly minLength?: Dynamic<number>;
+  readonly maxLength?: Dynamic<number>;
+  readonly length?: Dynamic<number>;
 }
 
-export class ArraySchema<T, const R extends RequiredOption = false> extends ConfigurableSchema<T[], R> {
+export class ArraySchema<T, const O extends ArrayOptions<T> = {}> extends ConfigurableSchema<T[], O> {
   readonly typeName = "array";
   readonly element: Schema<T>;
-  readonly options: ArrayOptions<T, R>;
+  declare readonly options: Options<O, ArrayOptions<T>>;
 
-  constructor(element: Schema<T>, options: ArrayOptions<T, R> = {}) {
-    super();
-    this.options = options;
+  constructor(element: Schema<T>, options: O & ArrayOptions<T>) {
+    super(options);
     this.element = element;
   }
 
-  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<T[]> {
+  protected _parseValue(value: unknown, ctx: ParseContext, o: Resolved<ArrayOptions<T>>): InternalResult<T[]> {
     if (!Array.isArray(value)) {
       return fail([
         {
@@ -33,7 +32,6 @@ export class ArraySchema<T, const R extends RequiredOption = false> extends Conf
       ]);
     }
 
-    const o = this.options;
     const lengthIssues: Issue[] = [];
 
     if (o.length != null && value.length !== o.length) {
@@ -58,7 +56,7 @@ export class ArraySchema<T, const R extends RequiredOption = false> extends Conf
     const issues: Issue[] = [];
 
     for (let i = 0; i < value.length; i++) {
-      const itemResult = this.element._parse(value[i], { path: [...ctx.path, i] });
+      const itemResult = this.element._parse(value[i], { ...ctx, path: [...ctx.path, i] });
       if (itemResult.success) {
         output.push(itemResult.data);
         if (itemResult.issues?.length) issues.push(...itemResult.issues);
@@ -72,9 +70,9 @@ export class ArraySchema<T, const R extends RequiredOption = false> extends Conf
   }
 }
 
-export function array<T, const R extends RequiredOption = false>(
+export function array<T, const O extends ArrayOptions<T> = {}>(
   element: Schema<T>,
-  options: ArrayOptions<T, R> = {},
-): ArraySchema<T, R> {
+  options: O & ArrayOptions<T> = {} as O,
+): ArraySchema<T, O> {
   return new ArraySchema(element, options);
 }

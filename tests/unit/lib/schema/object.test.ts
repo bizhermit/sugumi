@@ -59,6 +59,20 @@ describe("object", () => {
     assert.deepEqual(base.partial().options, { required: true, label: "ユーザー" });
   });
 
+  it("refineのissueにpathを付けると、その項目のエラーになる", () => {
+    const pair = s.object(
+      { password: s.string({ required: true }), confirm: s.string({ required: true }) },
+      { refine: (value) => value.password !== value.confirm && { code: "mismatch", path: ["confirm"] } },
+    );
+    assert.deepEqual(pair.parse({ password: "a", confirm: "a" }), { password: "a", confirm: "a" });
+    const result = pair.safeParse({ password: "a", confirm: "b" });
+    assert.ok(!result.success);
+    assert.deepEqual(
+      result.error.issues.map((issue) => [issue.code, issue.path]),
+      [["mismatch", ["confirm"]]],
+    );
+  });
+
   it("partial()でrequiredが外れると、booleanのdisallowFalseも外れる", () => {
     const patch = s.object({ agree: s.boolean({ required: { disallowFalse: true } }) }).partial();
     assert.deepEqual(patch.parse({}), {});

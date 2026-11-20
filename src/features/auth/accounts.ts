@@ -3,11 +3,10 @@ import type { LoginLimits } from "../../lib/config.ts";
 import { transaction, type DataBase } from "../../lib/db.ts";
 import type { LoginAccount } from "./login-account.ts";
 import { graphemeLength } from "../../lib/string.ts";
-import { hashPassword, PASSWORD_MAX_LENGTH, verifyPassword } from "./password.ts";
+import { password as passwordField } from "./_shared/account.ts";
+import { hashPassword, verifyPassword } from "./password.ts";
 import { recordDeviceLogin, reserveDeviceAttempt, sweepDevices, type DeviceLogin } from "./login-devices.ts";
 import { refundAddressAttempt, reserveAddressAttempt, sweepAddressFailures } from "./login-throttle.ts";
-
-export const USERNAME_MAX_LENGTH = 64;
 
 export type AuthInput = {
   readonly username: string;
@@ -115,8 +114,8 @@ WHERE
 
 export async function authenticate(db: DataBase, limits: LoginLimits, input: AuthInput): Promise<AuthResult> {
   const { username, password, remoteAddress, deviceToken, userAgent } = input;
-  if (graphemeLength(password) > PASSWORD_MAX_LENGTH) {
-    throw new Error(`パスワードが上限（${PASSWORD_MAX_LENGTH}文字）を超えています。`);
+  if (graphemeLength(password) > passwordField.options.maxLength) {
+    throw new Error(`パスワードが上限（${passwordField.options.maxLength}文字）を超えています。`);
   }
   const now = new Date();
   const trustedDevice = await reserveDeviceAttempt(db, limits, deviceToken, username, now);
@@ -201,4 +200,63 @@ export async function createAccount(
     throw new Error("アカウントを作成できませんでした。");
   }
   return row.id;
+}
+
+export type ChangePasswordResult =
+  | { readonly status: "ok" }
+  | { readonly status: "wrong_password"; readonly locksAccount: boolean }
+  | { readonly status: "locked" }
+  | { readonly status: "same_as_current" };
+
+type SelectPasswordHashSqlReturned = {
+  password_hash: string;
+};
+const SELECT_PASSWORD_HASH_SQL = `
+SELECT
+  password_hash
+FROM
+  accounts
+WHERE
+  id = $1
+`;
+
+const UPDATE_PASSWORD_HASH_SQL = `
+UPDATE accounts SET
+  password_hash = $2
+, failed_attempts = 0
+, locked_until = NULL
+WHERE
+  id = $1
+`;
+
+export async function changePassword(
+  db: DataBase,
+  limits: LoginLimits,
+  accountId: number,
+  currentPassword: string,
+  newPassword: string,
+): Promise<ChangePasswordResult> {
+  const maxLength = passwordField.options.maxLength;
+  if (graphemeLength(currentPassword) > maxLength || graphemeLength(newPassword) > maxLength) {
+    throw new Error(`パスワードが最大文字数（${maxLength}）を超えています。`);
+  }
+  const { rows } = await db.query<SelectPasswordHashSqlReturned>(SELECT_PASSWORD_HASH_SQL, [accountId]);
+  const row = rows[0];
+  if (row == null) {
+    throw new Error(`アカウントが存在しません: id=${accountId}`);
+  }
+  const attempt = await reserveAccountAttempt(db, limits, accountId, new Date());
+  const ok = await verifyPassword(currentPassword, row.password_hash);
+  if (!attempt.allowed) {
+    return { status: "locked" };
+  }
+  if (!ok) {
+    return { status: "wrong_password", locksAccount: attempt.locks };
+  }
+  if (currentPassword.normalize("NFC") === newPassword.normalize("NFC")) {
+    await db.query(UPDATE_ACCOUNT_RESET_FAILED_SQL, [accountId]);
+    return { status: "same_as_current" };
+  }
+  await db.query(UPDATE_PASSWORD_HASH_SQL, [accountId, await hashPassword(newPassword)]);
+  return { status: "ok" };
 }

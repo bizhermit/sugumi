@@ -10,9 +10,6 @@ const PARAMS = { N: 2 ** 15, r: 8, p: 3 };
 const KEY_LENGTH = 32;
 const SALT_LENGTH = 16;
 
-export const PASSWORD_MIN_LENGTH = 8;
-export const PASSWORD_MAX_LENGTH = 128;
-
 function derive(password: string, salt: Buffer, params: { N: number; r: number; p: number }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     // 同じ文字でも符号化が違うと別のパスワードになるため、正規化してから計算する。

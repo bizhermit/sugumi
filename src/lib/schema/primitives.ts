@@ -11,8 +11,8 @@ import {
 import { parseNumber } from "../number.ts";
 import { graphemeLength, toHalfWidth, toHyphen } from "../string.ts";
 import { fail, ok, type InternalResult } from "./error.ts";
-import { ConfigurableSchema, type CommonOptions, type RequiredOption } from "./schema.ts";
-import type { Issue, ParseContext } from "./types.ts";
+import { ConfigurableSchema, type CommonOptions, type Options, type Resolved } from "./schema.ts";
+import type { Dynamic, Issue, ParseContext } from "./types.ts";
 import { typeOf } from "./types.ts";
 
 export type StringType = "email" | "tel" | "url";
@@ -129,24 +129,23 @@ const STRING_TYPE_CHECKS: Record<StringType, (value: string) => boolean> = {
   url: isHttpUrl,
 };
 
-export interface StringOptions<R extends RequiredOption> extends CommonOptions<string, R> {
-  readonly minLength?: number;
-  readonly maxLength?: number;
-  readonly length?: number;
+export interface StringOptions extends CommonOptions<string> {
+  readonly minLength?: Dynamic<number>;
+  readonly maxLength?: Dynamic<number>;
+  readonly length?: Dynamic<number>;
   readonly trim?: boolean;
   readonly allowEmpty?: boolean;
   readonly type?: StringType;
-  readonly pattern?: RegExp;
+  readonly pattern?: Dynamic<RegExp>;
 }
 
-export class StringSchema<const R extends RequiredOption = false> extends ConfigurableSchema<string, R> {
+export class StringSchema<const O extends StringOptions = {}> extends ConfigurableSchema<string, O> {
   readonly typeName = "string";
-  readonly options: StringOptions<R>;
+  declare readonly options: Options<O, StringOptions>;
 
-  constructor(options: StringOptions<R> = {}) {
-    super();
-    this.options = options;
-    if (options.pattern?.global || options.pattern?.sticky) {
+  constructor(options: O & StringOptions) {
+    super(options);
+    if (typeof options.pattern === "object" && (options.pattern.global || options.pattern.sticky)) {
       throw new Error("patternにg/yフラグは使用できません。");
     }
   }
@@ -166,7 +165,7 @@ export class StringSchema<const R extends RequiredOption = false> extends Config
     return this.options.allowEmpty === true;
   }
 
-  protected _parseValue(input: unknown, ctx: ParseContext): InternalResult<string> {
+  protected _parseValue(input: unknown, ctx: ParseContext, o: Resolved<StringOptions>): InternalResult<string> {
     if (typeof input !== "string") {
       return fail([
         {
@@ -179,7 +178,6 @@ export class StringSchema<const R extends RequiredOption = false> extends Config
       ]);
     }
 
-    const o = this.options;
     const value = o.trim === false ? input : input.trim();
     const issues: Issue[] = [];
     const needsLength = o.length != null || o.minLength != null || o.maxLength != null;
@@ -200,6 +198,10 @@ export class StringSchema<const R extends RequiredOption = false> extends Config
     if (o.maxLength != null && length > o.maxLength) {
       issues.push({ path: ctx.path, type: "error", code: "max", key: "string.max", params: { max: o.maxLength } });
     }
+    // 静的な pattern はコンストラクタで確かめている。関数が返した RegExp はここでしか確かめられない。
+    if (typeof this.options.pattern === "function" && o.pattern != null && (o.pattern.global || o.pattern.sticky)) {
+      throw new Error("patternにg/yフラグは使用できません。");
+    }
     if (o.pattern && !o.pattern.test(value)) {
       issues.push({
         path: ctx.path,
@@ -218,14 +220,14 @@ export class StringSchema<const R extends RequiredOption = false> extends Config
   }
 }
 
-export function string<const R extends RequiredOption = false>(options: StringOptions<R> = {}): StringSchema<R> {
+export function string<const O extends StringOptions = {}>(options: O & StringOptions = {} as O): StringSchema<O> {
   return new StringSchema(options);
 }
 
-export interface NumberOptions<R extends RequiredOption> extends CommonOptions<number, R> {
+export interface NumberOptions extends CommonOptions<number> {
   readonly type?: "int" | "float";
-  readonly min?: number;
-  readonly max?: number;
+  readonly min?: Dynamic<number>;
+  readonly max?: Dynamic<number>;
   readonly sign?: "positive" | "negative" | "nonnegative";
   readonly decimals?: number;
 }
@@ -243,21 +245,16 @@ function decimalPlaces(value: number): number {
   return dot === -1 ? 0 : str.length - dot - 1;
 }
 
-export class NumberSchema<const R extends RequiredOption = false> extends ConfigurableSchema<number, R> {
+export class NumberSchema<const O extends NumberOptions = {}> extends ConfigurableSchema<number, O> {
   readonly typeName = "number";
-  readonly options: NumberOptions<R>;
-
-  constructor(options: NumberOptions<R> = {}) {
-    super();
-    this.options = options;
-  }
+  declare readonly options: Options<O, NumberOptions>;
 
   protected _preprocess(value: unknown): unknown {
     if (typeof value !== "string") return value;
     return parseNumber(value) ?? value;
   }
 
-  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<number> {
+  protected _parseValue(value: unknown, ctx: ParseContext, o: Resolved<NumberOptions>): InternalResult<number> {
     if (typeof value !== "number" || !Number.isFinite(value)) {
       return fail([
         {
@@ -270,7 +267,6 @@ export class NumberSchema<const R extends RequiredOption = false> extends Config
       ]);
     }
 
-    const o = this.options;
     const issues: Issue[] = [];
 
     if (o.type === "int" && !Number.isInteger(value)) {
@@ -316,25 +312,23 @@ export class NumberSchema<const R extends RequiredOption = false> extends Config
   }
 }
 
-export function number<const R extends RequiredOption = false>(options: NumberOptions<R> = {}): NumberSchema<R> {
+export function number<const O extends NumberOptions = {}>(options: O & NumberOptions = {} as O): NumberSchema<O> {
   return new NumberSchema(options);
 }
 
 export type BooleanRequiredOption = boolean | { readonly nullable?: boolean; readonly disallowFalse?: boolean };
 
-export class BooleanSchema<const R extends BooleanRequiredOption = false> extends ConfigurableSchema<boolean, R> {
+export interface BooleanOptions extends CommonOptions<boolean> {
+  readonly required?: Dynamic<BooleanRequiredOption>;
+}
+
+export function disallowsFalse(required: BooleanRequiredOption | undefined): boolean {
+  return typeof required === "object" && required.disallowFalse === true;
+}
+
+export class BooleanSchema<const O extends BooleanOptions = {}> extends ConfigurableSchema<boolean, O> {
   readonly typeName = "boolean";
-  readonly options: CommonOptions<boolean, R>;
-
-  constructor(options: CommonOptions<boolean, R> = {}) {
-    super();
-    this.options = options;
-  }
-
-  get disallowFalse(): boolean {
-    const required = this.options.required;
-    return typeof required === "object" && required.disallowFalse === true;
-  }
+  declare readonly options: Options<O, BooleanOptions>;
 
   protected _preprocess(value: unknown): unknown {
     if (typeof value !== "string") return value;
@@ -350,7 +344,7 @@ export class BooleanSchema<const R extends BooleanRequiredOption = false> extend
     }
   }
 
-  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<boolean> {
+  protected _parseValue(value: unknown, ctx: ParseContext, o: Resolved<BooleanOptions>): InternalResult<boolean> {
     if (typeof value !== "boolean") {
       return fail([
         {
@@ -362,39 +356,36 @@ export class BooleanSchema<const R extends BooleanRequiredOption = false> extend
         },
       ]);
     }
-    if (!value && this.disallowFalse) {
+    if (!value && disallowsFalse(o.required)) {
       return fail([{ path: ctx.path, type: "error", code: "required", key: "boolean.required", params: {} }]);
     }
     return ok(value);
   }
 }
 
-export function boolean<const R extends BooleanRequiredOption = false>(
-  options: CommonOptions<boolean, R> = {},
-): BooleanSchema<R> {
+export function boolean<const O extends BooleanOptions = {}>(options: O & BooleanOptions = {} as O): BooleanSchema<O> {
   return new BooleanSchema(options);
 }
 
-export interface DateOptions<R extends RequiredOption> extends CommonOptions<Temporal.PlainDate, R> {
-  readonly min?: Temporal.PlainDate;
-  readonly max?: Temporal.PlainDate;
+export interface DateOptions extends CommonOptions<Temporal.PlainDate> {
+  readonly min?: Dynamic<Temporal.PlainDate>;
+  readonly max?: Dynamic<Temporal.PlainDate>;
 }
 
-export class DateSchema<const R extends RequiredOption = false> extends ConfigurableSchema<Temporal.PlainDate, R> {
+export class DateSchema<const O extends DateOptions = {}> extends ConfigurableSchema<Temporal.PlainDate, O> {
   readonly typeName = "date";
-  readonly options: DateOptions<R>;
-
-  constructor(options: DateOptions<R> = {}) {
-    super();
-    this.options = options;
-  }
+  declare readonly options: Options<O, DateOptions>;
 
   protected _preprocess(value: unknown): unknown {
     if (typeof value !== "string") return value;
     return parseDate(value.trim()) ?? value;
   }
 
-  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<Temporal.PlainDate> {
+  protected _parseValue(
+    value: unknown,
+    ctx: ParseContext,
+    o: Resolved<DateOptions>,
+  ): InternalResult<Temporal.PlainDate> {
     if (!(value instanceof Temporal.PlainDate)) {
       return fail([
         {
@@ -407,7 +398,6 @@ export class DateSchema<const R extends RequiredOption = false> extends Configur
       ]);
     }
 
-    const o = this.options;
     const issues: Issue[] = [];
 
     if (o.min != null && Temporal.PlainDate.compare(value, o.min) < 0) {
@@ -422,27 +412,26 @@ export class DateSchema<const R extends RequiredOption = false> extends Configur
   }
 }
 
-export function date<const R extends RequiredOption = false>(options: DateOptions<R> = {}): DateSchema<R> {
+export function date<const O extends DateOptions = {}>(options: O & DateOptions = {} as O): DateSchema<O> {
   return new DateSchema(options);
 }
 
-export interface DateTimeOptions<R extends RequiredOption> extends CommonOptions<Temporal.ZonedDateTime, R> {
-  readonly min?: Temporal.ZonedDateTime;
-  readonly max?: Temporal.ZonedDateTime;
+export interface DateTimeOptions extends CommonOptions<Temporal.ZonedDateTime> {
+  readonly min?: Dynamic<Temporal.ZonedDateTime>;
+  readonly max?: Dynamic<Temporal.ZonedDateTime>;
   readonly timeZone?: string;
 }
 
-export class DateTimeSchema<const R extends RequiredOption = false> extends ConfigurableSchema<
+export class DateTimeSchema<const O extends DateTimeOptions = {}> extends ConfigurableSchema<
   Temporal.ZonedDateTime,
-  R
+  O
 > {
   readonly typeName = "datetime";
-  readonly options: DateTimeOptions<R>;
+  declare readonly options: Options<O, DateTimeOptions>;
 
-  constructor(options: DateTimeOptions<R> = {}) {
-    super();
+  constructor(options: O & DateTimeOptions) {
+    super(options);
     if (options.timeZone != null) assertTimeZone(options.timeZone);
-    this.options = options;
   }
 
   get timeZone(): string {
@@ -457,7 +446,11 @@ export class DateTimeSchema<const R extends RequiredOption = false> extends Conf
     return value;
   }
 
-  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<Temporal.ZonedDateTime> {
+  protected _parseValue(
+    value: unknown,
+    ctx: ParseContext,
+    o: Resolved<DateTimeOptions>,
+  ): InternalResult<Temporal.ZonedDateTime> {
     if (!(value instanceof Temporal.ZonedDateTime)) {
       return fail([
         {
@@ -470,7 +463,6 @@ export class DateTimeSchema<const R extends RequiredOption = false> extends Conf
       ]);
     }
 
-    const o = this.options;
     const issues: Issue[] = [];
 
     if (o.min != null && Temporal.ZonedDateTime.compare(value, o.min) < 0) {
@@ -497,30 +489,31 @@ export class DateTimeSchema<const R extends RequiredOption = false> extends Conf
   }
 }
 
-export function datetime<const R extends RequiredOption = false>(options: DateTimeOptions<R> = {}): DateTimeSchema<R> {
+export function datetime<const O extends DateTimeOptions = {}>(
+  options: O & DateTimeOptions = {} as O,
+): DateTimeSchema<O> {
   return new DateTimeSchema(options);
 }
 
-export interface TimeOptions<R extends RequiredOption> extends CommonOptions<Temporal.PlainTime, R> {
-  readonly min?: Temporal.PlainTime;
-  readonly max?: Temporal.PlainTime;
+export interface TimeOptions extends CommonOptions<Temporal.PlainTime> {
+  readonly min?: Dynamic<Temporal.PlainTime>;
+  readonly max?: Dynamic<Temporal.PlainTime>;
 }
 
-export class TimeSchema<const R extends RequiredOption = false> extends ConfigurableSchema<Temporal.PlainTime, R> {
+export class TimeSchema<const O extends TimeOptions = {}> extends ConfigurableSchema<Temporal.PlainTime, O> {
   readonly typeName = "time";
-  readonly options: TimeOptions<R>;
-
-  constructor(options: TimeOptions<R> = {}) {
-    super();
-    this.options = options;
-  }
+  declare readonly options: Options<O, TimeOptions>;
 
   protected _preprocess(value: unknown): unknown {
     if (typeof value !== "string") return value;
     return parseTime(value.trim()) ?? value;
   }
 
-  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<Temporal.PlainTime> {
+  protected _parseValue(
+    value: unknown,
+    ctx: ParseContext,
+    o: Resolved<TimeOptions>,
+  ): InternalResult<Temporal.PlainTime> {
     if (!(value instanceof Temporal.PlainTime)) {
       return fail([
         {
@@ -533,7 +526,6 @@ export class TimeSchema<const R extends RequiredOption = false> extends Configur
       ]);
     }
 
-    const o = this.options;
     const issues: Issue[] = [];
 
     if (o.min != null && Temporal.PlainTime.compare(value, o.min) < 0) {
@@ -560,21 +552,18 @@ export class TimeSchema<const R extends RequiredOption = false> extends Configur
   }
 }
 
-export function time<const R extends RequiredOption = false>(options: TimeOptions<R> = {}): TimeSchema<R> {
+export function time<const O extends TimeOptions = {}>(options: O & TimeOptions = {} as O): TimeSchema<O> {
   return new TimeSchema(options);
 }
 
 type Literal = string | number | boolean;
 
-export class LiteralSchema<T extends Literal, const R extends RequiredOption = false> extends ConfigurableSchema<T, R> {
+export class LiteralSchema<T extends Literal, const O extends CommonOptions<T> = {}> extends ConfigurableSchema<T, O> {
   readonly typeName = "literal";
   private readonly literalValue: T;
 
-  readonly options: CommonOptions<T, R>;
-
-  constructor(literalValue: T, options: CommonOptions<T, R> = {}) {
-    super();
-    this.options = options;
+  constructor(literalValue: T, options: O & CommonOptions<T>) {
+    super(options);
     this.literalValue = literalValue;
   }
 
@@ -594,49 +583,35 @@ export class LiteralSchema<T extends Literal, const R extends RequiredOption = f
   }
 }
 
-export function literal<T extends Literal, const R extends RequiredOption = false>(
+export function literal<T extends Literal, const O extends CommonOptions<T> = {}>(
   value: T,
-  options: CommonOptions<T, R> = {},
-): LiteralSchema<T, R> {
+  options: O & CommonOptions<T> = {} as O,
+): LiteralSchema<T, O> {
   return new LiteralSchema(value, options);
 }
 
-export class AnySchema<const R extends RequiredOption = false> extends ConfigurableSchema<any, R> {
+export class AnySchema<const O extends CommonOptions<any> = {}> extends ConfigurableSchema<any, O> {
   readonly typeName = "any";
-
-  readonly options: CommonOptions<any, R>;
-
-  constructor(options: CommonOptions<any, R> = {}) {
-    super();
-    this.options = options;
-  }
 
   protected _parseValue(value: unknown): InternalResult<any> {
     return ok(value);
   }
 }
 
-export function any<const R extends RequiredOption = false>(options: CommonOptions<any, R> = {}): AnySchema<R> {
+export function any<const O extends CommonOptions<any> = {}>(options: O & CommonOptions<any> = {} as O): AnySchema<O> {
   return new AnySchema(options);
 }
 
-export class UnknownSchema<const R extends RequiredOption = false> extends ConfigurableSchema<unknown, R> {
+export class UnknownSchema<const O extends CommonOptions<unknown> = {}> extends ConfigurableSchema<unknown, O> {
   readonly typeName = "unknown";
-
-  readonly options: CommonOptions<unknown, R>;
-
-  constructor(options: CommonOptions<unknown, R> = {}) {
-    super();
-    this.options = options;
-  }
 
   protected _parseValue(value: unknown): InternalResult<unknown> {
     return ok(value);
   }
 }
 
-export function unknown<const R extends RequiredOption = false>(
-  options: CommonOptions<unknown, R> = {},
-): UnknownSchema<R> {
+export function unknown<const O extends CommonOptions<unknown> = {}>(
+  options: O & CommonOptions<unknown> = {} as O,
+): UnknownSchema<O> {
   return new UnknownSchema(options);
 }

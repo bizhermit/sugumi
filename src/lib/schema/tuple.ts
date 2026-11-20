@@ -1,23 +1,21 @@
 import { fail, hasErrorSeverity, ok, type InternalResult } from "./error.ts";
-import { ConfigurableSchema, Schema, type CommonOptions, type RequiredOption } from "./schema.ts";
+import { ConfigurableSchema, Schema, type CommonOptions, type Options } from "./schema.ts";
 import type { Issue, ParseContext } from "./types.ts";
 import { typeOf } from "./types.ts";
 
 type Elements = readonly [Schema<any>, ...Schema<any>[]];
 type TupleOutput<T extends Elements> = { [K in keyof T]: T[K]["_output"] };
 
-export class TupleSchema<T extends Elements, const R extends RequiredOption = false> extends ConfigurableSchema<
+export class TupleSchema<T extends Elements, const O extends CommonOptions<any> = {}> extends ConfigurableSchema<
   TupleOutput<T>,
-  R
+  O
 > {
   readonly typeName = "tuple";
   readonly elements: T;
+  declare readonly options: Options<O, CommonOptions<TupleOutput<T>>>;
 
-  readonly options: CommonOptions<TupleOutput<T>, R>;
-
-  constructor(elements: T, options: CommonOptions<TupleOutput<T>, R> = {}) {
-    super();
-    this.options = options;
+  constructor(elements: T, options: O & CommonOptions<TupleOutput<T>>) {
+    super(options);
     this.elements = elements;
   }
 
@@ -50,7 +48,7 @@ export class TupleSchema<T extends Elements, const R extends RequiredOption = fa
     const issues: Issue[] = [];
 
     for (let i = 0; i < this.elements.length; i++) {
-      const result = this.elements[i]!._parse(value[i], { path: [...ctx.path, i] });
+      const result = this.elements[i]!._parse(value[i], { ...ctx, path: [...ctx.path, i] });
       if (result.success) {
         output.push(result.data);
         if (result.issues?.length) issues.push(...result.issues);
@@ -64,9 +62,9 @@ export class TupleSchema<T extends Elements, const R extends RequiredOption = fa
   }
 }
 
-export function tuple<T extends Elements, const R extends RequiredOption = false>(
+export function tuple<T extends Elements, const O extends CommonOptions<any> = {}>(
   elements: T,
-  options: CommonOptions<TupleOutput<T>, R> = {},
-): TupleSchema<T, R> {
+  options: O & CommonOptions<TupleOutput<T>> = {} as O,
+): TupleSchema<T, O> {
   return new TupleSchema(elements, options);
 }

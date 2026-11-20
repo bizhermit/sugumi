@@ -17,6 +17,9 @@ const userLayout: Layout = {
           <li>
             <a href="/settings">設定</a>
           </li>
+          <li>
+            <a href="/user/password">パスワード変更</a>
+          </li>
         </ul>
         <Form req={req} method="post" action="/logout">
           <span>{loginAccountSlot.get(req).displayName}</span> <button type="submit">ログアウト</button>

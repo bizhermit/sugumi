@@ -1,26 +1,19 @@
 import { FieldErrors } from "../../components/form/field-errors.tsx";
 import { Form } from "../../components/form/form.tsx";
+import { PasswordInput } from "../../components/form/password-input.tsx";
 import { asset } from "../../web/assets.ts";
 import { appSlot } from "../../web/context.ts";
 import { createCsrfCookie, createCsrfToken } from "../../web/csrf.ts";
 import { formSlot, inputAttributes, validateForm, type FormErrors } from "../../web/form.ts";
 import { Page, page } from "../../web/html-document.tsx";
 import { remoteAddressSlot } from "../../web/remote-address.ts";
-import { s } from "../../lib/schema/index.ts";
-import { authenticate, USERNAME_MAX_LENGTH } from "./accounts.ts";
+import { loginSchema, RETURN_TO_PARAM_NAME } from "./_shared/login.ts";
+import { authenticate } from "./accounts.ts";
 import { deviceCookie, readDeviceToken, readUserAgent } from "./login-devices.ts";
-import { PASSWORD_MAX_LENGTH } from "./password.ts";
-import { DEFAULT_RETURN_PATH, RETURN_TO_PARAM_NAME, toReturnPath } from "./return-to.ts";
+import { DEFAULT_RETURN_PATH, toReturnPath } from "./return-to.ts";
 import { createSession, deleteSession, findSession, sessionCookie } from "./session.ts";
 
 const styles = [asset(import.meta.resolve("./_assets/login.css"))];
-const scripts = [asset(import.meta.resolve("./_assets/login.ts"))];
-
-const loginForm = s.object({
-  username: s.string({ required: true, maxLength: USERNAME_MAX_LENGTH, label: "ユーザー" }),
-  password: s.string({ required: true, maxLength: PASSWORD_MAX_LENGTH, trim: false, label: "パスワード" }),
-  [RETURN_TO_PARAM_NAME]: s.string(),
-});
 
 type LoginPageOptions = {
   readonly username?: string;
@@ -35,7 +28,6 @@ function loginPage(req: Request, options: LoginPageOptions = {}) {
     status: options.status,
     title: "ログイン",
     styles,
-    scripts,
     slots: {
       main: (
         <main>
@@ -48,7 +40,7 @@ function loginPage(req: Request, options: LoginPageOptions = {}) {
               <label>
                 ユーザー{" "}
                 <input
-                  {...inputAttributes(loginForm, "username")}
+                  {...inputAttributes(loginSchema, "username")}
                   name="username"
                   autocomplete="username"
                   value={options.username ?? ""}
@@ -59,9 +51,8 @@ function loginPage(req: Request, options: LoginPageOptions = {}) {
             <p>
               <label>
                 パスワード{" "}
-                <input
-                  {...inputAttributes(loginForm, "password")}
-                  type="password"
+                <PasswordInput
+                  {...inputAttributes(loginSchema, "password")}
                   name="password"
                   autocomplete="current-password"
                 />
@@ -85,7 +76,7 @@ function get(req: Request): Page {
 
 async function post(req: Request): Promise<Response | Page> {
   const { db, logger, login, session } = appSlot.get(req);
-  const form = validateForm(loginForm, formSlot.get(req));
+  const form = validateForm(loginSchema, formSlot.get(req));
   if (form.warnings.length > 0) {
     logger.warn("ログインフォームに想定外の入力があります。", {
       count: form.warnings.length,

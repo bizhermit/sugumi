@@ -92,9 +92,17 @@ describe("validateForm", () => {
   });
 
   it("辞書を渡せば文言を差し替えられる", () => {
-    const result = validateForm(schema, formData([["username", ""]]), { "string.required": () => "必須" });
+    const result = validateForm(schema, formData([["username", ""]]), {
+      messages: { "string.required": () => "必須" },
+    });
     assert.ok(!result.ok);
     assert.deepEqual(result.errors, { username: ["必須"] });
+  });
+
+  it("dataを渡せば動的な制約に届く", () => {
+    const codeForm = s.object({ code: s.string({ required: (ctx) => ctx.data.needsCode === true }) });
+    assert.equal(validateForm(codeForm, formData([])).ok, true);
+    assert.equal(validateForm(codeForm, formData([]), { data: { needsCode: true } }).ok, false);
   });
 
   it("スキーマに無い項目はwarningとして返し、失敗にはしない", () => {
@@ -125,6 +133,11 @@ describe("inputAttributes", () => {
     agree: s.boolean({ required: { disallowFalse: true } }),
     flag: s.boolean({ required: true }),
     role: s.enum(["admin", "user"], { required: true }),
+    detail: s.string({
+      required: (ctx) => ctx.values.role === "admin",
+      maxLength: (ctx) => (ctx.values.role === "admin" ? 10 : 100),
+    }),
+    limit: s.number({ required: true, min: () => 1, max: 9 }),
   });
 
   it("stringはtype/required/minlength/maxlength。patternはHTMLと意味が違うので出さない", () => {
@@ -150,6 +163,11 @@ describe("inputAttributes", () => {
   it("booleanはdisallowFalseのときだけrequired（チェック済みが必須）", () => {
     assert.deepEqual(inputAttributes(schema, "agree"), { required: true });
     assert.deepEqual(inputAttributes(schema, "flag"), {});
+  });
+
+  it("動的な制約は属性にしない", () => {
+    assert.deepEqual(inputAttributes(schema, "detail"), {});
+    assert.deepEqual(inputAttributes(schema, "limit"), { type: "number", required: true, max: 9, step: "any" });
   });
 
   it("その他のスキーマはrequiredだけ", () => {

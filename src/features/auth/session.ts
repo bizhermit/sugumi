@@ -99,6 +99,11 @@ export async function deleteSession(db: DataBase, token: string): Promise<void> 
   await db.query("DELETE FROM sessions WHERE token_hash = $1", [hashToken(token)]);
 }
 
+/** パスワード変更などで、いま使っているセッション以外を失効させる。 */
+export async function deleteOtherSessions(db: DataBase, accountId: number, keepToken: string): Promise<void> {
+  await db.query("DELETE FROM sessions WHERE account_id = $1 AND token_hash <> $2", [accountId, hashToken(keepToken)]);
+}
+
 export function hasSessionCookie(req: Request): boolean {
   return readCookie(req, COOKIE_NAME) != null;
 }

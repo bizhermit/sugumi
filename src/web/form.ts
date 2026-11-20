@@ -4,11 +4,15 @@ import {
   DateSchema,
   DateTimeSchema,
   TimeSchema,
+  disallowsFalse,
   formatIssue,
+  isRequired,
   jaFormMessages,
   NumberSchema,
   StringSchema,
   walk,
+  type CommonOptions,
+  type Dynamic,
   type InferShape,
   type Issue,
   type MessageDictionary,
@@ -89,8 +93,8 @@ function setOwn(target: Record<string, unknown>, key: string, value: unknown): v
   Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true });
 }
 
-export function formToObject<S extends Shape, R extends RequiredOption>(
-  schema: ObjectSchema<S, R>,
+export function formToObject<S extends Shape, O extends CommonOptions<InferShape<S>>>(
+  schema: ObjectSchema<S, O>,
   form: FormData,
 ): Record<string, unknown> {
   const arrayKeys = new Set(
@@ -107,13 +111,22 @@ export function formToObject<S extends Shape, R extends RequiredOption>(
   return values;
 }
 
-export function validateForm<S extends Shape, R extends RequiredOption>(
-  schema: ObjectSchema<S, R>,
+export type ValidateFormOptions = {
+  readonly messages?: MessageDictionary;
+  /**
+   * 動的な制約と refine に ctx.data として渡す。
+   */
+  readonly data?: Readonly<Record<string, unknown>> | undefined;
+};
+
+export function validateForm<S extends Shape, O extends CommonOptions<InferShape<S>>>(
+  schema: ObjectSchema<S, O>,
   form: FormData,
-  messages: MessageDictionary = jaFormMessages,
+  options: ValidateFormOptions = {},
 ): FormResult<InferShape<S>> {
+  const messages = options.messages ?? jaFormMessages;
   const input = formToObject(schema, form);
-  const result = schema.safeParse(input);
+  const result = schema.safeParse(input, { data: options.data });
   if (result.success) {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 入力は常にオブジェクトのためundefined/nullにはならない。
     return { ok: true, data: result.data as InferShape<S>, warnings: result.issues ?? [] };
@@ -141,8 +154,18 @@ export type InputAttributes = Pick<
   "type" | "required" | "minlength" | "maxlength" | "min" | "max" | "step"
 >;
 
-export function inputAttributes<S extends Shape, R extends RequiredOption>(
-  schema: ObjectSchema<S, R>,
+// 動的な制約はHTML属性にしない。描画時の値で付けた属性は、条件側の入力が変わっても残り、
+// JSが無効だと正しい入力を送信できなくなるため。動的な制約はサーバーとクライアント検証スクリプトだけが見る。
+function staticValue<T>(value: Dynamic<T> | undefined): T | undefined {
+  return typeof value === "function" ? undefined : value;
+}
+
+function requiredAttribute(required: Dynamic<RequiredOption> | undefined): Pick<InputAttributes, "required"> {
+  return isRequired(staticValue(required)) ? { required: true } : {};
+}
+
+export function inputAttributes<S extends Shape, O extends CommonOptions<InferShape<S>>>(
+  schema: ObjectSchema<S, O>,
   name: keyof S & string,
 ): InputAttributes {
   const field = schema.shape[name];
@@ -151,56 +174,66 @@ export function inputAttributes<S extends Shape, R extends RequiredOption>(
   }
   if (field instanceof StringSchema) {
     const o = field.options;
+    const minLength = staticValue(o.minLength);
+    const maxLength = staticValue(o.maxLength);
     return {
       ...(o.type == null ? {} : { type: o.type }),
-      ...(field.required ? { required: true } : {}),
-      ...(o.minLength == null ? {} : { minlength: o.minLength }),
-      ...(o.maxLength == null ? {} : { maxlength: o.maxLength }),
+      ...requiredAttribute(o.required),
+      ...(minLength == null ? {} : { minlength: minLength }),
+      ...(maxLength == null ? {} : { maxlength: maxLength }),
     };
   }
   if (field instanceof NumberSchema) {
     const o = field.options;
+    const min = staticValue(o.min);
+    const max = staticValue(o.max);
     return {
       type: "number",
-      ...(field.required ? { required: true } : {}),
-      ...(o.min == null ? {} : { min: o.min }),
-      ...(o.max == null ? {} : { max: o.max }),
+      ...requiredAttribute(o.required),
+      ...(min == null ? {} : { min }),
+      ...(max == null ? {} : { max }),
       step: o.type === "int" ? 1 : o.decimals == null ? "any" : 10 ** -o.decimals,
     };
   }
   if (field instanceof DateSchema) {
     const o = field.options;
+    const min = staticValue(o.min);
+    const max = staticValue(o.max);
     return {
       type: "date",
-      ...(field.required ? { required: true } : {}),
-      ...(o.min == null ? {} : { min: o.min.toString() }),
-      ...(o.max == null ? {} : { max: o.max.toString() }),
+      ...requiredAttribute(o.required),
+      ...(min == null ? {} : { min: min.toString() }),
+      ...(max == null ? {} : { max: max.toString() }),
     };
   }
   if (field instanceof DateTimeSchema) {
     const o = field.options;
+    const min = staticValue(o.min);
+    const max = staticValue(o.max);
     return {
       type: "datetime-local",
-      ...(field.required ? { required: true } : {}),
-      ...(o.min == null ? {} : { min: toDateTimeInputValue(o.min.withTimeZone(field.timeZone)) }),
-      ...(o.max == null ? {} : { max: toDateTimeInputValue(o.max.withTimeZone(field.timeZone)) }),
+      ...requiredAttribute(o.required),
+      ...(min == null ? {} : { min: toDateTimeInputValue(min.withTimeZone(field.timeZone)) }),
+      ...(max == null ? {} : { max: toDateTimeInputValue(max.withTimeZone(field.timeZone)) }),
     };
   }
   if (field instanceof TimeSchema) {
     const o = field.options;
+    const min = staticValue(o.min);
+    const max = staticValue(o.max);
     return {
       type: "time",
-      ...(field.required ? { required: true } : {}),
-      ...(o.min == null ? {} : { min: toTimeInputValue(o.min) }),
-      ...(o.max == null ? {} : { max: toTimeInputValue(o.max) }),
+      ...requiredAttribute(o.required),
+      ...(min == null ? {} : { min: toTimeInputValue(min) }),
+      ...(max == null ? {} : { max: toTimeInputValue(max) }),
     };
   }
   if (field instanceof BooleanSchema) {
     // チェックボックスのrequiredは「チェック済み」の意味なので、falseも拒否する指定のときだけ付ける。
-    return field.disallowFalse ? { required: true } : {};
+    return disallowsFalse(staticValue(field.options.required)) ? { required: true } : {};
   }
   if (field instanceof ConfigurableSchema) {
-    return field.required ? { required: true } : {};
+    return requiredAttribute(field.options.required);
   }
   return {};
 }

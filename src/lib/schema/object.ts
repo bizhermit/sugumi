@@ -1,5 +1,5 @@
 import { fail, hasErrorSeverity, ok, type InternalResult } from "./error.ts";
-import { ConfigurableSchema, Schema, type CommonOptions, type RequiredOption } from "./schema.ts";
+import { ConfigurableSchema, Schema, type CommonOptions, type Options } from "./schema.ts";
 import type { Issue, ParseContext } from "./types.ts";
 import { typeOf } from "./types.ts";
 
@@ -10,7 +10,7 @@ export type InferShape<S extends Shape> = {
 };
 
 type PartialField<F extends Schema<any>> =
-  F extends ConfigurableSchema<infer U, any> ? ConfigurableSchema<U, false> : F;
+  F extends ConfigurableSchema<infer U, any> ? ConfigurableSchema<U, { readonly required: false }> : F;
 
 type PartialShape<S extends Shape> = { [K in keyof S]: PartialField<S[K]> };
 
@@ -19,18 +19,19 @@ type DeepPartialField<F extends Schema<any>> =
 
 type DeepPartialShape<S extends Shape> = { [K in keyof S]: DeepPartialField<S[K]> };
 
-export class ObjectSchema<S extends Shape, const R extends RequiredOption = false> extends ConfigurableSchema<
+// shape を変えて派生するときは、元の shape の値を前提にした refine と default を引き継がない。
+type DerivedOptions<O> = Omit<O, "refine" | "default"> & CommonOptions<any>;
+
+export class ObjectSchema<S extends Shape, const O extends CommonOptions<any> = {}> extends ConfigurableSchema<
   InferShape<S>,
-  R
+  O
 > {
   readonly typeName = "object";
   readonly shape: S;
+  declare readonly options: Options<O, CommonOptions<InferShape<S>>>;
 
-  readonly options: CommonOptions<InferShape<S>, R>;
-
-  constructor(shape: S, options: CommonOptions<InferShape<S>, R> = {}) {
-    super();
-    this.options = options;
+  constructor(shape: S, options: O & CommonOptions<InferShape<S>>) {
+    super(options);
     this.shape = shape;
   }
 
@@ -53,7 +54,7 @@ export class ObjectSchema<S extends Shape, const R extends RequiredOption = fals
 
     for (const key of Object.keys(this.shape)) {
       const fieldSchema = this.shape[key]!;
-      const result = fieldSchema._parse(record[key], { path: [...ctx.path, key] });
+      const result = fieldSchema._parse(record[key], { ...ctx, path: [...ctx.path, key] });
       if (result.success) {
         if (result.data !== undefined || key in record) output[key] = result.data;
         if (result.issues?.length) issues.push(...result.issues);
@@ -78,28 +79,28 @@ export class ObjectSchema<S extends Shape, const R extends RequiredOption = fals
     return ok(output as InferShape<S>, issues);
   }
 
-  private derive<S2 extends Shape>(shape: S2): ObjectSchema<S2, R> {
+  private derive<S2 extends Shape>(shape: S2): ObjectSchema<S2, DerivedOptions<O>> {
     const { refine: _refine, default: _default, ...rest } = this.options;
-    return new ObjectSchema(shape, rest as CommonOptions<InferShape<S2>, R>);
+    return new ObjectSchema(shape, rest as DerivedOptions<O>);
   }
 
-  extend<S2 extends Shape>(extension: S2): ObjectSchema<Omit<S, keyof S2> & S2, R> {
+  extend<S2 extends Shape>(extension: S2): ObjectSchema<Omit<S, keyof S2> & S2, DerivedOptions<O>> {
     return this.derive({ ...this.shape, ...extension } as Omit<S, keyof S2> & S2);
   }
 
-  pick<K extends keyof S>(keys: K[]): ObjectSchema<Pick<S, K>, R> {
+  pick<K extends keyof S>(keys: K[]): ObjectSchema<Pick<S, K>, DerivedOptions<O>> {
     const picked = {} as Pick<S, K>;
     for (const key of keys) picked[key] = this.shape[key];
     return this.derive(picked);
   }
 
-  omit<K extends keyof S>(keys: K[]): ObjectSchema<Omit<S, K>, R> {
+  omit<K extends keyof S>(keys: K[]): ObjectSchema<Omit<S, K>, DerivedOptions<O>> {
     const remaining = { ...this.shape };
     for (const key of keys) delete remaining[key];
     return this.derive(remaining as Omit<S, K>);
   }
 
-  partial(): ObjectSchema<PartialShape<S>, R> {
+  partial(): ObjectSchema<PartialShape<S>, DerivedOptions<O>> {
     const shape = {} as PartialShape<S>;
     for (const key of Object.keys(this.shape) as (keyof S)[]) {
       const field = this.shape[key];
@@ -108,7 +109,7 @@ export class ObjectSchema<S extends Shape, const R extends RequiredOption = fals
     return this.derive(shape);
   }
 
-  deepPartial(): ObjectSchema<DeepPartialShape<S>, R> {
+  deepPartial(): ObjectSchema<DeepPartialShape<S>, DerivedOptions<O>> {
     const shape = {} as DeepPartialShape<S>;
     for (const key of Object.keys(this.shape) as (keyof S)[]) {
       const field = this.shape[key];
@@ -119,9 +120,9 @@ export class ObjectSchema<S extends Shape, const R extends RequiredOption = fals
   }
 }
 
-export function object<S extends Shape, const R extends RequiredOption = false>(
+export function object<S extends Shape, const O extends CommonOptions<any> = {}>(
   shape: S,
-  options: CommonOptions<InferShape<S>, R> = {},
-): ObjectSchema<S, R> {
+  options: O & CommonOptions<InferShape<S>> = {} as O,
+): ObjectSchema<S, O> {
   return new ObjectSchema(shape, options);
 }

@@ -1,19 +1,35 @@
 import { fail, hasErrorSeverity, ok, SchemaError, type InternalResult, type ParseResult } from "./error.ts";
-import type { Issue, IssueSeverity, ParseContext } from "./types.ts";
+import type { Dynamic, Issue, IssueSeverity, ParseContext, PathSegment } from "./types.ts";
+
+export type ParseOptions = {
+  /**
+   * 動的な制約と refine に ctx.data として渡す。
+   */
+  readonly data?: Readonly<Record<string, unknown>> | undefined;
+};
+
+function rootContext(input: unknown, options: ParseOptions): ParseContext {
+  const values =
+    typeof input === "object" && input !== null && !Array.isArray(input) ? (input as Record<string, unknown>) : {};
+  return { path: [], values, data: options.data ?? {} };
+}
 
 export abstract class Schema<Output> {
   declare readonly _output: Output;
 
   abstract _parse(input: unknown, ctx: ParseContext): InternalResult<Output>;
 
-  parse(input: unknown): Output {
-    const result = this._parse(input, { path: [] });
+  /**
+   * 失敗したら SchemaError を投げる。
+   */
+  parse(input: unknown, options: ParseOptions = {}): Output {
+    const result = this._parse(input, rootContext(input, options));
     if (!result.success) throw new SchemaError(result.issues);
     return result.data;
   }
 
-  safeParse(input: unknown): ParseResult<Output> {
-    const result = this._parse(input, { path: [] });
+  safeParse(input: unknown, options: ParseOptions = {}): ParseResult<Output> {
+    const result = this._parse(input, rootContext(input, options));
     return result.success ? result : { success: false, error: new SchemaError(result.issues) };
   }
 }
@@ -30,48 +46,105 @@ export function allowsNull(required: RequiredOption | undefined): boolean {
   return typeof required === "object" && required.nullable === true;
 }
 
-export type Nullish<T, R extends RequiredOption> =
+type DynamicFunction = (ctx: ParseContext) => unknown;
+
+// 派生した options の型は「書いた型 & Dynamic<...>」になり、TS がそれを `true & 関数` のような
+// 実在しない型を含む union に展開する。関数の型を取り除いてから判定しないと、required が boolean に広がる。
+type StaticRequired<R> = Exclude<R, DynamicFunction>;
+
+/**
+ * options に書いた required から、値の型に使う required を取り出す。
+ * 関数（動的）は、実行時に必須でなくなりうるので false として扱う。
+ */
+export type RequiredOf<O> = O extends { readonly required: infer R }
+  ? [StaticRequired<R>] extends [never]
+    ? false
+    : StaticRequired<R> extends boolean | object
+      ? StaticRequired<R>
+      : false
+  : false;
+
+export type Nullish<T, R extends boolean | object> =
   | T
   | (R extends true | object ? never : undefined | null)
   | (R extends { readonly nullable: true } ? null : never);
+
+type ResolvedValue<V> = V extends DynamicFunction ? ReturnType<V> : V;
+
+/**
+ * 動的な option を値に直した options の型。
+ */
+export type Resolved<O> = {
+  readonly [K in keyof O]: K extends "refine" | "default" ? O[K] : ResolvedValue<O[K]>;
+};
+
+/**
+ * スキーマが持つ options の型。渡した項目は書いたとおりの型、省略した項目は All の型で読める。
+ * instanceof で絞り込むと型引数が any になるので、そのときは All にする。
+ */
+export type Options<O, All> = 0 extends 1 & O ? All : O & Omit<All, keyof O>;
 
 export interface RefineIssue {
   readonly code: string;
   readonly key?: string;
   readonly params?: Record<string, unknown>;
   readonly type?: IssueSeverity;
+  readonly path?: readonly PathSegment[];
 }
 
-export interface CommonOptions<T, R extends RequiredOption> {
-  readonly required?: R;
+export interface CommonOptions<T> {
+  readonly required?: Dynamic<RequiredOption>;
   readonly default?: T | (() => T);
   readonly strict?: boolean;
   readonly label?: string;
-  readonly refine?: (value: T) => RefineIssue | RefineIssue[] | false | null | undefined | void;
+  readonly refine?: (value: T, ctx: ParseContext) => RefineIssue | RefineIssue[] | false | null | undefined | void;
 }
 
-export abstract class ConfigurableSchema<T, R extends RequiredOption> extends Schema<Nullish<T, R>> {
+type OptionalOptions<T, O> = Omit<O, "required" | "default"> & { readonly required: false } & CommonOptions<T>;
+
+// refine と default は関数で書くものなので、動的な制約とは区別する。
+const NON_DYNAMIC_KEYS: ReadonlySet<string> = new Set(["refine", "default"]);
+
+function dynamicKeys(options: object): string[] {
+  return Object.entries(options)
+    .filter(([key, value]) => typeof value === "function" && !NON_DYNAMIC_KEYS.has(key))
+    .map(([key]) => key);
+}
+
+export abstract class ConfigurableSchema<T, O extends CommonOptions<T>> extends Schema<Nullish<T, RequiredOf<O>>> {
   abstract readonly typeName: string;
-  abstract readonly options: Readonly<CommonOptions<T, R>>;
+  readonly options: Options<O, CommonOptions<T>>;
+  private readonly dynamicKeys: readonly string[];
 
-  get required(): boolean {
-    return isRequired(this.options.required);
+  constructor(options: O & CommonOptions<T>) {
+    super();
+    this.options = options as Options<O, CommonOptions<T>>;
+    this.dynamicKeys = dynamicKeys(options);
   }
 
-  protected abstract _parseValue(value: unknown, ctx: ParseContext): InternalResult<T>;
-
-  withOptions<const R2 extends RequiredOption = R>(patch: Partial<CommonOptions<T, R2>>): ConfigurableSchema<T, R2> {
-    return this.replaceOptions({ ...this.options, ...patch } as CommonOptions<T, R2>);
+  /**
+   * 動的な option を今の入力で値に直す。動的な option がなければ options そのものを返す。
+   */
+  resolve(ctx: ParseContext): Resolved<this["options"]> {
+    if (this.dynamicKeys.length === 0) return this.options as Resolved<this["options"]>;
+    const resolved: Record<string, unknown> = { ...this.options };
+    for (const key of this.dynamicKeys) {
+      resolved[key] = (resolved[key] as DynamicFunction)(ctx);
+    }
+    return resolved as Resolved<this["options"]>;
   }
 
-  optional(): ConfigurableSchema<T, false> {
+  protected abstract _parseValue(
+    value: unknown,
+    ctx: ParseContext,
+    options: Resolved<this["options"]>,
+  ): InternalResult<T>;
+
+  optional(): ConfigurableSchema<T, OptionalOptions<T, O>> {
     const { default: _default, ...rest } = this.options;
-    return this.replaceOptions({ ...rest, required: false });
-  }
-
-  private replaceOptions<R2 extends RequiredOption>(merged: CommonOptions<T, R2>): ConfigurableSchema<T, R2> {
-    const clone = Object.create(Object.getPrototypeOf(this)) as ConfigurableSchema<T, R2>;
-    return Object.assign(clone, this, { options: merged });
+    const options = { ...rest, required: false };
+    const clone = Object.create(Object.getPrototypeOf(this)) as ConfigurableSchema<T, OptionalOptions<T, O>>;
+    return Object.assign(clone, this, { options, dynamicKeys: dynamicKeys(options) });
   }
 
   protected _preprocess(value: unknown): unknown {
@@ -89,8 +162,8 @@ export abstract class ConfigurableSchema<T, R extends RequiredOption> extends Sc
     return { ...issue, params: { ...issue.params, label } };
   }
 
-  _parse(input: unknown, ctx: ParseContext): InternalResult<Nullish<T, R>> {
-    const o = this.options;
+  _parse(input: unknown, ctx: ParseContext): InternalResult<Nullish<T, RequiredOf<O>>> {
+    const o = this.resolve(ctx);
     let value = o.strict ? input : this._preprocess(input);
 
     if (typeof value === "string" && value.trim() === "" && !this.acceptsEmptyString()) {
@@ -110,10 +183,10 @@ export abstract class ConfigurableSchema<T, R extends RequiredOption> extends Sc
           ),
         ]);
       }
-      return ok(value as Nullish<T, R>);
+      return ok(value as Nullish<T, RequiredOf<O>>);
     }
 
-    const result = this._parseValue(value, ctx);
+    const result = this._parseValue(value, ctx, o);
     if (!result.success) {
       return fail(result.issues.map((issue) => this.withLabel(issue, ctx)));
     }
@@ -121,12 +194,12 @@ export abstract class ConfigurableSchema<T, R extends RequiredOption> extends Sc
     const issues = (result.issues ?? []).map((issue) => this.withLabel(issue, ctx));
 
     if (o.refine) {
-      const refined = o.refine(result.data);
+      const refined = o.refine(result.data, ctx);
       for (const item of refined ? (Array.isArray(refined) ? refined : [refined]) : []) {
         issues.push(
           this.withLabel(
             {
-              path: ctx.path,
+              path: item.path == null ? ctx.path : [...ctx.path, ...item.path],
               type: item.type ?? "error",
               code: item.code,
               key: item.key ?? `${this.typeName}.${item.code}`,
@@ -139,6 +212,6 @@ export abstract class ConfigurableSchema<T, R extends RequiredOption> extends Sc
     }
 
     if (hasErrorSeverity(issues)) return fail(issues);
-    return ok(result.data as unknown as Nullish<T, R>, issues);
+    return ok(result.data as unknown as Nullish<T, RequiredOf<O>>, issues);
   }
 }

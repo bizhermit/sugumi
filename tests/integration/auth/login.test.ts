@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
-import { createAccount, USERNAME_MAX_LENGTH } from "../../../src/features/auth/accounts.ts";
-import { PASSWORD_MAX_LENGTH } from "../../../src/features/auth/password.ts";
+import { password, username } from "../../../src/features/auth/_shared/account.ts";
+import { createAccount } from "../../../src/features/auth/accounts.ts";
 import type { DataBase } from "../../../src/lib/db.ts";
 import { deleteAccounts, deleteAddressFailures, prepareTestDb } from "../helpers/db.ts";
 import { startTestServer, type TestServer } from "../helpers/server.ts";
@@ -102,9 +102,9 @@ describe("login", () => {
 
   for (const [label, fields] of [
     ["ユーザー名が空", { username: "", password: PASSWORD }],
-    ["ユーザー名が最大文字数を超える", { username: "u".repeat(USERNAME_MAX_LENGTH + 1), password: PASSWORD }],
+    ["ユーザー名が最大文字数を超える", { username: "u".repeat(username.options.maxLength + 1), password: PASSWORD }],
     ["パスワードが空", { username: USERNAME, password: "" }],
-    ["パスワードが最大文字数を超える", { username: USERNAME, password: "p".repeat(PASSWORD_MAX_LENGTH + 1) }],
+    ["パスワードが最大文字数を超える", { username: USERNAME, password: "p".repeat(password.options.maxLength + 1) }],
   ] as const) {
     it(`${label}なら400を返し、文言付きでログイン画面を表示する`, async () => {
       const csrf = await getCsrfToken();
@@ -122,7 +122,7 @@ describe("login", () => {
     const res = await post(
       "/login",
       { csrf },
-      { _csrf: csrf, username: LENGTH_CHECK_USERNAME, password: "👨‍👩‍👧‍👦".repeat(PASSWORD_MAX_LENGTH) },
+      { _csrf: csrf, username: LENGTH_CHECK_USERNAME, password: "👨‍👩‍👧‍👦".repeat(password.options.maxLength) },
       LENGTH_CHECK_ADDRESS,
     );
     assert.equal(res.status, 401);

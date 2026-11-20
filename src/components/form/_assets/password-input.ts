@@ -1,5 +1,4 @@
-const password = document.querySelector<HTMLInputElement>(`input[name="password"`);
-if (password) {
+for (const password of document.querySelectorAll<HTMLInputElement>('input[type="password"]')) {
   const toggle = document.createElement("button");
   toggle.type = "button";
   toggle.textContent = "パスワードを表示";

@@ -6,6 +6,7 @@ import * as authMiddleware from "./features/auth/middleware.ts";
 import * as home from "./features/user/home.tsx";
 import * as settings from "./features/user/settings.tsx";
 import * as user from "./features/user/index.tsx";
+import * as password from "./features/user/password.tsx";
 import { userLayout } from "./features/user/layout.tsx";
 import { rootLayout } from "./features/layout.tsx";
 import * as logout from "./features/auth/logout.tsx";
@@ -37,6 +38,10 @@ export const routes = layout(rootLayout, {
       ...prefix("/user", {
         "/": {
           GET: user.get,
+        },
+        "/password": {
+          GET: password.get,
+          POST: password.post,
         },
       }),
     }),
