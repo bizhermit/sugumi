@@ -14,7 +14,7 @@ import {
   toDateInputValue,
   toDateTimeInputValue,
   toTimeInputValue,
-} from "../../../src/lib/date.ts";
+} from "../../../../src/lib/_shared/date.ts";
 
 describe("アプリのタイムゾーン", () => {
   it("既定はAsia/Tokyoで、設定すれば変わる。不正なIDは例外とする", (t) => {

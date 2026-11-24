@@ -11,7 +11,7 @@ import {
   getDefaultMessages,
   resolveLabel,
   resolveLabels,
-} from "../../../../src/lib/schema/index.ts";
+} from "../../../../../src/lib/_shared/schema/index.ts";
 
 describe("メッセージ", () => {
   afterEach(() => {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatNumber, parseNumber } from "../../../src/lib/number.ts";
+import { formatNumber, parseNumber } from "../../../../src/lib/_shared/number.ts";
 
 describe("parseNumber", () => {
   it("10進の数字を数値に変換する", () => {

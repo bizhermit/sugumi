@@ -5,6 +5,6 @@
     "types": [],
     "noEmit": true
   },
-  "include": ["src/features/**/_assets", "src/components/**/_assets"],
+  "include": ["src/features/**/_client", "src/components/**/_client"],
   "exclude": []
 }

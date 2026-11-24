@@ -1,5 +1,5 @@
 import type { Html } from "#jsx/jsx-runtime";
-import type { FormErrors } from "../../web/form.ts";
+import type { FormErrors } from "../../web/_shared/form.ts";
 
 type Props = {
   readonly errors: FormErrors | undefined;

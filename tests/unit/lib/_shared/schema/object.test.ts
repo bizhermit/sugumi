@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { s, type Infer } from "../../../../src/lib/schema/index.ts";
+import { s, type Infer } from "../../../../../src/lib/_shared/schema/index.ts";
 
 describe("object", () => {
   const user = s.object(

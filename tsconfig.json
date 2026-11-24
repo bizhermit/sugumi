@@ -19,5 +19,5 @@
     "skipLibCheck": true
   },
   "include": ["src", "scripts", "tests"],
-  "exclude": ["src/**/_assets"]
+  "exclude": ["src/**/_client"]
 }

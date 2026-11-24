@@ -9,7 +9,7 @@ import { createAccount } from "../src/features/auth/accounts.ts";
 import { loadConfig } from "../src/lib/config.ts";
 import { createDb } from "../src/lib/db.ts";
 import { createLogger } from "../src/lib/logger.ts";
-import { formatIssue, jaFormMessages, type Schema } from "../src/lib/schema/index.ts";
+import { formatIssue, jaFormMessages, type Schema } from "../src/lib/_shared/schema/index.ts";
 
 function parseOrExit<T>(schema: Schema<T>, input: string | undefined): T {
   const result = schema.safeParse(input);

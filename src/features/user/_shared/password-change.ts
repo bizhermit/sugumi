@@ -1,4 +1,4 @@
-import { jaFormMessages, s, type MessageDictionary } from "../../../lib/schema/index.ts";
+import { jaFormMessages, s, type MessageDictionary } from "../../../lib/_shared/schema/index.ts";
 import { newPassword, password } from "../../auth/_shared/account.ts";
 
 export const passwordChangeSchema = s.object(

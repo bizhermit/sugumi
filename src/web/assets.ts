@@ -98,8 +98,8 @@ export function serveAsset(req: Request, url: URL): Response {
 /**
  * ページから読み込むアセットのURLを返す。
  *
- * const style = asset(import.meta.resolve("./_assets/style.css"));
- * const script = asset(import.meta.resolve("./_assets/script.ts"));
+ * const style = asset(import.meta.resolve("./_client/style.css"));
+ * const script = asset(import.meta.resolve("./_client/script.ts"));
  */
 export function asset(file: string, options: AssetOptions = {}): string {
   const path = fileURLToPath(file);
@@ -110,7 +110,7 @@ export function asset(file: string, options: AssetOptions = {}): string {
   const name = relative(SRC_DIR, path)
     .split(sep)
     .join("/")
-    .replace(/(^|\/)_assets\//, "$1")
+    .replace(/(^|\/)_client\//, "$1")
     .replace(/\.ts$/, ".js");
   const found = assets.get(name);
   if (found == null) {

@@ -1,4 +1,4 @@
-import { s } from "../../../lib/schema/index.ts";
+import { s } from "../../../lib/_shared/schema/index.ts";
 
 export const username = s.string({ required: true, maxLength: 64, label: "ユーザー" });
 export const displayName = s.string({ required: true, label: "表示名" });

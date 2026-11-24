@@ -2,12 +2,12 @@ import { globSync } from "node:fs";
 import { build } from "esbuild";
 import { relative } from "node:path";
 
-const entryPoints = globSync(["src/features/**/_assets/*.{ts,css}", "src/components/**/_assets/*.{ts,css}"]).map(
+const entryPoints = globSync(["src/features/**/_client/*.{ts,css}", "src/components/**/_client/*.{ts,css}"]).map(
   (file) => {
     return {
       in: file,
       out: relative("src", file)
-        .replace(/(^|\/)_assets\//, "$1")
+        .replace(/(^|\/)_client\//, "$1")
         .replace(/\.(ts|css)$/, ""),
     };
   },
@@ -25,12 +25,8 @@ const result = await build({
   logLevel: "info",
 });
 
-// src/libのうち許可するのは、サーバーに依存しないファイルだけ。
-const CLIENT_DIRECTORY = /(^|\/)_(?:assets|shared)\//;
-const CLIENT_LIB = ["src/lib/schema/", "src/lib/string.ts", "src/lib/number.ts", "src/lib/date.ts"];
-const violations = Object.keys(result.metafile.inputs).filter(
-  (input) => !CLIENT_DIRECTORY.test(input) && !CLIENT_LIB.some((path) => input.startsWith(path)),
-);
+const CLIENT_DIRECTORY = /(^|\/)_(?:client|shared)\//;
+const violations = Object.keys(result.metafile.inputs).filter((input) => !CLIENT_DIRECTORY.test(input));
 
 if (violations.length > 0) {
   console.error(`対象外のファイルがバンドルに含まれています:\n${violations.join("\n")}`);

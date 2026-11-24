@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { s, walk, type Infer, type Schema } from "../../../../src/lib/schema/index.ts";
+import { s, walk, type Infer, type Schema } from "../../../../../src/lib/_shared/schema/index.ts";
 
 describe("intersection", () => {
   const hasId = s.object({ id: s.number({ required: true }) }, { required: true });

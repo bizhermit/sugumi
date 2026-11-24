@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { graphemeLength, toHalfWidth, toHyphen } from "../../../src/lib/string.ts";
+import { graphemeLength, toHalfWidth, toHyphen } from "../../../../src/lib/_shared/string.ts";
 
 describe("graphemeLength", () => {
   it("絵文字（サロゲートペア、ZWJ）と結合文字を1文字に数える", () => {

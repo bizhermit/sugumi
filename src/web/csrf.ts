@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { hostCookie, readCookie } from "./cookie.ts";
 import { slot } from "./slot.ts";
+import { CSRF_FIELD_NAME } from "./_shared/csrf.ts";
 
 /**
  * CSRF対策は二段構え。ルートの処理前に両方実行する。
@@ -11,7 +12,6 @@ import { slot } from "./slot.ts";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const COOKIE_NAME = "csrf";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/; // 32バイトのbase64url
-export const CSRF_FIELD_NAME = "_csrf";
 
 export const csrfSlot = slot<string>("csrf");
 

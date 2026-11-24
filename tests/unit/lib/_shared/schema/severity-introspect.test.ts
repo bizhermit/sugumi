@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { Schema, s, walk, type FieldInfo } from "../../../../src/lib/schema/index.ts";
-import { fail, ok, type InternalResult } from "../../../../src/lib/schema/error.ts";
-import type { ParseContext } from "../../../../src/lib/schema/types.ts";
+import { Schema, s, walk, type FieldInfo } from "../../../../../src/lib/_shared/schema/index.ts";
+import { fail, ok, type InternalResult } from "../../../../../src/lib/_shared/schema/error.ts";
+import type { ParseContext } from "../../../../../src/lib/_shared/schema/types.ts";
 
 /** 成功にwarningを添える独自スキーマ。 */
 class WarnOnEmptyString extends Schema<string> {

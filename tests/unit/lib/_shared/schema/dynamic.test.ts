@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { s, type Infer } from "../../../../src/lib/schema/index.ts";
+import { s, type Infer } from "../../../../../src/lib/_shared/schema/index.ts";
 
 // 値の型が意図せず広がる（省略ありになる）退行を、コンパイルで止めるための型。
 type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;

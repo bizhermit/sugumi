@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { s, type StringType } from "../../../../src/lib/schema/index.ts";
+import { s, type StringType } from "../../../../../src/lib/_shared/schema/index.ts";
 
 describe("string", () => {
   it("指定しなければ任意。undefinedもnullも通る", () => {

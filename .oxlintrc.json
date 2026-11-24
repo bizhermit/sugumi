@@ -60,7 +60,7 @@
       }
     },
     {
-      "files": ["src/lib/schema/**"],
+      "files": ["src/lib/_shared/schema/**"],
       "rules": {
         "no-underscore-dangle": "off",
         "typescript/no-explicit-any": "off",

@@ -1,4 +1,4 @@
-import { s } from "../../../lib/schema/index.ts";
+import { s } from "../../../lib/_shared/schema/index.ts";
 import { password, username } from "./account.ts";
 
 export const RETURN_TO_PARAM_NAME = "to";

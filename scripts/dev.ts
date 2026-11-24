@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { watch } from "node:fs";
+import { rmSync, watch } from "node:fs";
 
 const BUILDS = [
   ["node_modules/.bin/tsc", "-p", "tsconfig.build.json"],
@@ -14,6 +14,8 @@ function build(): boolean {
   return true;
 }
 
+// 起動時に前回の出力を消す。tsc は移動や削除したファイルの出力を消さないため。
+rmSync("dist", { recursive: true, force: true });
 if (!build()) {
   process.exit(1);
 }

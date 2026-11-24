@@ -5,8 +5,8 @@ import type { HtmlElements } from "../../web/html-attributes.ts";
 type Props = Omit<HtmlElements["input"], "type">;
 
 const ASSETS = {
-  styles: [asset(import.meta.resolve("./_assets/password-input.css"))],
-  scripts: [asset(import.meta.resolve("./_assets/password-input.ts"))],
+  styles: [asset(import.meta.resolve("./_client/password-input.css"))],
+  scripts: [asset(import.meta.resolve("./_client/password-input.ts"))],
 };
 
 /** パスワードの入力欄。JSが有効なら表示切り替えのボタンが付く。 */

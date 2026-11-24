@@ -4,7 +4,8 @@ import { PasswordInput } from "../../components/form/password-input.tsx";
 import { asset } from "../../web/assets.ts";
 import { appSlot } from "../../web/context.ts";
 import { createCsrfCookie, createCsrfToken } from "../../web/csrf.ts";
-import { formSlot, inputAttributes, validateForm, type FormErrors } from "../../web/form.ts";
+import { validateForm, type FormErrors } from "../../web/_shared/form.ts";
+import { formSlot, inputAttributes } from "../../web/form.ts";
 import { Page, page } from "../../web/html-document.tsx";
 import { remoteAddressSlot } from "../../web/remote-address.ts";
 import { loginSchema, RETURN_TO_PARAM_NAME } from "./_shared/login.ts";
@@ -13,7 +14,7 @@ import { deviceCookie, readDeviceToken, readUserAgent } from "./login-devices.ts
 import { DEFAULT_RETURN_PATH, toReturnPath } from "./return-to.ts";
 import { createSession, deleteSession, findSession, sessionCookie } from "./session.ts";
 
-const styles = [asset(import.meta.resolve("./_assets/login.css"))];
+const styles = [asset(import.meta.resolve("./_client/login.css"))];
 
 type LoginPageOptions = {
   readonly username?: string;

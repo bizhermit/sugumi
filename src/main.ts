@@ -4,8 +4,8 @@ import { ConfigError, loadConfig } from "./lib/config.ts";
 import { createLogger } from "./lib/logger.ts";
 import { routes } from "./routes.ts";
 import { createDb } from "./lib/db.ts";
-import { setAppTimeZone } from "./lib/date.ts";
-import { jaMessages, setDefaultMessages } from "./lib/schema/message.ts";
+import { setAppTimeZone } from "./lib/_shared/date.ts";
+import { jaMessages, setDefaultMessages } from "./lib/_shared/schema/message.ts";
 
 function loadConfigOrExit() {
   try {

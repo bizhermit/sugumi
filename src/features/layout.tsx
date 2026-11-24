@@ -3,8 +3,8 @@ import type { Layout } from "../web/html-document.tsx";
 
 const rootLayout: Layout = {
   title: "WebAPP",
-  styles: [asset(import.meta.resolve("./_assets/global.css"))],
-  scripts: [asset(import.meta.resolve("./_assets/index.ts"))],
+  styles: [asset(import.meta.resolve("./_client/global.css"))],
+  scripts: [asset(import.meta.resolve("./_client/index.ts"))],
 };
 
 export { rootLayout };
