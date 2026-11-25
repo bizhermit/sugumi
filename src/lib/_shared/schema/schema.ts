@@ -48,8 +48,8 @@ export function allowsNull(required: RequiredOption | undefined): boolean {
 
 type DynamicFunction = (ctx: ParseContext) => unknown;
 
-// 派生した options の型は「書いた型 & Dynamic<...>」になり、TS がそれを `true & 関数` のような
-// 実在しない型を含む union に展開する。関数の型を取り除いてから判定しないと、required が boolean に広がる。
+// pick や partial で派生した options は `Omit<O, ...> & CommonOptions` になり、TS がそれを `true & 関数` のような
+// 実在しない型を含む union に展開する。また関数は object に含まれるため、先に取り除かないと動的な required が必須として扱われる。
 type StaticRequired<R> = Exclude<R, DynamicFunction>;
 
 /**

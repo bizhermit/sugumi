@@ -22,6 +22,17 @@ describe("createApp", () => {
     assert.equal(await res.text(), "OK");
   });
 
+  it("[GET] /healthz : CSRF Cookieを発行しない", async () => {
+    const res = await fetch(`${server.baseUrl}/healthz`);
+    assert.equal(res.headers.getSetCookie().length, 0);
+  });
+
+  it("[GET] /login : CSRF Cookieを発行する", async () => {
+    const res = await fetch(`${server.baseUrl}/login`);
+    assert.equal(res.status, 200);
+    assert.ok(res.headers.getSetCookie().some((cookie) => cookie.startsWith("__Host-csrf=")));
+  });
+
   it("[GET] / : 302 → /login", async () => {
     const res = await fetch(`${server.baseUrl}/`, { redirect: "manual" });
     assert.equal(res.status, 302);

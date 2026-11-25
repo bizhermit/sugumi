@@ -54,9 +54,11 @@ export class ObjectSchema<S extends Shape, const O extends CommonOptions<any> = 
 
     for (const key of Object.keys(this.shape)) {
       const fieldSchema = this.shape[key]!;
-      const result = fieldSchema._parse(record[key], { ...ctx, path: [...ctx.path, key] });
+      // プロトタイプ鎖の値（constructor など）を項目の値として読まない。
+      const has = Object.hasOwn(record, key);
+      const result = fieldSchema._parse(has ? record[key] : undefined, { ...ctx, path: [...ctx.path, key] });
       if (result.success) {
-        if (result.data !== undefined || key in record) output[key] = result.data;
+        if (result.data !== undefined || has) output[key] = result.data;
         if (result.issues?.length) issues.push(...result.issues);
       } else {
         issues.push(...result.issues);

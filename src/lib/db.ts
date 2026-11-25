@@ -27,11 +27,16 @@ export async function transaction<T>(db: DataBase, fn: (client: PoolClient) => P
     await client.query("BEGIN");
     const result = await fn(client);
     await client.query("COMMIT");
+    client.release();
     return result;
   } catch (err) {
-    await client.query("ROLLBACK");
+    try {
+      await client.query("ROLLBACK");
+      client.release();
+    } catch {
+      // ROLLBACK できない接続は壊れているのでプールに戻さず捨てる。投げるのは元の例外。
+      client.release(true);
+    }
     throw err;
-  } finally {
-    client.release();
   }
 }

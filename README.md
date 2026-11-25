@@ -35,25 +35,29 @@ Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレー�
 ├── src/
 │   ├── main.ts         起動コード。設定とロガーを作ってサーバーを立てる
 │   ├── routes.ts       URLとハンドラの対応表。全ルートをここに明示する
-│   ├── lib/            HTTPに依存しない共通処理（config, logger）
+│   ├── lib/            HTTPに依存しない共通処理（config, logger, db）
+│   │   └── _shared/        サーバーとブラウザの両方で使う処理（schema, date, string, number, email）
 │   ├── web/            HTTPの仕組み。アプリ固有の処理は置かない
 │   │   ├── app.ts              リクエストの受付、ルーティング、アクセスログ、エラー処理
 │   │   ├── routes.ts           ルート表の型とprefix/middleware/layout
 │   │   ├── html-document.tsx   Page/LayoutとHTML文書の生成
 │   │   ├── jsx-runtime.ts      JSXをHTMLへ文字列変換（エスケープ、className、Assetsの収集）
 │   │   ├── html-attributes.ts  HTML要素の属性の型
-│   │   ├── assets.ts           アセット（_assets/）のビルド結果の配信と設定
+│   │   ├── assets.ts           アセット（_client/）のビルド結果の配信と設定
 │   │   ├── static.ts           静的リソース（static/）の配信
 │   │   ├── security-headers.ts 全レスポンスに付けるセキュリティヘッダ
 │   │   ├── slot.ts             middlewareから下層へ値を渡す仕組み
-│   │   └── context.ts          AppContext（loggerなど、全体で共有するもの）
+│   │   ├── context.ts          AppContext（loggerなど、全体で共有するもの）
+│   │   ├── csrf.ts             CSRF対策
+│   │   ├── form.ts             フォームの読み取りとHTML属性への展開
+│   │   └── _shared/            サーバーとブラウザの両方で使うフォーム検証
 │   ├── components/     画面部品。featureをまたいで使用するJSXの部品
 │   │   └── form/
 │   │       ├── form.tsx
-│   │       └── _assets/        部品のCSS/ClientJS
+│   │       └── _client/        部品のCSS/ClientJS
 │   └── features/       機能部品。機能ごとにディレクトリを切る
 │       ├── layout.tsx          全画面共通のレイアウト
-│       ├── _assets/            全画面共通のCSS/ClientJS
+│       ├── _client/            全画面共通のCSS/ClientJS
 │       ├── auth/               認証関連
 │       └── user/               認証後の画面
 ├── static/             静的リソース（favicon.ico, robots.txt）

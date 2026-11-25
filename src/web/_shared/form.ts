@@ -7,6 +7,7 @@ import {
   type Issue,
   type MessageDictionary,
   type ObjectSchema,
+  type ParseOptions,
   type Shape,
 } from "../../lib/_shared/schema/index.ts";
 import { CSRF_FIELD_NAME } from "./csrf.ts";
@@ -46,12 +47,8 @@ export function formToObject<S extends Shape, O extends CommonOptions<InferShape
   return values;
 }
 
-export type ValidateFormOptions = {
+export type ValidateFormOptions = ParseOptions & {
   readonly messages?: MessageDictionary;
-  /**
-   * 動的な制約と refine に ctx.data として渡す。
-   */
-  readonly data?: Readonly<Record<string, unknown>> | undefined;
 };
 
 export function validateForm<S extends Shape, O extends CommonOptions<InferShape<S>>>(

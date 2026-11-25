@@ -10,7 +10,7 @@ body {
   padding: 1rem;
 }
 
-/* aria-busy は、prevent-double-submit.ts が送信中のフォームに付ける。 */
+/* aria-busy は、components/form/_client/form.ts が送信中のフォームに付ける。 */
 form[aria-busy="true"] button {
   cursor: progress;
   opacity: 0.6;

@@ -27,6 +27,17 @@ describe("object", () => {
     assert.deepEqual(user.parse({ id: 1, name: "Alice", _csrf: "x" }), { id: 1, name: "Alice" });
   });
 
+  it("項目名がプロトタイプのプロパティ名でも、入力に無ければ無いものとして扱う", () => {
+    const schema = s.object({ constructor: s.string(), toString: s.string({ required: true }) }, { required: true });
+    assert.deepEqual(schema.parse({ constructor: "x", toString: "y" }), { constructor: "x", toString: "y" });
+    const result = schema.safeParse({});
+    assert.ok(!result.success);
+    assert.deepEqual(
+      result.error.issues.map((issue) => issue.path),
+      [["toString"]],
+    );
+  });
+
   it("不正なフィールド全部のissueをpath付きで集める", () => {
     const result = user.safeParse({ id: "x", name: "" });
     assert.ok(!result.success);

@@ -64,7 +64,8 @@ async function main() {
   try {
     await migrate(db, migrations);
   } catch (err) {
-    await db.query("ROLLBACK");
+    // ROLLBACK の失敗で元の例外を隠さない。
+    await db.query("ROLLBACK").catch(() => {});
     throw err;
   } finally {
     await db.end();

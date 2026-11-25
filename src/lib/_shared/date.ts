@@ -3,7 +3,7 @@
  * - PlainDate: 日付のみ
  * - PlainTime: 時刻のみ
  * 計算と整形はサーバーだけで行い、ブラウザには文字列を渡す。
- * Safariの安定版はTemporalに未対応のため（2026-10時点）。
+ * Safariの安定版はTemporalに未対応だが、対応が遅いSafariが悪い（2026-11時点）。
  */
 
 let appTimeZone = "Asia/Tokyo";

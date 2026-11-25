@@ -115,8 +115,8 @@ describe("number", () => {
   });
 
   it("NaN/Infinity/数値にできない文字列は拒否する", () => {
-    assert.throws(() => s.number({ required: true }).parse(Number.NaN));
-    assert.throws(() => s.number({ required: true }).parse(Number.POSITIVE_INFINITY));
+    assert.throws(() => s.number({ required: true }).parse(Number.NaN), /Expected number/);
+    assert.throws(() => s.number({ required: true }).parse(Number.POSITIVE_INFINITY), /Expected number/);
     assert.throws(() => s.number({ required: true }).parse("not-a-number"), /Expected number/);
   });
 
@@ -269,7 +269,7 @@ describe("datetime", () => {
     assert.equal(schema.safeParse("2024-01-15T09:00").success, true);
     const result = schema.safeParse("2024-01-15T08:59");
     assert.ok(!result.success);
-    assert.deepEqual(result.error.issues[0]?.params, { min: "2024-01-15T09:00" });
+    assert.deepEqual(result.error.issues[0]?.params, { min: "2024-01-15T09:00:00" });
   });
 
   it("min/maxで別のタイムゾーンが指定されていた場合でも、メッセージはスキーマのタイムゾーンを出力する", () => {
@@ -278,7 +278,7 @@ describe("datetime", () => {
     assert.equal(schema.safeParse("2024-01-15T09:00").success, true);
     const result = schema.safeParse("2024-01-15T08:59");
     assert.ok(!result.success);
-    assert.deepEqual(result.error.issues[0]?.params, { min: "2024-01-15T09:00" });
+    assert.deepEqual(result.error.issues[0]?.params, { min: "2024-01-15T09:00:00" });
   });
 
   it("timeZoneに存在しないIDを指定すると、スキーマを作る時点でRangeErrorになる", () => {
@@ -307,6 +307,12 @@ describe("time", () => {
     assert.equal(schema.safeParse("08:59").success, false);
     assert.equal(schema.safeParse("18:00").success, true);
     assert.equal(schema.safeParse("18:01").success, false);
+  });
+
+  it("min/maxの文言は秒を落とさない", () => {
+    const result = s.time({ min: Temporal.PlainTime.from("09:30:30") }).safeParse("09:30:10");
+    assert.ok(!result.success);
+    assert.deepEqual(result.error.issues[0]?.params, { min: "09:30:30" });
   });
 });
 

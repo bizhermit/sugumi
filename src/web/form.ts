@@ -57,7 +57,7 @@ export async function readForm(req: Request, options: ReadFormOptions = {}): Pro
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BODY_BYTES;
   const contentType = req.headers.get("content-type") ?? "";
   if (!FORM_TYPE.test(contentType)) {
-    throw new HttpError(415, `フォームではないContent-Typeです: ${contentType}`);
+    throw new HttpError(415, "フォームではないContent-Typeです。");
   }
   if (Number(req.headers.get("content-length")) > maxBytes) {
     throw new HttpError(413, "リクエストボディが上限を超えています。");

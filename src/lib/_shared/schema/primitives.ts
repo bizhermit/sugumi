@@ -1,13 +1,5 @@
-import {
-  assertTimeZone,
-  getAppTimeZone,
-  fromDate,
-  parseDate,
-  parseDateTime,
-  parseTime,
-  toDateTimeInputValue,
-  toTimeInputValue,
-} from "../date.ts";
+import { assertTimeZone, getAppTimeZone, fromDate, parseDate, parseDateTime, parseTime } from "../date.ts";
+import { isEmail } from "../email.ts";
 import { parseNumber } from "../number.ts";
 import { graphemeLength, toHalfWidth, toHyphen } from "../string.ts";
 import { fail, ok, type InternalResult } from "./error.ts";
@@ -16,104 +8,6 @@ import type { Dynamic, Issue, ParseContext } from "./types.ts";
 import { typeOf } from "./types.ts";
 
 export type StringType = "email" | "tel" | "url";
-
-function isIpv4Address(value: string): boolean {
-  const s = value.split(".");
-  if (s.length !== 4) return false;
-  for (const numStr of s) {
-    if (!/^(0|[1-9]\d{0,2})$/.test(numStr)) return false;
-    const num = Number(numStr);
-    if (num < 0 || num > 255) return false;
-  }
-  return true;
-}
-
-function isEmail(value: string): boolean {
-  if (!value) return false;
-  let quoted = false,
-    escape = false;
-  const arr = Array.from(value);
-  for (let i = 0, il = arr.length; i < il; i++) {
-    const c = arr[i] ?? "";
-    if ("@" === c && !quoted) {
-      // console.log("local:", str.slice(0, i));
-      if (i < 1 || i > 64) {
-        // console.log("[x] local len", i, str);
-        return false;
-      }
-      if ("." === arr[i - 1]) {
-        // console.log("[x] local-part dot end", str);
-        return false;
-      }
-      // domain
-      const domain = arr.slice(i + 1).join("");
-      // console.log("domain:", domain);
-      if (domain.length > 253 || domain.split(".").some((label) => label.length > 63)) {
-        // console.log("[x] domain len", strLength(domain), str);
-        return false;
-      }
-      const ctx = domain.match(
-        /^(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:\[((?:[0-9]{1,3}\.){3}[0-9]{1,3})\])|(?:((?:[0-9]{1,3}\.){3}[0-9]{1,3}))|(?:\[(?:IPv6:[a-fA-F0-9:]+\])))$/,
-      );
-      if (!ctx) {
-        // console.log("[x] un domain", str);
-        return false;
-      }
-      const ipv4 = ctx[1] ?? ctx[2];
-      if (ipv4) return isIpv4Address(ipv4);
-      return true;
-    }
-    // local
-    if (('"' === c || "”" === c) && !escape) {
-      if (quoted) {
-        const next = arr[i + 1];
-        if ("." !== next && "@" !== next) {
-          // console.log("[x] quote not end of part", `[${str[i - 1]}${c}${str[i + 1]}]`, i, str);
-          return false;
-        }
-      } else {
-        const prev = arr[i - 1];
-        if (prev && "." !== prev) {
-          // console.log("[x] quote not start of part", `[${c}]`, i, str);
-          return false;
-        }
-      }
-      quoted = !quoted;
-      continue;
-    }
-    if (quoted) {
-      if (escape) {
-        if (!/[\x01-\x09\x0b\x0c\x0e-\x7f\\ ]/.test(c)) {
-          // console.log("[x] not allow quoted/escape char", `[${c}]`, str);
-          return false;
-        }
-      } else {
-        if ("\\" === c) {
-          escape = true;
-          continue;
-        }
-        if (!/[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f ]/.test(c)) {
-          // console.log("[x] not allow quoted char", `[${c}]`, str);
-          return false;
-        }
-      }
-    } else {
-      if (!/[.a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]/.test(c)) {
-        // console.log("[x] not allow char", `[${c}]`, str);
-        return false;
-      }
-      if ("." === c) {
-        if (i === 0 || "." === value[i - 1]) {
-          // console.log("[x] dot failed", str);
-          return false;
-        }
-      }
-    }
-    escape = false;
-  }
-  // console.log("[x] no domain", str);
-  return false;
-}
 
 const TEL_PATTERN = /^(?=.*\d)\+?[\d\-() ]+$/; // 国ごとに形式が異なるため、固定パターンは寛容とする
 
@@ -471,7 +365,7 @@ export class DateTimeSchema<const O extends DateTimeOptions = {}> extends Config
         type: "error",
         code: "min",
         key: "datetime.min",
-        params: { min: toDateTimeInputValue(o.min.withTimeZone(this.timeZone)) },
+        params: { min: o.min.withTimeZone(this.timeZone).toPlainDateTime().toString() },
       });
     }
     if (o.max != null && Temporal.ZonedDateTime.compare(value, o.max) > 0) {
@@ -480,7 +374,7 @@ export class DateTimeSchema<const O extends DateTimeOptions = {}> extends Config
         type: "error",
         code: "max",
         key: "datetime.max",
-        params: { max: toDateTimeInputValue(o.max.withTimeZone(this.timeZone)) },
+        params: { max: o.max.withTimeZone(this.timeZone).toPlainDateTime().toString() },
       });
     }
 
@@ -534,7 +428,7 @@ export class TimeSchema<const O extends TimeOptions = {}> extends ConfigurableSc
         type: "error",
         code: "min",
         key: "time.min",
-        params: { min: toTimeInputValue(o.min) },
+        params: { min: o.min.toString() },
       });
     }
     if (o.max != null && Temporal.PlainTime.compare(value, o.max) > 0) {
@@ -543,7 +437,7 @@ export class TimeSchema<const O extends TimeOptions = {}> extends ConfigurableSc
         type: "error",
         code: "max",
         key: "time.max",
-        params: { max: toTimeInputValue(o.max) },
+        params: { max: o.max.toString() },
       });
     }
 
