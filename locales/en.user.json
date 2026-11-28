@@ -1,0 +1,21 @@
+{
+  "title": "User",
+  "nav.home": "Home",
+  "nav.user": "User",
+  "nav.settings": "Settings",
+  "nav.password": "Change password",
+  "home.title": "Home",
+  "settings.title": "Settings",
+  "index.title": "Settings",
+  "index.heading": "User settings",
+  "password.title": "Change password",
+  "password.current": "Current password",
+  "password.confirm": "New password (confirmation)",
+  "password.submit": "Change",
+  "password.done": "Your password has been changed.",
+  "password.mismatch": "This does not match the new password",
+  "password.wrong": "The current password is incorrect",
+  "password.wrong_locked": "The current password is incorrect. The account has been locked after repeated failures",
+  "password.locked": "The account is locked. Please try again later",
+  "password.same": "Enter a password different from the current one"
+}

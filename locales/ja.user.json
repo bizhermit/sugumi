@@ -1,0 +1,21 @@
+{
+  "title": "ユーザー",
+  "nav.home": "ホーム",
+  "nav.user": "ユーザー",
+  "nav.settings": "設定",
+  "nav.password": "パスワード変更",
+  "home.title": "ホーム",
+  "settings.title": "設定",
+  "index.title": "設定",
+  "index.heading": "ユーザー設定",
+  "password.title": "パスワード変更",
+  "password.current": "現在のパスワード",
+  "password.confirm": "新しいパスワード（確認）",
+  "password.submit": "変更",
+  "password.done": "パスワードを変更しました。",
+  "password.mismatch": "新しいパスワードと一致しません",
+  "password.wrong": "現在のパスワードが違います",
+  "password.wrong_locked": "現在のパスワードが違います。間違いが続いたため、アカウントをロックしました",
+  "password.locked": "アカウントがロックされています。しばらくしてからやり直してください",
+  "password.same": "現在のパスワードと違うものを入力してください"
+}

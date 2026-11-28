@@ -1,0 +1,10 @@
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.build.json
+!src/
+!locales/
+!static/
+!db/
+!scripts/build-assets.ts

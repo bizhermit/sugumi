@@ -1,0 +1,43 @@
+import { fail, ok, type InternalResult } from "./error.ts";
+import { ConfigurableSchema, type CommonOptions, type Options } from "./schema.ts";
+import type { ParseContext } from "./types.ts";
+
+export class EnumSchema<
+  T extends readonly [string, ...string[]],
+  const O extends CommonOptions<any> = {},
+> extends ConfigurableSchema<T[number], O> {
+  readonly typeName = "enum";
+  readonly values: T;
+  declare readonly options: Options<O, CommonOptions<T[number]>>;
+
+  constructor(values: T, options: O & CommonOptions<T[number]>) {
+    super(options);
+    this.values = values;
+  }
+
+  acceptsEmptyString(): boolean {
+    return this.values.includes("");
+  }
+
+  protected _parseValue(value: unknown, ctx: ParseContext): InternalResult<T[number]> {
+    if (typeof value !== "string" || !this.values.includes(value)) {
+      return fail([
+        {
+          path: ctx.path,
+          type: "error",
+          code: "invalid_enum_value",
+          key: "enum.invalid_enum_value",
+          params: { options: this.values, received: value },
+        },
+      ]);
+    }
+    return ok(value as T[number]);
+  }
+}
+
+export function $enum<T extends readonly [string, ...string[]], const O extends CommonOptions<any> = {}>(
+  values: T,
+  options: O & CommonOptions<T[number]> = {} as O,
+): EnumSchema<T, O> {
+  return new EnumSchema(values, options);
+}

@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "types": [],
+    "noEmit": true
+  },
+  "include": ["src/**/_shared", "src/features/**/_client", "src/components/**/_client", "src/web/**/_client"],
+  "exclude": []
+}
