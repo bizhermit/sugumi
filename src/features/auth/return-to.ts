@@ -1,16 +1,3 @@
-import { RETURN_TO_PARAM_NAME } from "./_shared/login.ts";
-
-export const DEFAULT_RETURN_PATH = "/home";
-
-export function loginPathWithReturnTo(url: URL): string {
-  const returnPath = url.pathname + url.search;
-  if (returnPath === DEFAULT_RETURN_PATH) {
-    return "/login";
-  }
-  const params = new URLSearchParams({ [RETURN_TO_PARAM_NAME]: returnPath });
-  return `/login?${params.toString()}`;
-}
-
 export function toReturnPath(value: string | null | undefined): string | undefined {
   if (value == null || !value.startsWith("/")) {
     return undefined;

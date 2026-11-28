@@ -93,7 +93,7 @@ export class RecordSchema<T, const O extends RecordOptions<T> = {}> extends Conf
   }
 }
 
-export function record<T, const O extends RecordOptions<T> = {}>(
+export function $record<T, const O extends RecordOptions<T> = {}>(
   element: Schema<T>,
   options: O & RecordOptions<T> = {} as O,
 ): RecordSchema<T, O> {

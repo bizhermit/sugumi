@@ -14,6 +14,7 @@ Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレー�
 | `npm run check`       | 型チェック（tsc）を実行する。                                                 |
 | `npm run lint`        | lint（oxlint）を実行する。`npm run lint:fix`で自動修正を実行する。            |
 | `npm run format`      | フォーマット（oxfmt）を実行する。チェックのみの場合は`npm run format:check`。 |
+| `npm run i18n:types`  | 言語リソース（locales/）から文言のキーの型を生成する。                        |
 | `npm run test`        | テストを実行する。                                                            |
 | `npm run build:image` | 本番イメージを作成する。手順は[サーバー](deploy/server/README.md)を参照       |
 
@@ -29,28 +30,27 @@ Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレー�
 │   ├── lb/             リバースプロキシ（nginx）のDockerイメージ
 │   └── server/         自前サーバーでの運用手順とcompose
 ├── scripts/            開発・ビルド用スクリプト
-│   ├── dev.ts          開発サーバー（変更を検知してビルドと再起動）
+│   ├── dev.ts          開発サーバー起動スクリプト
 │   ├── build-assets.ts ブラウザ側のビルド（esbuild）
 │   └── build-image.ts  本番イメージの作成
 ├── src/
-│   ├── main.ts         起動コード。設定とロガーを作ってサーバーを立てる
+│   ├── main.ts         エントリーコード
 │   ├── routes.ts       URLとハンドラの対応表。全ルートをここに明示する
-│   ├── lib/            HTTPに依存しない共通処理（config, logger, db）
-│   │   └── _shared/        サーバーとブラウザの両方で使う処理（schema, date, string, number, email）
+│   ├── lib/            HTTPに依存しない共通処理
+│   │   └── _shared/        サーバーとブラウザの両方で使う処理
 │   ├── web/            HTTPの仕組み。アプリ固有の処理は置かない
 │   │   ├── app.ts              リクエストの受付、ルーティング、アクセスログ、エラー処理
 │   │   ├── routes.ts           ルート表の型とprefix/middleware/layout
 │   │   ├── html-document.tsx   Page/LayoutとHTML文書の生成
-│   │   ├── jsx-runtime.ts      JSXをHTMLへ文字列変換（エスケープ、className、Assetsの収集）
-│   │   ├── html-attributes.ts  HTML要素の属性の型
+│   │   ├── jsx-runtime.ts      JSX変換処理
 │   │   ├── assets.ts           アセット（_client/）のビルド結果の配信と設定
 │   │   ├── static.ts           静的リソース（static/）の配信
 │   │   ├── security-headers.ts 全レスポンスに付けるセキュリティヘッダ
 │   │   ├── slot.ts             middlewareから下層へ値を渡す仕組み
 │   │   ├── context.ts          AppContext（loggerなど、全体で共有するもの）
 │   │   ├── csrf.ts             CSRF対策
-│   │   ├── form.ts             フォームの読み取りとHTML属性への展開
-│   │   └── _shared/            サーバーとブラウザの両方で使うフォーム検証
+│   │   ├── form.ts             フォームの読み取り
+│   │   └── _shared/            サーバーとブラウザの両方で使うフォーム検証、HTML属性への展開、HTML要素の属性の型
 │   ├── components/     画面部品。featureをまたいで使用するJSXの部品
 │   │   └── form/
 │   │       ├── form.tsx
@@ -60,6 +60,7 @@ Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレー�
 │       ├── _client/            全画面共通のCSS/ClientJS
 │       ├── auth/               認証関連
 │       └── user/               認証後の画面
+├── locales/            言語リソース（<lang>.json, <lang>.<addon>.json）
 ├── static/             静的リソース（favicon.ico, robots.txt）
 ├── tests/              テスト。src/と同じ構成にする
 └── dist/               ビルド結果（git 管理外）
@@ -69,6 +70,13 @@ Node.js + TypeScript + PostgreSQL のWebアプリケーションテンプレー�
 
 - 依存の向きは `features → components → web → lib` の一方向のみ許可。逆向きにimportしない。featuresからweb,lib、componentsからlibの直接使用も可。
 - `asset()`はモジュールの先頭で呼び、起動時に解決させる。
+- コードの置き場所は、どこで動かしてよいかで決める。
+  - `_client/`: ブラウザで使用するもの（DOM操作、リアルタイムバリデーション等）。公開される。importしてよいのは`_client/`と`_shared/`のもののみ。
+  - `_shared/`: サーバーとブラウザの両方で使用するもの。公開される前提。importしてよいのは`_shared/`のもののみ。
+  - `_client/`にも`_shared/`にも属さない: サーバーで動かすもの。公開されない。`_client/`のものはimportしてはならない。
+    - DBアクセス、環境変数の読み取り、Node.jsのAPIを使用するもの
+    - セキュリティ・認証周りのもの
+    - リクエスト処理の部品
 
 ## 規約
 

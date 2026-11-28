@@ -1,5 +1,5 @@
 import type { Assets } from "./assets.ts";
-import type { HtmlElements } from "./html-attributes.ts";
+import type { HtmlElements } from "./_shared/html-attributes.ts";
 
 const NO_ASSETS: readonly Assets[] = [];
 

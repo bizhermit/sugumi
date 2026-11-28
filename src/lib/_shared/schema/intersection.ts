@@ -32,7 +32,7 @@ export class IntersectionSchema<T extends Members, const O extends CommonOptions
   }
 }
 
-export function intersection<T extends Members, const O extends CommonOptions<any> = {}>(
+export function $intersection<T extends Members, const O extends CommonOptions<any> = {}>(
   members: T,
   options: O & CommonOptions<IntersectionOutput<T>> = {} as O,
 ): IntersectionSchema<T, O> {

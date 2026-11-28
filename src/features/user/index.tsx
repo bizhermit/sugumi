@@ -1,12 +1,15 @@
 import { page } from "../../web/html-document.tsx";
+import { i18nSlot } from "../../web/i18n.ts";
 
-function get() {
+function get(req: Request) {
+  const { t } = i18nSlot.get(req);
+
   return page({
-    title: (outer) => `${outer} | 設定`,
+    title: (outer) => `${outer} | ${t("user.index.title")}`,
     slots: {
       main: (
         <>
-          <h1>ユーザー設定</h1>
+          <h1>{t("user.index.heading")}</h1>
         </>
       ),
     },

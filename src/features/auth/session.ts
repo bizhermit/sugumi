@@ -50,6 +50,21 @@ WHERE
   sessions.token_hash = $1
 `;
 
+const DELETE_SESSION_BY_TOKEN_HASH_SQL = `
+DELETE FROM sessions
+WHERE
+  token_hash = $1
+`;
+
+const UPDATE_SESSION_EXPIRED_SQL = `
+UPDATE
+  sessions
+SET
+  last_access_at = $1
+WHERE
+  token_hash = $2
+`;
+
 export async function findSession(db: DataBase, limits: SessionLimits, req: Request): Promise<Session | undefined> {
   const token = readCookie(req, COOKIE_NAME);
   if (token == null || !TOKEN_PATTERN.test(token)) return undefined;
@@ -59,11 +74,11 @@ export async function findSession(db: DataBase, limits: SessionLimits, req: Requ
   if (row == null) return undefined;
   const now = Date.now();
   if (isExpired(limits, row, now)) {
-    await db.query("DELETE FROM sessions WHERE token_hash = $1", [tokenHash]);
+    await db.query(DELETE_SESSION_BY_TOKEN_HASH_SQL, [tokenHash]);
     return undefined;
   }
   if (now - row.last_access_at.getTime() >= TOUCH_INTERVAL_MS) {
-    await db.query("UPDATE sessions SET last_access_at = $1 WHERE token_hash = $2", [new Date(now), tokenHash]);
+    await db.query(UPDATE_SESSION_EXPIRED_SQL, [new Date(now), tokenHash]);
   }
   return { token, account: { id: row.id, username: row.username, displayName: row.display_name } };
 }
@@ -96,12 +111,18 @@ export async function createSession(db: DataBase, limits: SessionLimits, account
 }
 
 export async function deleteSession(db: DataBase, token: string): Promise<void> {
-  await db.query("DELETE FROM sessions WHERE token_hash = $1", [hashToken(token)]);
+  await db.query(DELETE_SESSION_BY_TOKEN_HASH_SQL, [hashToken(token)]);
 }
 
-/** パスワード変更などで、いま使っているセッション以外を失効させる。 */
+const DELETE_SESSION_BY_EXPIRED_ACCOUNT_SQL = `
+DELETE FROM
+  sessions
+WHERE
+      account_id = $1
+  AND token_hash <> $2
+`;
 export async function deleteOtherSessions(db: DataBase, accountId: number, keepToken: string): Promise<void> {
-  await db.query("DELETE FROM sessions WHERE account_id = $1 AND token_hash <> $2", [accountId, hashToken(keepToken)]);
+  await db.query(DELETE_SESSION_BY_EXPIRED_ACCOUNT_SQL, [accountId, hashToken(keepToken)]);
 }
 
 export function hasSessionCookie(req: Request): boolean {

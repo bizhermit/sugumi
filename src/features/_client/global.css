@@ -1,17 +1,39 @@
-:root {
-  color-scheme: light dark;
-  font-family: system-ui, sans-serif;
-  line-height: 1.6;
-}
+@layer base, component;
 
-body {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 1rem;
-}
+@layer base {
+  *,
+  ::before,
+  ::after {
+    box-sizing: border-box;
+    margin: unset;
+  }
 
-/* aria-busy は、components/form/_client/form.ts が送信中のフォームに付ける。 */
-form[aria-busy="true"] button {
-  cursor: progress;
-  opacity: 0.6;
+  [hidden] {
+    display: none !important;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  :root {
+    color-scheme: light dark;
+    font-family: system-ui, sans-serif;
+    line-height: 1.8;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    --font-size-sm: 0.875rem;
+    --font-size-md: 1rem;
+    --font-size-lg: 1.25rem;
+  }
+
+  body {
+    overflow-wrap: anywhere;
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 1rem;
+  }
 }

@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { s, walk, type Infer, type Schema } from "../../../../../src/lib/_shared/schema/index.ts";
+import { $array } from "../../../../../src/lib/_shared/schema/array.ts";
+import { $intersection } from "../../../../../src/lib/_shared/schema/intersection.ts";
+import { walk } from "../../../../../src/lib/_shared/schema/introspect.ts";
+import { $lazy } from "../../../../../src/lib/_shared/schema/lazy.ts";
+import { $object } from "../../../../../src/lib/_shared/schema/object.ts";
+import { $number, $string } from "../../../../../src/lib/_shared/schema/primitives.ts";
+import type { Infer, Schema } from "../../../../../src/lib/_shared/schema/schema.ts";
 
 describe("intersection", () => {
-  const hasId = s.object({ id: s.number({ required: true }) }, { required: true });
-  const hasName = s.object({ name: s.string({ required: true }) }, { required: true });
-  const idAndName = s.intersection([hasId, hasName], { required: true });
+  const hasId = $object({ id: $number({ required: true }) }, { required: true });
+  const hasName = $object({ name: $string({ required: true }) }, { required: true });
+  const idAndName = $intersection([hasId, hasName], { required: true });
   type IdAndName = Infer<typeof idAndName>;
 
   it("合成する各objectの出力を1つにまとめる", () => {
@@ -35,7 +41,7 @@ describe("intersection", () => {
     assert.ok(result.success);
     assert.deepEqual(
       result.issues?.map((issue) => [issue.code, issue.path.join(".")]),
-      [["unknown_key", "extra"]],
+      [["unknown_key", ""]],
     );
     const failed = idAndName.safeParse({ id: 1 });
     assert.ok(!failed.success);
@@ -52,11 +58,11 @@ describe("lazy", () => {
     children: TreeNode[];
   }
 
-  const treeNode: Schema<TreeNode> = s.object(
+  const treeNode: Schema<TreeNode> = $object(
     {
-      value: s.number({ required: true }),
-      children: s.array(
-        s.lazy(() => treeNode),
+      value: $number({ required: true }),
+      children: $array(
+        $lazy(() => treeNode),
         { required: true },
       ),
     },
@@ -82,8 +88,8 @@ describe("lazy", () => {
 
   it("初回利用時に1度だけ解決する", () => {
     let calls = 0;
-    const inner = s.number({ required: true });
-    const wrapped = s.lazy(() => {
+    const inner = $number({ required: true });
+    const wrapped = $lazy(() => {
       calls++;
       return inner;
     });
@@ -98,7 +104,7 @@ describe("lazy", () => {
     const paths = walk(treeNode).map((f) => f.path.join("."));
     assert.deepEqual(paths, ["value", "children"]);
 
-    const wrapped = s.object({ name: s.lazy(() => s.string({ label: "名前" })) });
+    const wrapped = $object({ name: $lazy(() => $string({ label: "名前" })) });
     assert.deepEqual(walk(wrapped)[0]?.options, { label: "名前" });
   });
 });

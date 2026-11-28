@@ -19,6 +19,7 @@ import { HttpError, STATUS_TEXTS } from "./http-error.ts";
 import { pipeline } from "node:stream/promises";
 import { formSlot, readForm } from "./form.ts";
 import { remoteAddressSlot, resolveRemoteAddress } from "./remote-address.ts";
+import { i18nSlot, resolveI18n } from "./i18n.ts";
 
 function run(middleware: readonly Middleware[], handler: RouteHandler, req: Request): Promise<Response> {
   async function dispatch(index: number): Promise<Response> {
@@ -63,7 +64,6 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
   const start = performance.now();
   const url = new URL(req.url ?? "/", "http://localhost");
   const method = req.method ?? "GET";
-  // クエリの値は記録しない。個人情報を含みうるため。
   const requestFields = { method, path: url.pathname, query: [...url.searchParams.keys()] };
   const route = routes[url.pathname];
   const requestId = crypto.randomUUID();
@@ -99,8 +99,8 @@ async function handle(routes: RouteMap, app: AppContext, req: IncomingMessage, r
       csrfSlot.set(request, token);
       remoteAddressSlot.set(request, resolveRemoteAddress(request.headers, req.socket.remoteAddress, app.trustProxy));
       appSlot.set(request, { ...app, logger });
+      i18nSlot.set(request, resolveI18n(request, route.i18n ?? []));
       response = await run(route.middleware ?? [], handler, request);
-      // Cookie はページを返すときだけ発行する。ヘルスチェックのような Cookie を保持しないクライアントに毎回発行しないため。
       if (isNewToken && response.headers.get("content-type")?.startsWith("text/html")) {
         setCookie = createCsrfCookie(token);
       }

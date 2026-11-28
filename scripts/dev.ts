@@ -2,9 +2,11 @@ import { spawn, spawnSync } from "node:child_process";
 import { rmSync, watch } from "node:fs";
 
 const BUILDS = [
+  ["node", "scripts/generate-i18n-types.ts"],
   ["node_modules/.bin/tsc", "-p", "tsconfig.build.json"],
-  ["node", "scripts/build-assets.ts"],
+  ["node", "scripts/build-assets.ts", "--allow-missing-locales"],
 ] as const;
+const WATCH_IGNORE = ["**/i18n-texts.ts"] as const;
 
 function build(): boolean {
   for (const [command, ...args] of BUILDS) {
@@ -14,7 +16,6 @@ function build(): boolean {
   return true;
 }
 
-// 起動時に前回の出力を消す。tsc は移動や削除したファイルの出力を消さないため。
 rmSync("dist", { recursive: true, force: true });
 if (!build()) {
   process.exit(1);
@@ -33,7 +34,7 @@ function rebuild() {
     return;
   }
   building = true;
-  console.log(`${new Date().toLocaleTimeString()} - ファイルの変更を検知しました。ビルドします。`);
+  console.log(`${new Date().toLocaleTimeString()} - rebuild (file changed)`);
   build();
   building = false;
   if (pending) {
@@ -42,10 +43,12 @@ function rebuild() {
   }
 }
 
-watch("src", { recursive: true }, () => {
-  clearTimeout(timer);
-  timer = setTimeout(rebuild, 100);
-});
+for (const dir of ["src", "locales"]) {
+  watch(dir, { recursive: true, ignore: WATCH_IGNORE }, () => {
+    clearTimeout(timer);
+    timer = setTimeout(rebuild, 200);
+  });
+}
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {

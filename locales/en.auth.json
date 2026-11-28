@@ -1,0 +1,12 @@
+{
+  "username": "Username",
+  "displayName": "Display name",
+  "password": "Password",
+  "newPassword": "New password",
+  "login.title": "Log in",
+  "login.submit": "Log in",
+  "login.failed": "The username or password is incorrect.",
+  "login.required": "Please log in.",
+  "logout.title": "Log out",
+  "logout.submit": "Log out"
+}

@@ -10,8 +10,8 @@ export const STATUS_TEXTS: Readonly<Record<number, string>> = {
 export class HttpError extends Error {
   readonly status: number;
 
-  constructor(status: number, message: string, options?: ErrorOptions) {
-    super(message, options);
+  constructor(status: number, message?: string, options?: ErrorOptions) {
+    super(message ?? STATUS_TEXTS[status], options);
     this.status = status;
   }
 }

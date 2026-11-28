@@ -1,11 +1,10 @@
 import type { Issue } from "./types.ts";
-import { formatIssues } from "./message.ts";
 
 export class SchemaError extends Error {
   readonly issues: Issue[];
 
   constructor(issues: Issue[]) {
-    super(formatIssues(issues));
+    super(JSON.stringify(issues));
     this.name = "SchemaError";
     this.issues = issues;
   }

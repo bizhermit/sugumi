@@ -4,13 +4,19 @@
     "typeAware": true
   },
   "plugins": ["typescript", "unicorn", "oxc", "node", "promise"],
+  "jsPlugins": ["./scripts/oxlint-boundaries.ts"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
     "perf": "warn"
   },
   "rules": {
-    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-console": [
+      "warn",
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
     "no-control-regex": "off",
     "no-empty": "warn",
     "no-empty-pattern": "warn",
@@ -29,10 +35,20 @@
       }
     ],
     "prefer-const": "warn",
-    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
     "no-restricted-properties": [
       "error",
-      { "object": "process", "property": "env", "message": "環境変数はloadConfigを通して参照してください" }
+      {
+        "object": "process",
+        "property": "env",
+        "message": "環境変数はloadConfigを通して参照してください"
+      }
     ],
     "unicorn/no-empty-file": "off",
     "typescript/no-explicit-any": "error",
@@ -43,16 +59,32 @@
     "typescript/no-unsafe-return": "error",
     "typescript/no-misused-promises": "error",
     "typescript/only-throw-error": "error",
-    "typescript/prefer-promise-reject-errors": ["error", { "allowThrowingUnknown": true }],
+    "typescript/prefer-promise-reject-errors": [
+      "error",
+      {
+        "allowThrowingUnknown": true
+      }
+    ],
     "typescript/prefer-nullish-coalescing": "warn",
     "typescript/restrict-plus-operands": "error",
-    "typescript/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }]
+    "typescript/switch-exhaustiveness-check": [
+      "error",
+      {
+        "considerDefaultExhaustiveForUnions": true
+      }
+    ]
   },
   "env": {
     "node": true
   },
   "ignorePatterns": ["**/*.min.{js,mjs,cjs}"],
   "overrides": [
+    {
+      "files": ["src/**"],
+      "rules": {
+        "boundaries/imports": "error"
+      }
+    },
     {
       "files": ["src/lib/config.ts"],
       "rules": {

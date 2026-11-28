@@ -21,6 +21,6 @@ export class LazySchema<T> extends Schema<T> {
   }
 }
 
-export function lazy<T>(getter: () => Schema<T>): LazySchema<T> {
+export function $lazy<T>(getter: () => Schema<T>): LazySchema<T> {
   return new LazySchema(getter);
 }

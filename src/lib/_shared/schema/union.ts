@@ -38,7 +38,7 @@ export class UnionSchema<T extends Members, const O extends CommonOptions<any> =
   }
 }
 
-export function union<T extends Members, const O extends CommonOptions<any> = {}>(
+export function $union<T extends Members, const O extends CommonOptions<any> = {}>(
   members: T,
   options: O & CommonOptions<UnionOutput<T>> = {} as O,
 ): UnionSchema<T, O> {

@@ -48,7 +48,7 @@ describe("accounts", () => {
   });
 
   it("上限より長いパスワードは呼び出し側の検証漏れなので例外", async () => {
-    await assert.rejects(auth(`${PREFIX}user1`, "x".repeat(129)), /上限/);
+    await assert.rejects(auth(`${PREFIX}user1`, "x".repeat(129)), /最大文字数/);
   });
 
   it("同じユーザー名のアカウントは作成できない", async () => {

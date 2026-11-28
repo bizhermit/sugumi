@@ -48,7 +48,6 @@ export class StringSchema<const O extends StringOptions = {}> extends Configurab
     if (typeof value === "number" || typeof value === "boolean") {
       return String(value);
     }
-    // 電話番号は全角や長音で入力されることが多いため、半角とハイフンに揃える。
     if (typeof value === "string" && this.options.type === "tel") {
       return toHyphen(toHalfWidth(value));
     }
@@ -92,7 +91,6 @@ export class StringSchema<const O extends StringOptions = {}> extends Configurab
     if (o.maxLength != null && length > o.maxLength) {
       issues.push({ path: ctx.path, type: "error", code: "max", key: "string.max", params: { max: o.maxLength } });
     }
-    // 静的な pattern はコンストラクタで確かめている。関数が返した RegExp はここでしか確かめられない。
     if (typeof this.options.pattern === "function" && o.pattern != null && (o.pattern.global || o.pattern.sticky)) {
       throw new Error("patternにg/yフラグは使用できません。");
     }
@@ -114,7 +112,7 @@ export class StringSchema<const O extends StringOptions = {}> extends Configurab
   }
 }
 
-export function string<const O extends StringOptions = {}>(options: O & StringOptions = {} as O): StringSchema<O> {
+export function $string<const O extends StringOptions = {}>(options: O & StringOptions = {} as O): StringSchema<O> {
   return new StringSchema(options);
 }
 
@@ -206,7 +204,7 @@ export class NumberSchema<const O extends NumberOptions = {}> extends Configurab
   }
 }
 
-export function number<const O extends NumberOptions = {}>(options: O & NumberOptions = {} as O): NumberSchema<O> {
+export function $number<const O extends NumberOptions = {}>(options: O & NumberOptions = {} as O): NumberSchema<O> {
   return new NumberSchema(options);
 }
 
@@ -257,7 +255,7 @@ export class BooleanSchema<const O extends BooleanOptions = {}> extends Configur
   }
 }
 
-export function boolean<const O extends BooleanOptions = {}>(options: O & BooleanOptions = {} as O): BooleanSchema<O> {
+export function $boolean<const O extends BooleanOptions = {}>(options: O & BooleanOptions = {} as O): BooleanSchema<O> {
   return new BooleanSchema(options);
 }
 
@@ -306,7 +304,7 @@ export class DateSchema<const O extends DateOptions = {}> extends ConfigurableSc
   }
 }
 
-export function date<const O extends DateOptions = {}>(options: O & DateOptions = {} as O): DateSchema<O> {
+export function $date<const O extends DateOptions = {}>(options: O & DateOptions = {} as O): DateSchema<O> {
   return new DateSchema(options);
 }
 
@@ -383,7 +381,7 @@ export class DateTimeSchema<const O extends DateTimeOptions = {}> extends Config
   }
 }
 
-export function datetime<const O extends DateTimeOptions = {}>(
+export function $datetime<const O extends DateTimeOptions = {}>(
   options: O & DateTimeOptions = {} as O,
 ): DateTimeSchema<O> {
   return new DateTimeSchema(options);
@@ -446,7 +444,7 @@ export class TimeSchema<const O extends TimeOptions = {}> extends ConfigurableSc
   }
 }
 
-export function time<const O extends TimeOptions = {}>(options: O & TimeOptions = {} as O): TimeSchema<O> {
+export function $time<const O extends TimeOptions = {}>(options: O & TimeOptions = {} as O): TimeSchema<O> {
   return new TimeSchema(options);
 }
 
@@ -477,7 +475,7 @@ export class LiteralSchema<T extends Literal, const O extends CommonOptions<T> =
   }
 }
 
-export function literal<T extends Literal, const O extends CommonOptions<T> = {}>(
+export function $literal<T extends Literal, const O extends CommonOptions<T> = {}>(
   value: T,
   options: O & CommonOptions<T> = {} as O,
 ): LiteralSchema<T, O> {
@@ -492,7 +490,7 @@ export class AnySchema<const O extends CommonOptions<any> = {}> extends Configur
   }
 }
 
-export function any<const O extends CommonOptions<any> = {}>(options: O & CommonOptions<any> = {} as O): AnySchema<O> {
+export function $any<const O extends CommonOptions<any> = {}>(options: O & CommonOptions<any> = {} as O): AnySchema<O> {
   return new AnySchema(options);
 }
 
@@ -504,7 +502,7 @@ export class UnknownSchema<const O extends CommonOptions<unknown> = {}> extends 
   }
 }
 
-export function unknown<const O extends CommonOptions<unknown> = {}>(
+export function $unknown<const O extends CommonOptions<unknown> = {}>(
   options: O & CommonOptions<unknown> = {} as O,
 ): UnknownSchema<O> {
   return new UnknownSchema(options);

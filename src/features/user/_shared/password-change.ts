@@ -1,23 +1,19 @@
-import { jaFormMessages, s, type MessageDictionary } from "../../../lib/_shared/schema/index.ts";
+import { $object } from "../../../lib/_shared/schema/object.ts";
+import { $string } from "../../../lib/_shared/schema/primitives.ts";
 import { newPassword, password } from "../../auth/_shared/account.ts";
 
-export const passwordChangeSchema = s.object(
+export const passwordChangeSchema = $object(
   {
-    currentPassword: s.string({ ...password.options, label: "現在のパスワード" }),
+    currentPassword: $string({ ...password.options, label: "user.password.current" }),
     newPassword,
-    confirmPassword: s.string({ ...password.options, label: "新しいパスワード（確認）" }),
+    confirmPassword: $string({ ...password.options, label: "user.password.confirm" }),
   },
   {
     refine: (value) =>
       value.newPassword !== value.confirmPassword && {
         code: "mismatch",
-        key: "password.mismatch",
+        key: "user.password.mismatch",
         path: ["confirmPassword"],
       },
   },
 );
-
-export const passwordChangeMessages: MessageDictionary = {
-  ...jaFormMessages,
-  "password.mismatch": () => "新しいパスワードと一致しません",
-};

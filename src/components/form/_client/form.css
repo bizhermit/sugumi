@@ -1,9 +1,39 @@
-form {
-  display: flex;
-  flex-flow: column nowrap;
-}
+@layer component {
+  ._form {
+    display: flex;
+    flex-flow: column nowrap;
 
-.form-error {
-  display: block;
-  color: #b00020;
+    &[aria-busy="true"] {
+      button {
+        cursor: progress;
+        opacity: 0.6;
+      }
+    }
+  }
+
+  ._form-messages {
+    display: flex;
+    flex-flow: column nowrap;
+    justify-content: flex-start;
+    align-items: flex-start;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  ._form-message {
+    display: block;
+    font-size: var(--font-size-sm);
+
+    &[data-type="error"] {
+      color: #b00020;
+    }
+    &[data-type="warning"] {
+      color: #c9a400;
+    }
+    &[data-type="info"] {
+      color: #008120;
+    }
+  }
 }

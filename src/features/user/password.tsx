@@ -1,86 +1,86 @@
-import { FieldErrors } from "../../components/form/field-errors.tsx";
+import { FormMessages } from "../../components/form/form-message.tsx";
 import { Form } from "../../components/form/form.tsx";
 import { PasswordInput } from "../../components/form/password-input.tsx";
 import { appSlot } from "../../web/context.ts";
-import { validateForm, type FormErrors } from "../../web/_shared/form.ts";
-import { formSlot, inputAttributes } from "../../web/form.ts";
+import type { Issue } from "../../lib/_shared/schema/types.ts";
+import { inputAttributes, validateForm } from "../../web/_shared/form.ts";
+import { formSlot } from "../../web/form.ts";
+import { i18nSlot } from "../../web/i18n.ts";
 import { Page, page } from "../../web/html-document.tsx";
 import { changePassword, type ChangePasswordResult } from "../auth/accounts.ts";
 import { loginAccountSlot } from "../auth/login-account.ts";
 import { deleteOtherSessions, sessionSlot } from "../auth/session.ts";
-import { passwordChangeMessages, passwordChangeSchema } from "./_shared/password-change.ts";
+import { passwordChangeSchema } from "./_shared/password-change.ts";
 
 const PATH = "/user/password";
 const DONE_PARAM_NAME = "done";
 
-function failureErrors(result: Exclude<ChangePasswordResult, { status: "ok" }>): FormErrors {
+function failureIssue(result: Exclude<ChangePasswordResult, { status: "ok" }>): Issue {
   if (result.status === "wrong_password") {
-    return {
-      currentPassword: [
-        result.locksAccount
-          ? "現在のパスワードが違います。間違いが続いたため、アカウントをロックしました"
-          : "現在のパスワードが違います",
-      ],
-    };
+    const code = result.locksAccount ? "wrong_locked" : "wrong";
+    return { path: ["currentPassword"], type: "error", code, key: `user.password.${code}`, params: {} };
   }
   if (result.status === "locked") {
-    return { "": ["アカウントがロックされています。しばらくしてからやり直してください"] };
+    return { path: [], type: "error", code: "locked", key: "user.password.locked", params: {} };
   }
-  return { newPassword: ["現在のパスワードと違うものを入力してください"] };
+  return { path: ["newPassword"], type: "error", code: "same", key: "user.password.same", params: {} };
 }
 
 type PasswordPageOptions = {
   readonly message?: string;
-  readonly errors?: FormErrors;
+  readonly issues?: readonly Issue[];
   readonly status?: number;
 };
 
 function passwordPage(req: Request, options: PasswordPageOptions = {}): Page {
+  const { t } = i18nSlot.get(req);
+  const pageTitle = t("user.password.title");
+
   return page({
     status: options.status,
-    title: "パスワード変更",
+    title: (outer) => `${outer} | ${pageTitle}`,
     slots: {
       main: (
         <>
-          <h1>パスワード変更</h1>
+          <h1>{pageTitle}</h1>
           {options.message != null && <p>{options.message}</p>}
-          <FieldErrors errors={options.errors} name="" />
+          <FormMessages req={req} issues={options.issues} />
           <Form req={req} method="post" action={PATH}>
             <p>
               <label>
-                現在のパスワード{" "}
+                {t("user.password.current")}{" "}
                 <PasswordInput
                   {...inputAttributes(passwordChangeSchema, "currentPassword")}
                   name="currentPassword"
                   autocomplete="current-password"
                 />
               </label>
-              <FieldErrors errors={options.errors} name="currentPassword" />
+              <FormMessages req={req} issues={options.issues} name="currentPassword" />
             </p>
             <p>
               <label>
-                新しいパスワード{" "}
+                {t("auth.newPassword")}{" "}
                 <PasswordInput
                   {...inputAttributes(passwordChangeSchema, "newPassword")}
                   name="newPassword"
                   autocomplete="new-password"
                 />
               </label>
-              <FieldErrors errors={options.errors} name="newPassword" />
+              <FormMessages req={req} issues={options.issues} name="newPassword" />
             </p>
             <p>
               <label>
-                新しいパスワード（確認）{" "}
+                {t("user.password.confirm")}{" "}
                 <PasswordInput
                   {...inputAttributes(passwordChangeSchema, "confirmPassword")}
                   name="confirmPassword"
                   autocomplete="new-password"
                 />
               </label>
-              <FieldErrors errors={options.errors} name="confirmPassword" />
+              <FormMessages req={req} issues={options.issues} name="confirmPassword" />
             </p>
             <p>
-              <button type="submit">変更</button>
+              <button type="submit">{t("user.password.submit")}</button>
             </p>
           </Form>
         </>
@@ -91,21 +91,15 @@ function passwordPage(req: Request, options: PasswordPageOptions = {}): Page {
 
 function get(req: Request): Page {
   const done = new URL(req.url).searchParams.has(DONE_PARAM_NAME);
-  return passwordPage(req, done ? { message: "パスワードを変更しました。" } : {});
+  return passwordPage(req, done ? { message: i18nSlot.get(req).t("user.password.done") } : {});
 }
 
 async function post(req: Request): Promise<Response | Page> {
   const { db, logger, login } = appSlot.get(req);
   const account = loginAccountSlot.get(req);
-  const form = validateForm(passwordChangeSchema, formSlot.get(req), { messages: passwordChangeMessages });
-  if (form.warnings.length > 0) {
-    logger.warn("パスワード変更フォームに想定外の入力があります。", {
-      count: form.warnings.length,
-      paths: form.warnings.slice(0, 10).map((warning) => warning.path.join(".")),
-    });
-  }
+  const form = validateForm(passwordChangeSchema, formSlot.get(req));
   if (!form.ok) {
-    return passwordPage(req, { status: 400, errors: form.errors });
+    return passwordPage(req, { status: 400, issues: form.issues });
   }
 
   const result = await changePassword(db, login, account.id, form.data.currentPassword, form.data.newPassword);
@@ -114,10 +108,10 @@ async function post(req: Request): Promise<Response | Page> {
     if (result.status === "wrong_password" && result.locksAccount) {
       logger.warn("アカウントをロックしました。", { accountId: account.id });
     }
-    return passwordPage(req, { status: 400, errors: failureErrors(result) });
+    return passwordPage(req, { status: 400, issues: [failureIssue(result)] });
   }
 
-  // 他の端末でログインしたままのセッションは、パスワードを知らない第三者のものかもしれないので失効させる。
+  // 他の端末でログインしたままのセッションは、パスワードを知らない第三者が操作している可能性があるため失効させる。
   await deleteOtherSessions(db, account.id, sessionSlot.get(req).token);
   logger.info("パスワードを変更しました。", { accountId: account.id });
   return new Response(null, { status: 303, headers: { Location: `${PATH}?${DONE_PARAM_NAME}` } });

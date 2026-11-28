@@ -1,0 +1,12 @@
+{
+  "username": "ユーザー",
+  "displayName": "表示名",
+  "password": "パスワード",
+  "newPassword": "新しいパスワード",
+  "login.title": "ログイン",
+  "login.submit": "ログイン",
+  "login.failed": "ユーザー名またはパスワードが違います。",
+  "login.required": "ログインしてください。",
+  "logout.title": "ログアウト",
+  "logout.submit": "ログアウト"
+}

@@ -11,7 +11,7 @@ import {
 import type { DataBase } from "../../../src/lib/db.ts";
 import { deleteAccounts, prepareTestDb } from "../helpers/db.ts";
 import { TEST_SESSION_LIMITS } from "../helpers/limits.ts";
-import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/return-to.ts";
+import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/_shared/login.ts";
 
 const PREFIX = "test-session-";
 const MINUTE_MS = 60 * 1000;

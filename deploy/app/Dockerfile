@@ -8,6 +8,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
 COPY src/ ./src/
+COPY locales/ ./locales/
 COPY scripts/build-assets.ts ./scripts/
 # dependenciesが空だとnode_modules/が作られず、後のCOPYが失敗するため、空でも作っておく。
 RUN npx tsc -p tsconfig.build.json \

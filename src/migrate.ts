@@ -28,12 +28,16 @@ async function getMigrations(): Promise<Migration[]> {
   return result;
 }
 
+const CREATE_MIGRATIONS_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  name varchar(120) PRIMARY KEY
+, applied_at timestamptz NOT NULL DEFAULT now()
+)`;
+
 async function migrate(db: Client, migrations: readonly Migration[]) {
   await db.query("BEGIN");
   await db.query("SELECT pg_advisory_xact_lock(7316001)");
-  await db.query(
-    "CREATE TABLE IF NOT EXISTS schema_migrations (name varchar(120) PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())",
-  );
+  await db.query(CREATE_MIGRATIONS_TABLE_SQL);
   await db.query("REVOKE INSERT, UPDATE, DELETE ON schema_migrations FROM app");
 
   const { rows } = await db.query<{ name: string }>("SELECT name from schema_migrations");

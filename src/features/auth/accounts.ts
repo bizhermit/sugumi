@@ -115,7 +115,7 @@ WHERE
 export async function authenticate(db: DataBase, limits: LoginLimits, input: AuthInput): Promise<AuthResult> {
   const { username, password, remoteAddress, deviceToken, userAgent } = input;
   if (graphemeLength(password) > passwordField.options.maxLength) {
-    throw new Error(`パスワードが上限（${passwordField.options.maxLength}文字）を超えています。`);
+    throw new Error(`パスワードが最大文字数（${passwordField.options.maxLength}）を超えています。`);
   }
   const now = new Date();
   const trustedDevice = await reserveDeviceAttempt(db, limits, deviceToken, username, now);

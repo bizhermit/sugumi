@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { Schema, s, walk, type FieldInfo } from "../../../../../src/lib/_shared/schema/index.ts";
+import { $array } from "../../../../../src/lib/_shared/schema/array.ts";
 import { fail, ok, type InternalResult } from "../../../../../src/lib/_shared/schema/error.ts";
+import { $intersection } from "../../../../../src/lib/_shared/schema/intersection.ts";
+import { walk, type FieldInfo } from "../../../../../src/lib/_shared/schema/introspect.ts";
+import { $object } from "../../../../../src/lib/_shared/schema/object.ts";
+import { $number, $string } from "../../../../../src/lib/_shared/schema/primitives.ts";
+import { $record } from "../../../../../src/lib/_shared/schema/record.ts";
+import { Schema } from "../../../../../src/lib/_shared/schema/schema.ts";
+import { $tuple } from "../../../../../src/lib/_shared/schema/tuple.ts";
 import type { ParseContext } from "../../../../../src/lib/_shared/schema/types.ts";
+import { $union } from "../../../../../src/lib/_shared/schema/union.ts";
 
 /** 成功にwarningを添える独自スキーマ。 */
 class WarnOnEmptyString extends Schema<string> {
@@ -26,7 +34,7 @@ describe("severity", () => {
   });
 
   it("入れ子のwarningはobjectを通して上がる", () => {
-    const schema = s.object({ name: new WarnOnEmptyString() });
+    const schema = $object({ name: new WarnOnEmptyString() });
     const result = schema.safeParse({ name: "" });
     assert.ok(result.success);
     assert.equal(result.issues?.length, 1);
@@ -34,7 +42,7 @@ describe("severity", () => {
   });
 
   it("errorが1つでもあれば失敗する", () => {
-    const schema = s.object({ name: new WarnOnEmptyString(), age: s.number({ required: true }) });
+    const schema = $object({ name: new WarnOnEmptyString(), age: $number({ required: true }) });
     assert.equal(schema.safeParse({ name: "", age: "x" }).success, false);
   });
 });
@@ -45,8 +53,8 @@ function byPath(fields: FieldInfo[], path: (string | number)[]): FieldInfo | und
 
 describe("walk", () => {
   it("末端の項目のtypeNameとoptionsを返す", () => {
-    const user = s.object({
-      name: s.string({ required: true, label: "名前", minLength: 1, maxLength: 20 }),
+    const user = $object({
+      name: $string({ required: true, label: "名前", minLength: 1, maxLength: 20 }),
     });
     const fields = walk(user);
     assert.equal(fields.length, 1);
@@ -56,16 +64,16 @@ describe("walk", () => {
   });
 
   it("入れ子のobjectはキーをpathにして辿る", () => {
-    const schema = s.object({ profile: s.object({ age: s.number({ required: true, min: 0 }) }) });
+    const schema = $object({ profile: $object({ age: $number({ required: true, min: 0 }) }) });
     const field = byPath(walk(schema), ["profile", "age"]);
     assert.equal(field?.typeName, "number");
     assert.deepEqual(field?.options, { required: true, min: 0 });
   });
 
   it("array/recordは自身を1項目として出し、要素のスキーマをpathに添字0を入れて辿る", () => {
-    const schema = s.object({
-      tags: s.array(s.string({ required: true, maxLength: 10 }), { required: true, minLength: 1 }),
-      scores: s.record(s.number({ required: true })),
+    const schema = $object({
+      tags: $array($string({ required: true, maxLength: 10 }), { required: true, minLength: 1 }),
+      scores: $record($number({ required: true })),
     });
     const fields = walk(schema);
     assert.equal(fields.length, 4);
@@ -77,22 +85,22 @@ describe("walk", () => {
   });
 
   it("tupleは自身を1項目として出し、位置をpathにして辿る", () => {
-    const fields = walk(s.tuple([s.number({ required: true }), s.string({ required: true })], { required: true }));
+    const fields = walk($tuple([$number({ required: true }), $string({ required: true })], { required: true }));
     assert.equal(byPath(fields, [])?.typeName, "tuple");
     assert.equal(byPath(fields, [0])?.typeName, "number");
     assert.equal(byPath(fields, [1])?.typeName, "string");
   });
 
   it("intersectionは合成する各objectの項目を同じ階層に並べる", () => {
-    const hasId = s.object({ id: s.number({ required: true }) }, { required: true });
-    const hasName = s.object({ name: s.string({ required: true }) }, { required: true });
-    const fields = walk(s.intersection([hasId, hasName]));
+    const hasId = $object({ id: $number({ required: true }) }, { required: true });
+    const hasName = $object({ name: $string({ required: true }) }, { required: true });
+    const fields = walk($intersection([hasId, hasName]));
     assert.equal(byPath(fields, ["id"])?.typeName, "number");
     assert.equal(byPath(fields, ["name"])?.typeName, "string");
   });
 
   it("unionは展開せず1項目として扱う", () => {
-    const fields = walk(s.object({ value: s.union([s.string({ required: true }), s.number({ required: true })]) }));
+    const fields = walk($object({ value: $union([$string({ required: true }), $number({ required: true })]) }));
     assert.equal(fields.length, 1);
     assert.equal(byPath(fields, ["value"])?.typeName, "union");
   });

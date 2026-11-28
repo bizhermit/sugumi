@@ -19,9 +19,6 @@ export abstract class Schema<Output> {
 
   abstract _parse(input: unknown, ctx: ParseContext): InternalResult<Output>;
 
-  /**
-   * 失敗したら SchemaError を投げる。
-   */
   parse(input: unknown, options: ParseOptions = {}): Output {
     const result = this._parse(input, rootContext(input, options));
     if (!result.success) throw new SchemaError(result.issues);
@@ -48,14 +45,8 @@ export function allowsNull(required: RequiredOption | undefined): boolean {
 
 type DynamicFunction = (ctx: ParseContext) => unknown;
 
-// pick や partial で派生した options は `Omit<O, ...> & CommonOptions` になり、TS がそれを `true & 関数` のような
-// 実在しない型を含む union に展開する。また関数は object に含まれるため、先に取り除かないと動的な required が必須として扱われる。
 type StaticRequired<R> = Exclude<R, DynamicFunction>;
 
-/**
- * options に書いた required から、値の型に使う required を取り出す。
- * 関数（動的）は、実行時に必須でなくなりうるので false として扱う。
- */
 export type RequiredOf<O> = O extends { readonly required: infer R }
   ? [StaticRequired<R>] extends [never]
     ? false
@@ -79,8 +70,11 @@ export type Resolved<O> = {
 };
 
 /**
- * スキーマが持つ options の型。渡した項目は書いたとおりの型、省略した項目は All の型で読める。
- * instanceof で絞り込むと型引数が any になるので、そのときは All にする。
+ * スキーマが持つ options の型。
+ * - 渡した項目: 書いたとおりの型
+ * - 省略した項目: All の型
+ *
+ * ※ instanceof で絞り込むと型引数が any になるため、そのときは All にする。
  */
 export type Options<O, All> = 0 extends 1 & O ? All : O & Omit<All, keyof O>;
 
@@ -102,7 +96,6 @@ export interface CommonOptions<T> {
 
 type OptionalOptions<T, O> = Omit<O, "required" | "default"> & { readonly required: false } & CommonOptions<T>;
 
-// refine と default は関数で書くものなので、動的な制約とは区別する。
 const NON_DYNAMIC_KEYS: ReadonlySet<string> = new Set(["refine", "default"]);
 
 function dynamicKeys(options: object): string[] {
@@ -122,9 +115,6 @@ export abstract class ConfigurableSchema<T, O extends CommonOptions<T>> extends 
     this.dynamicKeys = dynamicKeys(options);
   }
 
-  /**
-   * 動的な option を今の入力で値に直す。動的な option がなければ options そのものを返す。
-   */
   resolve(ctx: ParseContext): Resolved<this["options"]> {
     if (this.dynamicKeys.length === 0) return this.options as Resolved<this["options"]>;
     const resolved: Record<string, unknown> = { ...this.options };
@@ -158,7 +148,6 @@ export abstract class ConfigurableSchema<T, O extends CommonOptions<T>> extends 
   private withLabel(issue: Issue, ctx: ParseContext): Issue {
     const label = this.options.label;
     if (label == null || issue.path.length !== ctx.path.length) return issue;
-    // pathが長いissueは子から上がってきたものであるため、子のlabelを親のlabelで上書きしない。
     return { ...issue, params: { ...issue.params, label } };
   }
 

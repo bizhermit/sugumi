@@ -5,7 +5,7 @@ import { createAccount } from "../../../src/features/auth/accounts.ts";
 import type { DataBase } from "../../../src/lib/db.ts";
 import { deleteAccounts, deleteAddressFailures, prepareTestDb } from "../helpers/db.ts";
 import { startTestServer, type TestServer } from "../helpers/server.ts";
-import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/return-to.ts";
+import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/_shared/login.ts";
 
 const PREFIX = "test-login-";
 const USERNAME = `${PREFIX}user1`;
@@ -111,7 +111,7 @@ describe("login", () => {
       const res = await post("/login", { csrf }, { _csrf: csrf, ...fields, to: "/settings" });
       assert.equal(res.status, 400);
       const html = await res.text();
-      assert.match(html, /class="form-error"/);
+      assert.match(html, /class="_form-message" data-type="error"/);
       assert.match(html, /name="to" value="\/settings"/);
       assert.equal(cookieValue(res, "session"), undefined);
     });

@@ -16,7 +16,6 @@ export class EnumSchema<
   }
 
   acceptsEmptyString(): boolean {
-    // 選択肢に""があるときだけ空文字を値として受け付ける。
     return this.values.includes("");
   }
 
@@ -36,7 +35,7 @@ export class EnumSchema<
   }
 }
 
-export function enumType<T extends readonly [string, ...string[]], const O extends CommonOptions<any> = {}>(
+export function $enum<T extends readonly [string, ...string[]], const O extends CommonOptions<any> = {}>(
   values: T,
   options: O & CommonOptions<T[number]> = {} as O,
 ): EnumSchema<T, O> {

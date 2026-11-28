@@ -1,17 +1,19 @@
-import { FieldErrors } from "../../components/form/field-errors.tsx";
+import { FormMessages } from "../../components/form/form-message.tsx";
 import { Form } from "../../components/form/form.tsx";
 import { PasswordInput } from "../../components/form/password-input.tsx";
 import { asset } from "../../web/assets.ts";
 import { appSlot } from "../../web/context.ts";
 import { createCsrfCookie, createCsrfToken } from "../../web/csrf.ts";
-import { validateForm, type FormErrors } from "../../web/_shared/form.ts";
-import { formSlot, inputAttributes } from "../../web/form.ts";
+import type { Issue } from "../../lib/_shared/schema/types.ts";
+import { inputAttributes, validateForm } from "../../web/_shared/form.ts";
+import { formSlot } from "../../web/form.ts";
+import { i18nSlot } from "../../web/i18n.ts";
 import { Page, page } from "../../web/html-document.tsx";
 import { remoteAddressSlot } from "../../web/remote-address.ts";
-import { loginSchema, RETURN_TO_PARAM_NAME } from "./_shared/login.ts";
+import { DEFAULT_RETURN_PATH, loginSchema, RETURN_TO_PARAM_NAME } from "./_shared/login.ts";
 import { authenticate } from "./accounts.ts";
 import { deviceCookie, readDeviceToken, readUserAgent } from "./login-devices.ts";
-import { DEFAULT_RETURN_PATH, toReturnPath } from "./return-to.ts";
+import { toReturnPath } from "./return-to.ts";
 import { createSession, deleteSession, findSession, sessionCookie } from "./session.ts";
 
 const styles = [asset(import.meta.resolve("./_client/login.css"))];
@@ -20,26 +22,29 @@ type LoginPageOptions = {
   readonly username?: string;
   readonly returnTo?: string;
   readonly message?: string;
-  readonly errors?: FormErrors;
+  readonly issues?: readonly Issue[];
   readonly status?: number;
 };
 
 function loginPage(req: Request, options: LoginPageOptions = {}) {
+  const { t } = i18nSlot.get(req);
+  const pageTitle = t("auth.login.title");
+
   return page({
     status: options.status,
-    title: "ログイン",
+    title: (outer) => `${outer} | ${pageTitle}`,
     styles,
     slots: {
       main: (
         <main>
-          <h1>ログイン</h1>
+          <h1>{pageTitle}</h1>
           {options.message != null && <p className="login-message">{options.message}</p>}
-          <FieldErrors errors={options.errors} name="" />
+          <FormMessages req={req} issues={options.issues} />
           <Form req={req} method="post" action="/login" className="login-form">
             {options.returnTo != null && <input type="hidden" name={RETURN_TO_PARAM_NAME} value={options.returnTo} />}
             <p>
               <label>
-                ユーザー{" "}
+                <span>{t("auth.username")}</span>
                 <input
                   {...inputAttributes(loginSchema, "username")}
                   name="username"
@@ -47,21 +52,21 @@ function loginPage(req: Request, options: LoginPageOptions = {}) {
                   value={options.username ?? ""}
                 />
               </label>
-              <FieldErrors errors={options.errors} name="username" />
+              <FormMessages req={req} issues={options.issues} name="username" />
             </p>
             <p>
               <label>
-                パスワード{" "}
+                <span>{t("auth.password")}</span>
                 <PasswordInput
                   {...inputAttributes(loginSchema, "password")}
                   name="password"
                   autocomplete="current-password"
                 />
               </label>
-              <FieldErrors errors={options.errors} name="password" />
+              <FormMessages req={req} issues={options.issues} name="password" />
             </p>
             <p>
-              <button type="submit">ログイン</button>
+              <button type="submit">{t("auth.login.submit")}</button>
             </p>
           </Form>
         </main>
@@ -78,17 +83,11 @@ function get(req: Request): Page {
 async function post(req: Request): Promise<Response | Page> {
   const { db, logger, login, session } = appSlot.get(req);
   const form = validateForm(loginSchema, formSlot.get(req));
-  if (form.warnings.length > 0) {
-    logger.warn("ログインフォームに想定外の入力があります。", {
-      count: form.warnings.length,
-      paths: form.warnings.slice(0, 10).map((warning) => warning.path.join(".")),
-    });
-  }
   if (!form.ok) {
     const returnTo = toReturnPath(form.values[RETURN_TO_PARAM_NAME]);
     return loginPage(req, {
       status: 400,
-      errors: form.errors,
+      issues: form.issues,
       ...(form.values.username == null ? {} : { username: form.values.username }),
       ...(returnTo == null ? {} : { returnTo }),
     });
@@ -105,7 +104,6 @@ async function post(req: Request): Promise<Response | Page> {
     userAgent: readUserAgent(req),
   });
   if (result.status !== "ok") {
-    // 失敗の種類は画面に出さず、ログに残す。ロックと遮断の開始は運用で気付けるようwarnにする。
     const accountId = "accountId" in result ? result.accountId : undefined;
     logger.info("ログインに失敗しました。", { reason: result.status, accountId, remoteAddress });
     if (result.status === "wrong_password" && result.locksAccount) {
@@ -117,15 +115,16 @@ async function post(req: Request): Promise<Response | Page> {
     return loginPage(req, {
       status: 401,
       username,
-      message: "ユーザー名またはパスワードが違います。",
+      message: i18nSlot.get(req).t("auth.login.failed"),
       ...(returnTo == null ? {} : { returnTo }),
     });
   }
 
-  const previous = await findSession(db, session, req);
-  if (previous != null) {
-    await deleteSession(db, previous.token);
+  const previousSession = await findSession(db, session, req);
+  if (previousSession != null) {
+    await deleteSession(db, previousSession.token);
   }
+
   const { account, device } = result;
   const token = await createSession(db, session, account.id);
   logger.info("ログインしました。", { accountId: account.id, newDevice: device.isNew, remoteAddress });

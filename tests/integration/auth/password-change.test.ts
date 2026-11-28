@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { newPassword } from "../../../src/features/auth/_shared/account.ts";
 import { createAccount } from "../../../src/features/auth/accounts.ts";
-import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/return-to.ts";
+import { DEFAULT_RETURN_PATH } from "../../../src/features/auth/_shared/login.ts";
 import type { DataBase } from "../../../src/lib/db.ts";
 import { deleteAccounts, deleteAddressFailures, prepareTestDb } from "../helpers/db.ts";
 import { TEST_LOGIN_LIMITS } from "../helpers/limits.ts";
@@ -110,30 +110,35 @@ describe("password change", () => {
     }
   });
 
-  for (const [label, fields, message] of [
+  for (const [label, fields, name, message] of [
     [
       "現在のパスワードが空",
       { currentPassword: "", newPassword: NEW_PASSWORD, confirmPassword: NEW_PASSWORD },
+      "currentPassword",
       "現在のパスワードを入力してください",
     ],
     [
       "新しいパスワードが最小文字数に満たない",
       { currentPassword: PASSWORD, newPassword: "p".repeat(newPassword.options.minLength - 1), confirmPassword: "p" },
+      "newPassword",
       `新しいパスワードは${newPassword.options.minLength}文字以上で入力してください`,
     ],
     [
       "確認が一致しない",
       { currentPassword: PASSWORD, newPassword: NEW_PASSWORD, confirmPassword: `${NEW_PASSWORD}x` },
+      "confirmPassword",
       "新しいパスワードと一致しません",
     ],
     [
       "現在のパスワードが違う",
       { currentPassword: "wrong-pass", newPassword: NEW_PASSWORD, confirmPassword: NEW_PASSWORD },
+      "currentPassword",
       "現在のパスワードが違います",
     ],
     [
       "新しいパスワードが現在と同じ",
       { currentPassword: PASSWORD, newPassword: PASSWORD, confirmPassword: PASSWORD },
+      "newPassword",
       "現在のパスワードと違うものを入力してください",
     ],
   ] as const) {
@@ -142,7 +147,13 @@ describe("password change", () => {
       const res = await change(auth, fields);
       assert.equal(res.status, 400);
       const html = await res.text();
-      assert.match(html, new RegExp(`<span class="form-error">${message}</span>`));
+      // 同じ欄に別のメッセージが先に並んでいても通す。
+      assert.match(
+        html,
+        new RegExp(
+          `<div class="_form-messages" data-name="${name}">(?:<span[^>]*>[^<]*</span>)*<span class="_form-message" data-type="error">${message}</span>`,
+        ),
+      );
       assert.equal((await login(USERNAME, PASSWORD)).status, 303);
     });
   }

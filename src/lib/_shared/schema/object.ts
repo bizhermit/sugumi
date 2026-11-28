@@ -19,7 +19,6 @@ type DeepPartialField<F extends Schema<any>> =
 
 type DeepPartialShape<S extends Shape> = { [K in keyof S]: DeepPartialField<S[K]> };
 
-// shape を変えて派生するときは、元の shape の値を前提にした refine と default を引き継がない。
 type DerivedOptions<O> = Omit<O, "refine" | "default"> & CommonOptions<any>;
 
 export class ObjectSchema<S extends Shape, const O extends CommonOptions<any> = {}> extends ConfigurableSchema<
@@ -54,7 +53,7 @@ export class ObjectSchema<S extends Shape, const O extends CommonOptions<any> = 
 
     for (const key of Object.keys(this.shape)) {
       const fieldSchema = this.shape[key]!;
-      // プロトタイプ鎖の値（constructor など）を項目の値として読まない。
+      // プロトタイプ（constructor など）を項目の値として読まない。
       const has = Object.hasOwn(record, key);
       const result = fieldSchema._parse(has ? record[key] : undefined, { ...ctx, path: [...ctx.path, key] });
       if (result.success) {
@@ -68,7 +67,7 @@ export class ObjectSchema<S extends Shape, const O extends CommonOptions<any> = 
     for (const key of Object.keys(record)) {
       if (!Object.hasOwn(this.shape, key)) {
         issues.push({
-          path: [...ctx.path, key],
+          path: ctx.path,
           type: "warning",
           code: "unknown_key",
           key: "object.unknown_key",
@@ -122,7 +121,7 @@ export class ObjectSchema<S extends Shape, const O extends CommonOptions<any> = 
   }
 }
 
-export function object<S extends Shape, const O extends CommonOptions<any> = {}>(
+export function $object<S extends Shape, const O extends CommonOptions<any> = {}>(
   shape: S,
   options: O & CommonOptions<InferShape<S>> = {} as O,
 ): ObjectSchema<S, O> {

@@ -49,7 +49,6 @@ export class ArraySchema<T, const O extends ArrayOptions<T> = {}> extends Config
     if (o.maxLength != null && value.length > o.maxLength) {
       lengthIssues.push({ path: ctx.path, type: "error", code: "max", key: "array.max", params: { max: o.maxLength } });
     }
-    // 要素数が合わないときは要素を見ない。上限を超えた配列の全要素を検証して、issueを量産しないため。
     if (lengthIssues.length > 0) return fail(lengthIssues);
 
     const output: T[] = [];
@@ -70,7 +69,7 @@ export class ArraySchema<T, const O extends ArrayOptions<T> = {}> extends Config
   }
 }
 
-export function array<T, const O extends ArrayOptions<T> = {}>(
+export function $array<T, const O extends ArrayOptions<T> = {}>(
   element: Schema<T>,
   options: O & ArrayOptions<T> = {} as O,
 ): ArraySchema<T, O> {

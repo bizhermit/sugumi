@@ -1,3 +1,4 @@
+import type { I18nAddon } from "../lib/_shared/i18n.ts";
 import { Page, type Layout } from "./html-document.tsx";
 
 export type RouteHandler = (req: Request) => Response | Page | Promise<Response | Page>;
@@ -9,6 +10,7 @@ export type Method = (typeof METHODS)[number];
 
 export type Route = Readonly<Partial<Record<Method, RouteHandler>>> & {
   readonly middleware?: readonly Middleware[];
+  readonly i18n?: readonly I18nAddon[];
 };
 
 export type RouteMap = Readonly<Record<string, Route>>;
@@ -45,7 +47,7 @@ export function layout(def: Layout, routes: RouteMap): RouteMap {
         };
       }
     }
-    result[key] = { ...route, ...wrapped };
+    result[key] = { ...route, ...wrapped, i18n: [...(def.i18n ?? []), ...(route.i18n ?? [])] };
   }
   return result;
 }

@@ -62,7 +62,7 @@ export class TupleSchema<T extends Elements, const O extends CommonOptions<any> 
   }
 }
 
-export function tuple<T extends Elements, const O extends CommonOptions<any> = {}>(
+export function $tuple<T extends Elements, const O extends CommonOptions<any> = {}>(
   elements: T,
   options: O & CommonOptions<TupleOutput<T>> = {} as O,
 ): TupleSchema<T, O> {

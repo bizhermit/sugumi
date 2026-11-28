@@ -34,7 +34,7 @@ export async function transaction<T>(db: DataBase, fn: (client: PoolClient) => P
       await client.query("ROLLBACK");
       client.release();
     } catch {
-      // ROLLBACK できない接続は壊れているのでプールに戻さず捨てる。投げるのは元の例外。
+      // ROLLBACKできない接続は壊れているため、プールに戻さず捨てる。投げるのは元の例外。
       client.release(true);
     }
     throw err;

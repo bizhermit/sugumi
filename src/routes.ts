@@ -2,6 +2,7 @@ import { layout, middleware, prefix, type RouteMap } from "./web/routes.ts";
 import * as index from "./features/index.ts";
 import * as healthz from "./features/healthz.ts";
 import * as login from "./features/auth/login.tsx";
+import { authLayout } from "./features/auth/layout.tsx";
 import * as authMiddleware from "./features/auth/middleware.ts";
 import * as home from "./features/user/home.tsx";
 import * as settings from "./features/user/settings.tsx";
@@ -18,10 +19,12 @@ export const routes = layout(rootLayout, {
   "/healthz": {
     GET: healthz.get,
   },
-  "/login": {
-    GET: login.get,
-    POST: login.post,
-  },
+  ...layout(authLayout, {
+    "/login": {
+      GET: login.get,
+      POST: login.post,
+    },
+  }),
   ...layout(
     userLayout,
     middleware([authMiddleware.requireLogin], {

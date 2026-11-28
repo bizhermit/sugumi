@@ -13,6 +13,7 @@ export type Assets = {
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
 };
 
 type Asset = {
@@ -37,6 +38,7 @@ const DEFAULT_CACHE = {
 
 const PUBLIC_DIR = fileURLToPath(new URL("../../public/", import.meta.url));
 const SRC_DIR = fileURLToPath(new URL("../", import.meta.url));
+const CLIENT_DIRECTORY = /(^|\/)_client\//;
 
 function loadAssets(dir: string): Map<string, Asset> {
   let entries;
@@ -65,6 +67,14 @@ function loadAssets(dir: string): Map<string, Asset> {
 const assets = loadAssets(PUBLIC_DIR);
 const caches = new Map<string, AssetCache>();
 
+function assetUrl(name: string, found: Asset): string {
+  return `${ASSETS_PREFIX}${name}?v=${found.hash}`;
+}
+
+export function listAssets(): { readonly name: string; readonly body: Buffer; readonly url: string }[] {
+  return [...assets].map(([name, found]) => ({ name, body: found.body, url: assetUrl(name, found) }));
+}
+
 function cacheControl(cache: AssetCache): string {
   if (cache.maxAge <= 0) {
     return "no-cache";
@@ -84,7 +94,6 @@ export function serveAsset(req: Request, url: URL): Response {
 
   const headers = new Headers({ "content-type": found.contentType, etag: `"${found.hash}"` });
   // asset()のURLは内容が変わるとvの値も変わるため、キャッシュを破棄させる必要はない。
-  // vがなければ毎回ETagで確かめさせる。
   headers.set(
     "cache-control",
     url.searchParams.get("v") === found.hash ? cacheControl(caches.get(name) ?? DEFAULT_CACHE) : "no-cache",
@@ -103,15 +112,12 @@ export function serveAsset(req: Request, url: URL): Response {
  */
 export function asset(file: string, options: AssetOptions = {}): string {
   const path = fileURLToPath(file);
-  if (!path.startsWith(SRC_DIR)) {
+  const source = relative(SRC_DIR, path).split(sep).join("/");
+  if (!path.startsWith(SRC_DIR) || !CLIENT_DIRECTORY.test(source)) {
     throw new Error(`アセットのパスが不正です: ${file}`);
   }
 
-  const name = relative(SRC_DIR, path)
-    .split(sep)
-    .join("/")
-    .replace(/(^|\/)_client\//, "$1")
-    .replace(/\.ts$/, ".js");
+  const name = source.replace(CLIENT_DIRECTORY, "$1").replace(/\.ts$/, ".js");
   const found = assets.get(name);
   if (found == null) {
     throw new Error(`アセットが存在しません: ${name}`);
@@ -124,5 +130,5 @@ export function asset(file: string, options: AssetOptions = {}): string {
     }
     caches.set(name, options.cache);
   }
-  return `${ASSETS_PREFIX}${name}?v=${found.hash}`;
+  return assetUrl(name, found);
 }
